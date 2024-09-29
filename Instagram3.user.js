@@ -30,6 +30,7 @@
 			});
 	}
 
+	// return YYYYMMYYHHMMSS
 	function formatDateForFilename(d=throwExp('date')){
 		let parts = "FullYear,Month,Date,Hours,Minutes,Seconds".split(',').map(x=>d['get'+x]());
 		parts[1]++; // month++
@@ -155,10 +156,9 @@
 			}
 		}
 
-
 		onScan_UpdateFollowingLikedLastUpload(batch){
 
-			batch.forEach(({owner,following,liked,date})=>{ 
+			batch.forEach(({owner,following,liked,date})=>{
 				if(following || this.userRepo.containsKey(owner)){
 					const dateMs=date.valueOf();
 					this.userRepo.update(owner,x=>{
@@ -290,24 +290,25 @@
 		}
 
 		handle = (x) => {
-			const {url,body,responseText,id} = x;
+			const {url,body} = x;
 			if(this.matches(url,body)){
-				this.processResponseText(responseText,id);
+				this.processResponse(x);
 				x.handled = this.constructor["name"];
 			}
 		}
 
-		processResponseText(responseText,id){
+		processResponse(x){
+			const {responseText,id} = x;
 			try{
 				const json = JSON.parse(responseText);
 				// array of PicGroup
-				const picGroups = this.findMediaArray(json)
+				const batch = this.findMediaArray(json)
 					.map(PicGroup.fromMediaWithUser);
 
-				this.lastBatch = picGroups;
+				this.lastBatch = x.batch = batch; // trigger event
 
-				if(0 < picGroups.length){
-					const msg = `${this.constructor.name} extracted %c${picGroups.length}%c pic groups from json.`;
+				if(batch.length){
+					const msg = `${this.constructor.name} extracted %c${batch.length}%c pic groups from json.`;
 					console.debug(msg,'background:green;color:white;font-size:18px;','color:black;background:white;font-size:12px;');
 				}
 
@@ -353,12 +354,12 @@
 		static configurations = {
 
 			// Users "Posts" tab
-			"PolarisProfilePostsQuery":GQL1, // initial
-			"PolarisProfilePostsTabContentQuery_connection":GQL1, // scrolling down
+			"PolarisProfilePostsQuery":{simple:"Post-0", mainPropName:GQL1}, // initial
+			"PolarisProfilePostsTabContentQuery_connection":{simple:"Post-n", mainPropName:GQL1}, // scrolling down
 
 			// Tagged Tab 
-			"PolarisProfileTaggedTabContentQuery":GQL2, // initial
-			"PolarisProfileTaggedTabContentQuery_connection":GQL2 // more
+			"PolarisProfileTaggedTabContentQuery":{simple:"Tag-0", mainPropName:GQL2}, // initial
+			"PolarisProfileTaggedTabContentQuery_connection":{simple:"Tag-N", mainPropName:GQL2} // more
 
 			// "PolarisProfilePostsTabContentQuery_connection":GQL1,
 
@@ -371,11 +372,14 @@
 		handle = (x) => {
 			const {url:{pathname},body,responseText,id} = x;
 			if( this.matchesPath(pathname) ){
-				x.friendlyName = new URLSearchParams(body).get('fb_api_req_friendly_name');
+				x.bodyParams = new URLSearchParams(body);
+				x.friendlyName = x.bodyParams.get('fb_api_req_friendly_name');
 
-				if( this.matchesFriendlyName(x.friendlyName) ){
-					x.handled = `${this.constructor["name"]}-${x.friendlyName}`;
-					this.processResponseText(responseText,id);
+				if( x.friendlyName in GraphQLExtractor.configurations ){
+					const {simple,mainPropName} = GraphQLExtractor.configurations[x.friendlyName];
+					this.mainPropName = mainPropName;
+					x.handled = `${this.constructor["name"]}-${simple}`;
+					this.processResponse(x);
 				}
 			}
 		}
@@ -383,12 +387,6 @@
 		matchesPath(pathname){
 			return pathname=='/api/graphql'   // old way
 				|| pathname=='/graphql/query'; // new way
-		}
-		matchesFriendlyName(friendlyName){
-			const matches = friendlyName in GraphQLExtractor.configurations;
-			if(matches)
-				this.dataPropName = GraphQLExtractor.configurations[friendlyName];
-			return matches;
 		}
 
 		findMediaArray(json){
@@ -398,7 +396,8 @@
 					console.log("Query error",json);
 					return [];
 				}
-				return data[this.dataPropName].edges
+				const dataProp = data[this.mainPropName];
+				return dataProp.edges
 					.map(edge=>edge.node);
 			}
 			catch(ex){
@@ -711,18 +710,28 @@
 	// =============
 	function trackKeyPresses({iiLookup}){
 
-		unsafeWindow.addEventListener('keydown',function({which}){
+		unsafeWindow.addEventListener('keydown',function({which,repeat,ctrlKey,altKey,shiftKey}){
+			if(repeat) return;
 			switch(which) {
-				case 32: {// ' '
+				case 32: {// ' ' - download image under mouse
 					const {singleImage,imgUrl} = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
 					singleImage.downloadAsync(imgUrl);
 					} break;
-				case 85: {// 'u'
+				case 68: // 'd'
+					simpleDownloadImageUnderPoint(mousePos);
+					break;
+				case 70: // 'f'
+					break;
+				case 84: {// 't' - show Tagged Users under mouse
 					let {singleImage:{owner:imgOwner,taggedUsers}} = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
 					console.log(imgOwner,taggedUsers);
 					} break;
-				case 68: // 'd'
-					simpleDownloadImageUnderPoint(mousePos);
+				case 85: // 'u' - Save Users
+					if(ctrlKey && shiftKey){
+						const filename = `users_instagram_${formatDateForFilename(new Date())}.json`;
+						saveTextToFile(localStorage.users,filename);
+						console.log("localStorage.users save to "+filename);
+					}
 					break;
 				default:
 					console.debug('which:',which);
@@ -868,7 +877,7 @@
 			const a = sanitizeImgUrl(img.src);
 			const b = sanitizeImgUrl(picGroup.pics[0].imgUrls[0]);
 			if( a != b )
-				console.error("Group urls do not match", imgIndex, a, b);
+				console.warn("Group urls do not match", a, b);
 
 			img.parentNode.style.position='relative';
 
@@ -912,7 +921,6 @@
 						border:"thick solid black",
 					}
 					const rowsNeeded = Math.floor((pics.length-1) / numPerRow) + 1;
-					console.log('rows needed',rowsNeeded);
 					pics.forEach((si,index) => {
 						const newImg = document.createElement('IMG');
 						newImg.setAttribute('src',si.imgUrls[0])
@@ -920,7 +928,6 @@
 						const colIndex = index % numPerRow, rowIndex = (index - colIndex)/numPerRow;
 						newImg.style.left = (colIndex*clipSize)+"px";
 						const useRow = (rowsNeeded-rowIndex-1);
-						console.log(rowIndex,rowsNeeded,useRow)
 						newImg.style.bottom = (useRow*clipSize)+"px";
 						img.parentNode.appendChild(newImg);
 					})
@@ -929,6 +936,13 @@
 
 		}
 
+	}
+
+	function saveTextToFile(text,filename){
+		var a = document.createElement("a");
+		a.href = "data:text,"+text;
+		a.download = filename;
+		a.click();
 	}
 
 	// ===============
@@ -1017,6 +1031,7 @@
 
 		const snooper = buildRequestSnooper();
 		const iiLookup = new ImageLookupByUrl(snooper._loadLog);
+		const userService = new UserService({userRepo});
 
 		const gallery = new Gallery(startingState.lastVisit);
 
@@ -1060,8 +1075,30 @@
 		snooper.addHandler( new UnfollowTracker(userRepo).track );
 		snooper.addHandler( new VisitingUserTracker(CTX).track );
 
+		snooper.addHandler(x=>{
+			if(x.handled) return;
+			const {url:{pathname}} = x;
+			let desc = {
+				'/ajax/bz': "ajax/bz",
+				'/ajax/bulk-route-definitions/': 'bulk-routes',
+				'/api/v1/web/fxcal/ig_sso_users/': "ig_sso_users",
+				'/ajax/bootloader-endpoint/': "boot-endpoint",
+				'/api/v1/feed/reels_tray/': "reals_tray",
+				'/api/v1/web/accounts/fb_profile/': "fb_profile",
+				'/sync/instagram/': "sync"
+			}[pathname] || (function(){
+				if(pathname.endsWith('/comments/')) return "comments";
+				if(pathname.endsWith('.js')) return 'javascript';
+				if(pathname.startsWith('/btmanifest/')) return 'btManifest';
+				if(pathname.includes('graphql')){ return 'graphql'; }
+			})();
+			if(desc)
+				x.notHandled = `[${desc}]`;
+		})
+
 		iiLookup.monitor(extractors);
 		gallery.monitorExtractors(extractors);
+		userService.monitor(extractors);
 
 		if(isTracking){
 			userRepo.update(pageOwner,u=>u.lastVisit=loadTimeMs);
@@ -1100,12 +1137,6 @@
 		initUserPage();
 
 	console.print('%cInstagram2.js loaded','background-color:#DFD'); // Last line of file
-
-	// let scrollCount = 0;
-	// unsafeWindow.addEventListener("scroll",function(){
-	//     scrollCount++;
-	//     console.log('scrolled',scrollCount);
-	// });
 
 })();
 
