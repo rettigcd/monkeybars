@@ -2,6 +2,7 @@
 // ---- Snooping on HTTP Requests ----
 // -----------------------------------
 
+
 class SnoopRequest{
 	constructor({method,url,body,responseText,func}){
 		const readonly = {url,responseText,body,method,func,id:uuidv4()};
