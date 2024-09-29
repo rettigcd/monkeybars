@@ -11,11 +11,33 @@
 // @require      file://C:/Users/rettigcd/src/monkeybars/vsco.user.js
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vsco.co
 // @grant        GM_download
+// @grant        GM_setClipboard
 // @grant        unsafeWindow
 // ==/UserScript==
 
 (function() {
 	'use strict';
+
+	class EpochTime{
+		constructor(countsInOneSeconds,convertNum){
+			this._convertNum = convertNum;
+			this.SECONDS = countsInOneSeconds;
+			this.MINUTES = 60 * this.SECONDS;
+			this.HOURS = 60 * this.MINUTES;
+			this.DAYS = 24 * this.HOURS;
+		}
+		SECONDS; MINUTES; HOURS; DAYS;
+		now(){ return this.toNum(new Date()); }
+		// Converts s, mS or date to number
+		toNum(value){ return this._convertNum(value instanceof Date ? value.valueOf() : value); }
+		// Converts s or mS to Date(...)
+		toDate(num){ return new Date(EpochTime.isSeconds(num) ? num*1000 : num); }
+		static isSeconds(num){ return num<EpochTime.maxSeconds; }
+		static maxSeconds = (1<<16)*(1<<16); 
+	}
+	const jsTime   = new EpochTime( 1000, num => EpochTime.isSeconds(num) ? num*1000 : num );
+	const unixTime = new EpochTime( 1, num => EpochTime.isSeconds(num) ? num : Math.floor(num / 1000) );
+	const storageTime = unixTime;
 
 	console.print = function (...args) { queueMicrotask (console.log.bind (console, ...args)); }
 
@@ -385,10 +407,10 @@
 
 	function isDueToScanNewImages(data){ // predicate - not a fundamental part of UserData nor Counts
 		if( data.status!=UserStatus.following && data.status!=UserStatus.failed) return false;
-		const effectiveDownloadsInLastYear = data.downloadsInLastYear || 1;
+		const effectiveDownloadsInLastYear = data.downloadsInLastYear || 1; // $$$$$$$$$$$$$
 		const daysBetweenScans = Math.max( 0.75, 365/effectiveDownloadsInLastYear*0.35); // 35% of wait duration
-		const nextScanDate = Math.floor( daysBetweenScans*24*60*60*1000 ) + data._info.viewDate;
-		return nextScanDate < new Date().valueOf();
+		const nextScanTime = Math.floor( daysBetweenScans*storageTime.DAYS ) + data._info.viewDate;
+		return nextScanTime < storageTime.now();
 	}
 
 	// ===== ::ScanNewImagesMenu =====
@@ -430,13 +452,13 @@
 
 		_refreshNewImageCount(){
 			const dayWaitMap = [,,7,2,1,0];
-			const now = new Date().valueOf();
+			const now = storageTime.now();
 
 			function waitToDisplayNewImages(data){ // predicate, not inherant property of UserData
 				return 0; // don't wait for anyone
 				// const dily = data.downloadsInLastYear;
 				// const days = dily > 30 ? 0 : dily > 20 ? 1 : dily > 5 ? 2 : 7;
-				// return days*1000*60*60*24;
+				// return days*storageTime.DAYS;
 			}
 			function displayNewImages(user){
 				const imgs = user.newImages;
@@ -556,7 +578,7 @@ console.log('status', this.user.status );
 
 			const bgColor = (() => {
 				if(this.model.videoUrl) return 'purple';
-				if(new Date().valueOf()-imgDate.valueOf() > 1000 * 60 * 60 * 24 * 365) return colors.old;
+				if(storageTime.now()-storageTime.toNum(imgDate) > 365 * storageTime.DAYS) return colors.old;
 				return monthColors[imgDate.getMonth()];
 			})();
 			const containerCss = { width:boxSize+'px',	display:'inline-block','text-align':'center',margin:'5px',position:'relative',background:bgColor };
@@ -569,7 +591,7 @@ console.log('status', this.user.status );
 			this._$wrapper = $('<div>').appendTo($container).css(containerCss);
 
 			// metadata caption
-			function makeDateString(ticks){ return (ticks===null) ? 'N/A' : formatDate.YMD( new Date(ticks) ); }
+			function makeDateString(ticks){ return (ticks===null) ? 'N/A' : formatDate.YMD( storageTime.toDate(ticks) ); }
 			this._$wrapper.append(
 				$('<br>'),
 				$('<span>').html(imgProps.width+' x '+imgProps.height).css(imageSizeCss),
@@ -724,13 +746,13 @@ console.log('status', this.user.status );
 		set status(status){ 
 			// when we follow someone, assume everything has been viewed.
 			if(status=='following')
-				this._update( data => data._info.viewDate = new Date().valueOf() )
+				this._update( data => data._info.viewDate = storageTime.now() )
 			return this._update( data => data.status=status);
 		}
 
 		// Counts
 		logDownloadImage(imgProps){
-			const imageYear = new Date(imgProps.captureDate||imgProps.uploadDate).getFullYear();
+			const imageYear = storageTime.toDate(imgProps.captureDate||imgProps.uploadDate).getFullYear();
 			this._update( data=>{ data.trackImage( imageYear ); } );
 			this.trigger('imageDownloaded');
 		}
@@ -783,7 +805,7 @@ console.log('status', this.user.status );
 			const pageLoadDate = new Date();
 			this.thisYear = pageLoadDate.getFullYear();
 			const startNext = new Date(this.thisYear+1, 0, 0);
-			this.percentYearLeft = (startNext-pageLoadDate) / (1000*60*60*24*365);
+			this.percentYearLeft = (storageTime.toNum(startNext)-storageTime.toNum(pageLoadDate)) / (365*storageTime.DAYS);
 		}
 		downloadsInLastYear(byYear){ return (byYear[this.thisYear]||0) + Math.round( (byYear[this.thisYear-1]||0)*this.percentYearLeft ); }
 	}
@@ -814,16 +836,16 @@ console.log('status', this.user.status );
 		get firstFailure(){ return this._info.failure.first; }
 		toFailureString(){
 			const failure = this._info.failure;
-			return [ formatDate.YMD( new Date(failure.first)), failure.count, this.username, this.status].join('\t');
+			return [ formatDate.YMD( storageTime.toDate(failure.first)), failure.count, this.username, this.status].join('\t');
 		}
 		// Write / Modify
 		set status(value){ this._info.stars = convert.toStars(value); }
 		loadFailed(){
 			if(this._info.hasOwnProperty('failure')) this._info.failure.count++;
-			else this._info.failure = {count:1,first:new Date().valueOf()};
+			else this._info.failure = {count:1,first:storageTime.now()};
 		}
 		scanForNewImagesComplete(){
-			this._info.viewDate = new Date().valueOf();
+			this._info.viewDate = storageTime.now();
 			delete this._info.failure;
 		}
 	}
@@ -944,7 +966,7 @@ console.log('status', this.user.status );
 		}
 
 		// returns ImageModel objects
-		async * fetchGalleryImagesAsync(){ // $$$
+		async * fetchGalleryImagesAsync(){
 			const startingHtml = await this._fetchGalleryPageHtml();
 			const preloadedState = Fetcher.extractPreloadedStateFromHtml(startingHtml);
 			const token = preloadedState.users.currentUser.tkn;
@@ -966,8 +988,8 @@ console.log('status', this.user.status );
 						height : i.height,
 						width : i.width,
 						responsiveUrl : i.responsive_url,
-						captureDate : i.capture_date,
-						uploadDate : i.upload_date,
+						captureDate : storageTime.toNum(i.capture_date),
+						uploadDate : storageTime.toNum(i.upload_date),
 					}))
 					.sort(byDesc(x=>x.uploadDate));
 				for(let img of newImgs) yield img;
@@ -1012,8 +1034,8 @@ console.log('status', this.user.status );
 						width: img.width,
 						responsiveUrl:img.responsiveUrl,
 						videoUrl: img.videoUrl,
-						captureDate: img.captureDate,
-						uploadDate: img.uploadDate
+						captureDate: storageTime.toNum(img.captureDate),
+						uploadDate: storageTime.toNum(img.uploadDate)
 					}));
 			let videos = preloadedState.entities.videos;
 			return images;
@@ -1028,7 +1050,7 @@ console.log('status', this.user.status );
 		constructor({owner,height,width,responsiveUrl,videoUrl,captureDate,uploadDate}){
 			Object.assign(this,{owner,height,width,responsiveUrl,videoUrl,captureDate,uploadDate});
 
-			this.imgDate = new Date(captureDate||uploadDate);
+			this.imgDate = storageTime.toDate(captureDate||uploadDate);
 			this.localFileName = owner+' '+formatDate.forFilename(this.imgDate)+".jpg";
 
 			this.url = videoUrl&&('https://'+videoUrl) 
@@ -1139,7 +1161,7 @@ console.log('status', this.user.status );
 
 			// group images by Month and build a Month Model
 			// byMonth = {'2010-06':ImageModel[], '2010-06':ImageModel[]}
-			const groups = groupBy(allImages, img => formatDate.YM(new Date(img.uploadDate)) )
+			const groups = groupBy(allImages, img => formatDate.YM(storageTime.toDate(img.uploadDate)) )
 			this.byMonth ={};
 			for(let yearMonth in groups){
 				const mm = new MonthModel(yearMonth,groups[yearMonth]);
@@ -1433,13 +1455,19 @@ console.log('status', this.user.status );
 			setTimeout(()=>window.location.href=`/${users[0].username}/gallery`,2000);
 	}
 
+	function saveTextToFile(text,filename){
+		var a = document.createElement("a");
+		a.href = "data:text,"+text;
+		a.download = filename;
+		a.click();
+	}
 
 	// Services / repositories / models
 	const userAccess = new UserAccess();
 	const currentUser = userAccess.get( userAccess.currentUsername );
 	const calendar = new CalendarModel( currentUser )
 	const startingState = structuredClone(currentUser.data._info);
-	const loadTimeMs = new Date().valueOf();
+	const loadTimeNum = storageTime.now();
 
 	// build the UI / Views
 	const ui = new Layout();
@@ -1476,12 +1504,24 @@ console.log('status', this.user.status );
 		if(repeat) return;
 		// 37 left, 38 up, 39 right, 40 down
 		switch(which){
-			case 36: /*home*/ scrollToTop(); break;
-			case 37: /*left*/ calendar.prev(); break;
+			case 36: /*home*/ 
+				scrollToTop(); break;
+			case 37: /*left*/ 
+				calendar.prev(); break;
 			case 38: /*up*/ break;
-			case 39: /*right*/ calendar.next(); break;
+			case 39: /*right*/ 
+				calendar.next(); break;
 			case 40: /*down*/ break;
-			case 79: /*O*/ thumbs.openLast(); break;
+			case 79: /*O*/ 
+				thumbs.openLast(); break;
+			case 85: // 'u' - Save Users
+			if(ctrlKey && shiftKey){
+				const filename = `users_vsco_${formatDate.forFilename(new Date())}.json`;
+				saveTextToFile(localStorage.users,filename);
+				console.log("localStorage.users save to "+filename);
+			}
+			break;
+
 			case 88: /*X*/ thumbs.closeFirst(); break;
 			default: console.debug('which:',which); break; 
 		}
@@ -1508,7 +1548,7 @@ console.log('status', this.user.status );
 				// Show New Images !
 				if(startingState.viewDate===undefined){
 					console.print('%cNo View Date found',importantCss);
-					const lastYear = Object.keys(startingState.dl).reverse()[0]||new Date(loadTimeMs).getYear();
+					const lastYear = Object.keys(startingState.dl).reverse()[0]||storageTime.toDate(loadTimeNum).getYear();
 					console.print(`Downloads for ${lastYear}: %c${startingState.dl[lastYear]}`,downloadCountCss);
 					calendar.loadAsync();
 				}
@@ -1567,8 +1607,19 @@ console.log('status', this.user.status );
 		missingViewDate: function(sortLongestOutageFirst=false){
 			userAccess.missingViewDate( sortLongestOutageFirst ).goto();
 		},
-		nextToPrune(yearsWithoutDownload=4){
-			userAccess.toPrune( yearsWithoutDownload ).gotogo();
+		nextToPrune: function(yearsWithoutDownload=4){
+			userAccess.toPrune( yearsWithoutDownload ).goto();
+		},
+		convertToUnix: function(){
+			const dict = JSON.parse(localStorage.users);
+			Object.values(dict).forEach(u=>{
+				if(u.viewDate) u.viewDate = unixTime.toNum( u.viewDate );
+				if(u.failure) u.failure.first = unixTime.toNum( u.failure.first );
+				return u;
+			});
+			const json = '{\r\n'+Object.entries(dict).sort((a,b)=>a[0]<b[0]?-1:1).map(a=>a.map(JSON.stringify).join(':')).join(',\r\n')+'\r\n}';
+			localStorage.users = json; console.log('transition to Unix time complete');
+			// GM_setClipboard(json, "text", () => console.log("Updated Users saved to clipboard!"));
 		},
 		downloads: []
 	}
