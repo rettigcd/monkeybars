@@ -103,4 +103,4 @@ class RequestSnooper{
 	_loadLog = []; // records every SnoopRequest made.
 }
 
-console.debug('%csnoop.js loaded','background-color:#DFD'); // Last line of file
+queueMicrotask (console.log.bind (console, '%csnoop.js loaded','background-color:#DFD')); // Last line of file

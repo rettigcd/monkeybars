@@ -33,4 +33,4 @@ function CachedPersistentArray(key,glue){
 	this.add = function(item){ if(!items.includes(item)) { items.push(item); items.sort(); save(); } }
 }
 
-console.debug('%cstorage.js loaded','background-color:#DFD'); // Last line of file
+queueMicrotask (console.log.bind (console, '%cstorage.js loaded','background-color:#DFD')); // Last line of file

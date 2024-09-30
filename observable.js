@@ -52,4 +52,4 @@ class HasEvents{
 	}
 }
 
-console.debug('%cobservable.js loaded','background-color:#DFD'); // Last line of file
+queueMicrotask (console.log.bind (console, '%cobservable.js loaded','background-color:#DFD'));
