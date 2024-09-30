@@ -5,11 +5,11 @@
 // @description  Make individual Instagram images more accessible.
 // @author       Dean Rettig
 // @run-at       document-start
-// @require      file://C:/Users/rettigcd/src/monkeybars/storage.js
-// @require      file://C:/Users/rettigcd/src/monkeybars/utils.js
-// @require      file://C:/Users/rettigcd/src/monkeybars/snoop.js
-// @require      file://C:/Users/rettigcd/src/monkeybars/observable.js
-// @require      file://C:/Users/rettigcd/src/monkeybars/Instagram3.user.js
+// @require      file://C:/[monkeyBarsFolder]/storage.js
+// @require      file://C:/[monkeyBarsFolder]/utils.js
+// @require      file://C:/[monkeyBarsFolder]/snoop.js
+// @require      file://C:/[monkeyBarsFolder]/observable.js
+// @require      file://C:/[monkeyBarsFolder]/Instagram3.user.js
 // @match        https://www.instagram.com/*
 // @exclude      https://www.instagram.com/p/*/
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=instagram.com
@@ -728,7 +728,7 @@
 					} break;
 				case 85: // 'u' - Save Users
 					if(ctrlKey && shiftKey){
-						const filename = `users_instagram_${formatDateForFilename(new Date())}.json`;
+						const filename = `instagram.localStorage.users ${formatDateForFilename(new Date())}.json`;
 						saveTextToFile(localStorage.users,filename);
 						console.log("localStorage.users save to "+filename);
 					}

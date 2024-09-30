@@ -6,9 +6,10 @@
 // @author       Dean Rettig
 // @match        http*://vsco.co/*/gallery
 // @require      https://code.jquery.com/jquery-3.3.1.min.js
-// @require      file://C:/Users/rettigcd/src/monkeybars/observable.js
-// @require      file://C:/Users/rettigcd/src/monkeybars/storage.js
-// @require      file://C:/Users/rettigcd/src/monkeybars/vsco.user.js
+// @require      file://C:/[monkeyBarsFolder]/epoch_time.js
+// @require      file://C:/[monkeyBarsFolder]/observable.js
+// @require      file://C:/[monkeyBarsFolder]/storage.js
+// @require      file://C:/[monkeyBarsFolder]/vsco.user.js
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=vsco.co
 // @grant        GM_download
 // @grant        GM_setClipboard
@@ -18,26 +19,7 @@
 (function() {
 	'use strict';
 
-	class EpochTime{
-		constructor(countsInOneSeconds,convertNum){
-			this._convertNum = convertNum;
-			this.SECONDS = countsInOneSeconds;
-			this.MINUTES = 60 * this.SECONDS;
-			this.HOURS = 60 * this.MINUTES;
-			this.DAYS = 24 * this.HOURS;
-		}
-		SECONDS; MINUTES; HOURS; DAYS;
-		now(){ return this.toNum(new Date()); }
-		// Converts s, mS or date to number
-		toNum(value){ return this._convertNum(value instanceof Date ? value.valueOf() : value); }
-		// Converts s or mS to Date(...)
-		toDate(num){ return new Date(EpochTime.isSeconds(num) ? num*1000 : num); }
-		static isSeconds(num){ return num<EpochTime.maxSeconds; }
-		static maxSeconds = (1<<16)*(1<<16); 
-	}
-	const jsTime   = new EpochTime( 1000, num => EpochTime.isSeconds(num) ? num*1000 : num );
-	const unixTime = new EpochTime( 1, num => EpochTime.isSeconds(num) ? num : Math.floor(num / 1000) );
-	const storageTime = unixTime;
+	const storageTime = EpochTime.UnixTime;
 
 	console.print = function (...args) { queueMicrotask (console.log.bind (console, ...args)); }
 
@@ -547,9 +529,6 @@
 		}
 		bindToUser(user){
 			this.user = user; // here, user is interactor
-
-console.log('status', this.user.status );
-
 			this.$select.val( this.user.status );
 		}
 	}
@@ -1516,7 +1495,7 @@ console.log('status', this.user.status );
 				thumbs.openLast(); break;
 			case 85: // 'u' - Save Users
 			if(ctrlKey && shiftKey){
-				const filename = `users_vsco_${formatDate.forFilename(new Date())}.json`;
+				const filename = `vsco.localStorage.users ${formatDate.forFilename(new Date())}.json`;
 				saveTextToFile(localStorage.users,filename);
 				console.log("localStorage.users save to "+filename);
 			}
