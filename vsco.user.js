@@ -25,21 +25,16 @@
 
 	function throwExp(msg){ console.trace(); throw msg; } 
 
-	function replaceArrayValues(target,source){
-		target.length=0;
-		target.push.apply(target,source);
-	}
-	function rnd(i){ return Math.floor(Math.random() * i); }
-
-	const light = {
+	// ===== CSS =====
+	function light(){ return {
 		winter:'#ddf', spring:'#9ab895', summer:'#d48e8e', fall:'#b3a174', old:'white',
 		attribute:'black', galleryRowBg:'white'
-	};
-	const dark = {
+	};}
+	function dark(){ return {
 		winter:'#668', spring:'#373', summer:'#844', fall:'#663', old:'#444',
 		attribute:'white', galleryRowBg:'#333'
-	};
-	const colors = dark;
+	};}
+	const colors = dark();
 
 	const msgCss           = 'color:#F88; background:black; font-size:1rem; padding:0.3rem 0.7rem;border-radius:8px;';
 	const importantCss     = 'color:#F88; background:black; font-size:1rem; padding:0.3rem 0.7rem;border-radius:8px;';
@@ -86,25 +81,28 @@
 
 	// ===== Promises =====
 
-	function executePromisesInParallel(actions,parallelCount=8){
+	function executePromisesInParallel(asyncActions,parallelCount=8){
 		const deferred = $.Deferred();
-		const status = {loaded:0,total:actions.length};
-		actions=actions.slice();
-		async function process(){
-			while(actions.length>0){
-				try{ await (actions.shift())(); } catch (error) { console.log(error); }
+		const status = {loaded:0,total:asyncActions.length};
+		asyncActions=asyncActions.slice(); // make copy so we can modify
+
+		async function processAsync(){
+			while(0<asyncActions.length){
+				try{ await (asyncActions.shift())(); } catch (error) { console.log(error); }
 				++status.loaded;
 				deferred.notify(status);
 			}
 			if(status.loaded == status.total) deferred.resolve();
 		}
-		while(parallelCount--) process();
+
+		while(parallelCount--) processAsync();
 		return deferred;
 	}
 
 	// ===== ::ui  =====
 	class Layout{
-		constructor(){
+		gallery;
+		constructor(userAccess){
 			const css = {
 				top			: {position:"fixed",top:"0px",left:'0px',width:'100%',height:"40px",'z-index':'3000',background:'rgba(255,255,255,0.9)',overflow:"auto"},
 				leftPanel	: {margin:0,padding:0,display:'inline-block'},
@@ -118,18 +116,30 @@
 
 			this.$top = $('<div>').prependTo('body').css(css.top);
 			this.$leftPanel = $('<div>').appendTo(this.$top).css(css.leftPanel);
-				this.$userStatusDiv = $('<div>').appendTo(this.$leftPanel).css(css.star);
-				this.$userDownloadCountsDiv = $('<div>').appendTo(this.$leftPanel).css(css.counts);
-				this.$scanNewImagesDiv = $('<div>').appendTo(this.$leftPanel).css(css.userLink);
-				this.$visibleRowProgress = $('<div>').appendTo(this.$leftPanel).css(css.progress);
+			this.$userStatusDiv = $('<div>').appendTo(this.$leftPanel).css(css.star);
+			this.$userDownloadCountsDiv = $('<div>').appendTo(this.$leftPanel).css(css.counts);
+			this.$scanNewImagesDiv = $('<div>').appendTo(this.$leftPanel).css(css.userLink);
+			this.$visibleRowProgress = $('<div>').appendTo(this.$leftPanel).css(css.progress);
 
 			this.$calendar = $('<div>').appendTo(this.$top).css(css.calendar);
 			this.$scanNext = $('<div>').appendTo(this.$top).css(css.next);
 			this.$thumbDiv = $('<div>').insertAfter(this.$top);
+
 			let $spacer = $('<div>').prependTo('body').css("height",css.top.height);
 			setInterval(()=>$spacer.css('height',this.$top.height()),2000); // !!! ? does top height change?
-
 			this.$import = $('<input>').appendTo('body').attr('type','file').attr('multiple',true);
+
+			// bind to model
+			new ScanNewImagesMenu( this.$scanNewImagesDiv, userAccess );
+			this.gallery = new Gallery( this.$thumbDiv, this.$visibleRowProgress );
+			// next links
+			for(let link of [userAccess.needsReview(), userAccess.missingViewDate(), userAccess.toPrune()])
+				link.appendTo(this.$scanNext);
+		}
+		showCurrentUser(userCtx, calendar){
+			this.$userStatusDiv.append( makeUserStatusControl( userCtx ) );
+			this.$userDownloadCountsDiv.append( makeDownloadCountsControl(userCtx) );
+			this.$calendar.append( new CalendarView( calendar ) );
 		}
 	}
 
@@ -300,21 +310,19 @@
 		}
 	}
 
-	class DownloadCountsControl{
-		constructor($div){
-			this.$div = $div;
-			this.$div.css({padding:"2px",border:"thin solid green"});
-		}
-		bind(user){
-			this.update(user.data);
-			user.on( 'imageDownloaded',()=>this.update(user.data) );
-		}
-		update(data){
-			this.$div.html( "&#x2193 "+data.downloadsInLastYear );
+	function makeDownloadCountsControl(userCtx){
+		const $div = $('<div>');
+		$div.css({padding:"2px",border:"thin solid green"});
+		function updateUi() {
+			const {data} = userCtx;
+			$div.html( "&#x2193 "+data.downloadsInLastYear );
 			const byYear = Object.entries(data.byYear).sort(byDesc(x=>x[0])).map(x=>x[0]+':'+x[1]);
 			if( byYear.length > 0)
-				this.$div.attr('title',byYear.join(' '));
+				$div.attr('title',byYear.join(' '));
 		}
+		updateUi();
+		userCtx.on( 'imageDownloaded', updateUi );
+		return $div;
 	}
 
 	// ===== ::Progress (displays % and text) =====
@@ -397,9 +405,12 @@
 
 	// ===== ::ScanNewImagesMenu =====
 	class ScanNewImagesMenu{
-		constructor($div){ this.$div = $div; }
+		constructor($div,userAccess){ 
+			this.$div = $div;
+			this._setUsersByStar(userAccess);
+		}
 
-		setUsersByStar( userAccess ){
+		_setUsersByStar( userAccess ){
 			this._userAccess = userAccess;
 
 			this.$div.empty();
@@ -518,19 +529,15 @@
 		}
 	};
 
-	/// ::StarRow
-	class UserStatusControl{
-		constructor($div){
-			this.$select = $('<select>').appendTo($div)
-				.on('click', ()=> this.user.status = this.$select.val() );
-			Object.entries(UserStatus)
-				.filter(([text,value])=>value!=UserStatus.failed)
-				.forEach(([text,value])=>this.$select.append(`<option value="${value}">${text}</option>`));
-		}
-		bindToUser(user){
-			this.user = user; // here, user is interactor
-			this.$select.val( this.user.status );
-		}
+	/// ::User Status (following,ignore,etc)
+	function makeUserStatusControl(userCtx){
+		const $select = $('<select>')
+			.on('click', function(){ userCtx.status = $(this).val(); } );
+		Object.entries(UserStatus)
+			.filter(([text,value])=>value!=UserStatus.failed)
+			.forEach(([text,value])=>$select.append(`<option value="${value}">${text}</option>`));
+		$select.val( userCtx.status );
+		return $select
 	}
 
 	function findStringBetween(src,prefix,suffix){
@@ -544,8 +551,6 @@
 	// ==========================
 	// ==========================
 	// ==========================
-
-	// https://vsco.co/marygaigals/gallery
 
 	class ImageThumbControl{ // single image
 		constructor(imgProps,$container){
@@ -655,6 +660,7 @@
 			const currentUsername = this.currentUsername;
 			const users = this.allUsers
 				.filter(user=>user.username!=currentUsername && user.data.status==UserStatus.shouldReview);
+			function rnd(i){ return Math.floor(Math.random() * i); }
 			return new NextLink({
 				label:'for review',
 				count: users.length,
@@ -736,10 +742,12 @@
 			this.trigger('imageDownloaded');
 		}
 
+		get isCurrentUser(){ return this._access.currentUsername == this.username; }
+
 		// ui items
 		rename(newName){ this._access.repo.rename(this.username,newName); this.username=newName; }
 
-		get fetch(){ return new Fetcher(this.username); }
+		get fetch(){ return new Fetcher(this.username, this.isCurrentUser ); }
 
 		async scanForNewImagesAsync(){
 			try{
@@ -796,6 +804,7 @@
 			this.username = username;
 			this._info = info;
 		}
+
 		// read
 		get status(){
 			if( !(this._info.failure==null) ) return UserStatus.failed;
@@ -817,18 +826,20 @@
 			const failure = this._info.failure;
 			return [ formatDate.YMD( storageTime.toDate(failure.first)), failure.count, this.username, this.status].join('\t');
 		}
+
 		// Write / Modify
 		set status(value){ this._info.stars = convert.toStars(value); }
 		loadFailed(){
 			if(this._info.hasOwnProperty('failure')) this._info.failure.count++;
 			else this._info.failure = {count:1,first:storageTime.now()};
 		}
+
 		scanForNewImagesComplete(){
 			this._info.viewDate = storageTime.now();
 			delete this._info.failure;
 		}
+		static _lastYearTracker = new LastYearTracker();
 	}
-	UserData._lastYearTracker = new LastYearTracker();
 
 	const UserStatus = {
 		following : "following",
@@ -906,7 +917,7 @@
 				.filter(onlyUnique)
 				.filter(u=>!this._access.commonRepo.includes(u)); // exclude anything in the commonRepo
 			console.log(`Collection scan of [${this.username}] found ${linkedUsers.length} links.`); // log
-			this._access.linkRepo.update(this.username,arr=>replaceArrayValues(arr,linkedUsers.sort()));
+			this._access.linkRepo.update(this.username,arr=>{ arr.length=0; arr.push(...linkedUsers.sort()); });
 			return linkedUsers;
 		}
 		_listUsers(usernames){
@@ -919,9 +930,9 @@
 	// ::Fetching
 
 	class Fetcher {
-		constructor(username){
+		constructor(username,useDocumentBody){
 			this.username = username;
-			this._useDocumentBody = username == currentUser.username;
+			this._useDocumentBody = useDocumentBody;
 		}
 
 		get galleryUrl(){ return 'https://vsco.co/'+this.username+'/gallery'; }
@@ -948,7 +959,9 @@
 		async * fetchGalleryImagesAsync(){
 			const startingHtml = await this._fetchGalleryPageHtml();
 			const preloadedState = Fetcher.extractPreloadedStateFromHtml(startingHtml);
+
 			const token = preloadedState.users.currentUser.tkn;
+
 			const [siteId,siteMedia] = Object.entries(preloadedState.medias.bySiteId)[0];
 			const result = Fetcher.extractImagesFromPreloadedState(preloadedState).sort(byDesc(x=>x.uploadDate));
 			for(let img of result)
@@ -1379,29 +1392,30 @@
 
 	class Importer{
 		constructor($import){
-			const self=this;
-			$import.on('change',function (evt) {
+
+			const importFileAsync = async (file,key) => {
+				localStorage[key] = await this.readFileAsync(file);
+				console.log(`${key} loaded from file.`);
+			}
+
+			$import.on('change',function(evt) {
 				for(const file of this.files){
 					switch(file.name){
-						case 'localStorage.users.json': self.importLocalStorageFromFile(file,'users'); break;
-						case 'localStorage.graph.json': self.importLocalStorageFromFile(file,'graph'); break;
-						case 'localStorage.common.csv': self.importLocalStorageFromFile(file,'common'); break;
+						case 'localStorage.users.json': importFileAsync(file,'users'); break;
+						case 'localStorage.graph.json': importFileAsync(file,'graph'); break;
+						case 'localStorage.common.csv': importFileAsync(file,'common'); break;
 						default: alert('Unexpected file: '+file.name ); break;
 					}
 				}
 			})
 		}
-		async importLocalStorageFromFile(file,key){
-			localStorage[key] = await this.readFileAsync(file);
-			console.log(`${key} loaded from file.`);
-		}
 		readFileAsync(file) {
-			var dfd = jQuery.Deferred();
-			var reader = new FileReader();
-			reader.onload = e => dfd.resolve( e.target.result );
-			reader.onerror = e => dfd.reject( 'sorry there was an error reading file.');
-			reader.readAsText(file);
-			return dfd.promise();
+			return new Promise((resolve,reject)=>{
+				var reader = new FileReader();
+				reader.onload = () => resolve( reader.result );
+				reader.onerror = (error) => reject( error );
+				reader.readAsText(file);
+			})
 		}
 	}
 
@@ -1441,72 +1455,55 @@
 		a.click();
 	}
 
+
+
 	// Services / repositories / models
 	const userAccess = new UserAccess();
-	const currentUser = userAccess.get( userAccess.currentUsername );
-	const calendar = new CalendarModel( currentUser )
-	const startingState = structuredClone(currentUser.data._info);
 	const loadTimeNum = storageTime.now();
 
-	// build the UI / Views
-	const ui = new Layout();
-	const thumbs = new Gallery( ui.$thumbDiv, ui.$visibleRowProgress );
-	const starRow = new UserStatusControl( ui.$userStatusDiv );
-	const scanNewImagesMenu = new ScanNewImagesMenu( ui.$scanNewImagesDiv );
-	ui.$calendar.append( new CalendarView( calendar ) );
+	// UI / Views - general
+	const ui = new Layout( userAccess );
+	const thumbs = ui.gallery;
 
-	const downloadCounts = new DownloadCountsControl(ui.$userDownloadCountsDiv);
+
+	// Current User
+	const currentUser = userAccess.get( userAccess.currentUsername );
+	const calendar = new CalendarModel( currentUser );
+	const startingState = structuredClone(currentUser.data._info);
+
+	// UI / view - currentUser
+	ui.showCurrentUser(currentUser, calendar);
+
 	const importer = new Importer( ui.$import );
 
-	// == Blue Console.log() ==
-	function logStartingState(){
-		console.print('starting state => %c'+JSON.stringify(startingState,null,'\t'),'color:blue;');
-	}
-
-	// bind
-	downloadCounts.bind(currentUser);
-	starRow.bindToUser(currentUser);
-	scanNewImagesMenu.setUsersByStar( userAccess );
-	
-
-	// links
-	userAccess.needsReview().appendTo(ui.$scanNext);
-	userAccess.missingViewDate().appendTo(ui.$scanNext);
-	userAccess.toPrune().appendTo(ui.$scanNext);
-
-	// enter(13) shift(16) ctl(17) alt(18) capslock(20) esc(27)
-	// pgup(33) pgdwn(34) end(35) home(36) left(37) up(38) right(39) down(40) ins(45) del(46)
-	// 0(48)..9(57), numpad: 0(96)..9(105)
-	// A(65)
-	// F2(113), F4(115) F7(118) F9(120), numlock(144)
-	unsafeWindow.addEventListener('keydown',function({which,repeat,ctrlKey,altKey,shiftKey}){
-		if(repeat) return;
-		// 37 left, 38 up, 39 right, 40 down
-		switch(which){
-			case 36: /*home*/ 
-				scrollToTop(); break;
-			case 37: /*left*/ 
-				calendar.prev(); break;
-			case 38: /*up*/ break;
-			case 39: /*right*/ 
-				calendar.next(); break;
-			case 40: /*down*/ break;
-			case 79: /*O*/ 
-				thumbs.openLast(); break;
-			case 85: // 'u' - Save Users
+	const keyPressActions = {
+		"79": /* o */ () => thumbs.openLast(),
+		"88": /* x */ () => thumbs.closeFirst(),
+		"36": /* home */ () => scrollToTop(),
+		"85": /* u */ function({ctrlKey,shiftKey}){ // Save Users
 			if(ctrlKey && shiftKey){
 				const filename = `vsco.localStorage.users ${formatDate.forFilename(new Date())}.json`;
 				saveTextToFile(localStorage.users,filename);
 				console.log("localStorage.users save to "+filename);
 			}
-			break;
-
-			case 88: /*X*/ thumbs.closeFirst(); break;
-			default: console.debug('which:',which); break; 
 		}
+	};
+	if( calendar ){
+		Object.assign(keyPressActions,{
+			"37": /*left*/ () => calendar.prev(),
+			"39": /*right*/ () => calendar.next(),
+			// "38": /*up*/ break;
+			// "40": /*down*/ break;
+		});
+	}
+
+	unsafeWindow.addEventListener('keydown',function({which,repeat,ctrlKey,altKey,shiftKey}){
+		if(!repeat)
+			(keyPressActions[which] || (() => console.debug('which',which)))({ctrlKey,shiftKey});
 	});
 
-	// Init page
+	// Init page - assume we have a user
+	function logStartingState(){ console.print('starting state => %c'+JSON.stringify(startingState,null,'\t'),'color:blue;'); }
 	(async function(){
 		switch( currentUser.status ){
 			case UserStatus.new:
