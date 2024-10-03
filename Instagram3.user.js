@@ -6,6 +6,7 @@
 // @author       Dean Rettig
 // @run-at       document-start
 // @require      file://C:/[monkeyBarsFolder]/storage.js
+// @require      file://C:/[monkeyBarsFolder]/epoch_time.js
 // @require      file://C:/[monkeyBarsFolder]/utils.js
 // @require      file://C:/[monkeyBarsFolder]/snoop.js
 // @require      file://C:/[monkeyBarsFolder]/observable.js
@@ -19,6 +20,8 @@
 
 (function() {
 	'use strict';
+
+	const storageTime = EpochTime.JavascriptTime;
 
 	function buildRequestSnooper(){
 		return new RequestSnooper()
@@ -129,7 +132,6 @@
 		_missingStandIn = ""
 	}
 
-
 	// =======================
 	// :: BasePicExtractor 
 	// =======================
@@ -160,7 +162,7 @@
 
 			batch.forEach(({owner,following,liked,date})=>{
 				if(following || this.userRepo.containsKey(owner)){
-					const dateMs=date.valueOf();
+					const dateMs=storageTime.toNum(date);
 					this.userRepo.update(owner,x=>{
 						x.username = owner;
 						if(following)
@@ -179,7 +181,7 @@
 			const updateLastGood = ({host:singleImage,downloaded}) => {
 				const {owner,date} = singleImage;
 				if(downloaded && owner && this.userRepo.containsKey(owner)){
-					const date = singleImage.date.valueOf();
+					const date = storageTime.toNum(singleImage.date);
 					this.userRepo.update(owner,u=>{
 						if((u.lastGood||0)<date)
 							u.lastGood = date;
@@ -222,7 +224,10 @@
 
 			// these 2 values are missing from Tagged
 			const owner = user.username;
-			const date = new Date(taken_at&&(taken_at*1000) || device_timestamp/1000 ); // one is too small, other too big
+
+			const date = storageTime.toDate(taken_at&&(taken_at*1000) || device_timestamp/1000 ); // one is too small, other too big
+			// !!! TODO: if storageTime.toDate works correctly, this can be simplified to:
+			//const date = storageTime.toDate(taken_at || device_timestamp/1000 ); // device_timestamp is too big
 
 			const pics = carousel_media && carousel_media
 				.map(({usertags,image_versions2}) => SingleImage.fromMedia({usertags,image_versions2,owner,date})) 
@@ -483,7 +488,6 @@
 		hays.forEach(hay => delete haystack[hay]);
 	}
 
-
 	// ===========
 	// ::User
 	// ===========
@@ -510,6 +514,32 @@
 						u.isFollowing = true;
 					})
 			}
+		}
+	}
+
+	// Next Link
+	class NextLink {
+		label; nextUrl; count;
+		constructor({label,nextUrl,count}){
+			Object.assign(this,{label,nextUrl,count});
+		}
+		goto(){
+			console.print(`${this.count} ${this.label}.`);
+			if(this.nextUrl)
+				setTimeout(()=>window.location.href=this.nextUrl,2000);
+		}
+		// UI stuff
+		appendTo(host){
+			const {label,nextUrl,count} = this;
+			if(!nextUrl) return;
+			const div = document.createElement('DIV');
+			div.innerText = `${label}: ${count}`;
+			Object.assign(div.style,{'text-decoration':'underline','cursor':'pointer','font-size':'12px'});
+			div.addEventListener('click', () => document.location.href = nextUrl);
+			host.appendChild(div);
+		}
+		static forFirstUser(label,users){
+			return new NextLink({ label, count:users.length, nextUrl:users.length?'/'+users[0].username+'/':undefined });
 		}
 	}
 
@@ -659,7 +689,7 @@
 	// =====================================
 
 	function msToAgeString(ageMs){
-		const daysOld = (ageMs) / DAYS;
+		const daysOld = (ageMs) / storageTime.DAYS;
 		const {divider,label,color:ageColor}
 			= (daysOld < 3) ? {divider:1,label:'day',color:'red'}
 			: (daysOld < 14)  ?{divider:1, label:'day',color:'green'}
@@ -747,6 +777,7 @@
 	// AKA younger than
 	function getRefreshTime(x){ // only works for scored 2..5
 		if(x.score===undefined) return false;
+		const {MONTHIS,WEEKS} = storageTime;
 		const timeframe = ({
 			'2':(x)=>2*MONTHS,
 			'3':(x)=>1*MONTHS,
@@ -763,7 +794,7 @@
 			// FOLLOWED that are public. - and maybe LOTS of followers.
 			public: (x) => x.isFollowing && !x.isPrivate,
 			// FOLLOWED that aren't producing. (limit this to lazy-public?)
-			lazy: (x) => x.isFollowing && withinLast(x.lastVisit,2*MONTHS) && !withinLast(x.lastGood,1*YEARS),
+			lazy: (x) => x.isFollowing && withinLast(x.lastVisit,2*storageTime.MONTHS) && !withinLast(x.lastGood,1*storageTime.YEARS),
 		},
 		tracked:{ // AKA - not following
 			//	- ALL tracked
@@ -785,19 +816,19 @@
 		constructor({userRepo,iiLookup}){
 			function showUsers(filter){ return userRepo.values().filter(filter); }
 			this.followed={
-				stale: (notVisitedDays=60)=>showUsers(filters.followed.stale(notVisitedDays*DAYS)).sort(by(x=>x.lastVisit||0)),
+				stale: (notVisitedDays=60)=>showUsers(filters.followed.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)),
 				public: ()=>showUsers(filters.followed.public),
 				lazy: ()=>showUsers(filters.followed.lazy).sort(by(x=>x.lastGood||0)),
 			};
 			this.tracked={
-				stale: (notVisitedDays=60)=>showUsers(filters.tracked.stale(notVisitedDays*DAYS)).sort(by(x=>x.lastVisit||0)),
+				stale: (notVisitedDays=60)=>showUsers(filters.tracked.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)),
 				all: (notVisitedDays=60)=>showUsers(filters.tracked.all).sort(by(x=>x.username)),
 				private: (notVisitedDays=60)=>showUsers(filters.tracked.private).sort(by(x=>x.username)),
 			};
 			this.scored={
 				all: ()=>showUsers(filters.scored.all).sort(by(getRefreshTime)),
 				stale: ()=>showUsers(filters.scored.stale).sort(by(getRefreshTime)),
-				//stale: (notVisitedDays=7)=>showUsers(filters.scored.stale(notVisitedDays*DAYS)).sort(by(x=>x.lastVisit||0)),
+				//stale: (notVisitedDays=7)=>showUsers(filters.scored.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)),
 			}
 			this.dayOfWeek=function(){
 				const counts = [0,0,0,0,0,0,0];
@@ -869,18 +900,23 @@
 
 		decorateThumb(img,picGroup){
 			const {date,following,liked,pics} = picGroup;
-			const imageMs = date.valueOf();
+			const imageMs = storageTime.toNum(date);
 			const {ageText,ageColor} = msToAgeString(loadTimeMs-imageMs);
 
+			// Store the thumbUrl we used to find the pic-group
 			picGroup.thumbUrl = img.src;
 
+			// Verify urls match
 			const a = sanitizeImgUrl(img.src);
 			const b = sanitizeImgUrl(picGroup.pics[0].imgUrls[0]);
 			if( a != b )
 				console.warn("Group urls do not match", a, b);
 
-			img.parentNode.style.position='relative';
+			// Setup host
+			const host = img.parentNode;
+			host.style.position='relative';
 
+			// Add top-left text
 			const isNew = this.lastVisit < imageMs; // if .lastVisit is undefined, don't override color
 			const style = {
 				...(isNew 
@@ -897,21 +933,29 @@
 			let txt = `Age: ${ageText}`
 			if(liked) txt += " ♥ ";
 			if(isNew) txt += " NEW! ";
-			if(pics.length>1) txt += ` (${pics.length}) `;
 			const span = document.createElement('SPAN');
 			Object.assign(span.style,style);
 			span.innerText = txt;
-			img.parentNode.appendChild(span);
+			host.appendChild(span);
 
+			if(pics.length > 1){
 
-			// TODO - instead of adding # as (#)
-			// Add a new expand <span> at the bottom that disappears once expanded)
-			if(pics.length > 1)
-				span.addEventListener('click',function(event){
+				// Add bottom left
+				const showImagesSpan = document.createElement('SPAN');
+				showImagesSpan.innerText = `+ ${pics.length-1}`;
+				Object.assign(showImagesSpan.style,{ position:'absolute', bottom:0, zIndex:1000, 
+					color:"red", background:"white", border:"thin solid red","border-radius":"4px",
+					"font":"bold 16px Arial",
+					padding:"2px 6px",
+				});
+				host.appendChild(showImagesSpan);
+				showImagesSpan.addEventListener('click',function(event){
 					event.stopPropagation(); // don't open image
 					event.preventDefault(); // 
 
-					const numPerRow = 5;
+					this.remove();
+
+					const numPerRow = 4;
 					const {width,height} = img, clipSize = width / numPerRow;
 
 					const clipStyle = {
@@ -920,8 +964,10 @@
 						height:(clipSize-4)+"px",
 						border:"thick solid black",
 					}
-					const rowsNeeded = Math.floor((pics.length-1) / numPerRow) + 1;
-					pics.forEach((si,index) => {
+					
+					const thumbPics = pics.slice(1);
+					const rowsNeeded = Math.floor((thumbPics.length-1) / numPerRow) + 1;
+					thumbPics.forEach((si,index) => {
 						const newImg = document.createElement('IMG');
 						newImg.setAttribute('src',si.imgUrls[0])
 						Object.assign(newImg.style,clipStyle);
@@ -929,11 +975,11 @@
 						newImg.style.left = (colIndex*clipSize)+"px";
 						const useRow = (rowsNeeded-rowIndex-1);
 						newImg.style.bottom = (useRow*clipSize)+"px";
-						img.parentNode.appendChild(newImg);
+						host.appendChild(newImg);
 					})
 
 				})
-
+			}
 		}
 
 	}
@@ -951,7 +997,7 @@
 	function reportLastVisit(lastVisit){
 		// depends on: loadTimeMs
 		if(0<lastVisit){
-			const lvd = new Date(lastVisit).toDateString();
+			const lvd = storageTime.toDate(lastVisit).toDateString();
 			const {ageText,ageColor} = msToAgeString(loadTimeMs-lastVisit);
 			const ageStyle =`color:white;background-color:${ageColor};`;
 			console.print(`Last Visit: %c${ageText}%c ago on %c${lvd}`,ageStyle,'color:black;background-color:white;',ageStyle);
@@ -1019,6 +1065,11 @@
 		trackKeyPresses(CTX);
 	}
 
+	// used to periodically visit pages that have been scored
+	function oldestScored(reports){ return NextLink.forFirstUser("stale scored", reports.scored.stale()); }
+	// used to find un-scored people, that aren't being periodically visited
+	function oldestTracked(reports){ return NextLink.forFirstUser("stale unscored", reports.followed.stale()); }
+
 	function initUserPage(){
 		const userRepo = new SyncedPersistentDict('users');
 
@@ -1032,32 +1083,35 @@
 		const snooper = buildRequestSnooper();
 		const iiLookup = new ImageLookupByUrl(snooper._loadLog);
 		const userService = new UserService({userRepo});
+		const reports = new UserReports({userRepo,iiLookup});
 
 		const gallery = new Gallery(startingState.lastVisit);
+
+		// Next links
+		window.onload = function(){
+			const linkHost = document.createElement('DIV'); 
+			Object.assign(linkHost.style,{position:"fixed",top:0,right:0,background:"#ddf",padding:"5px"});
+			document.body.appendChild(linkHost)
+			oldestScored(reports).appendTo(linkHost);
+			oldestTracked(reports).appendTo(linkHost);
+		}
 
 		const CTX = unsafeWindow.cmd = {
 			// global
 			snoopLog:snooper._loadLog,
 			userRepo,
 			iiLookup,
+			reports,
+
+			next:() => oldestTracked(reports).goto(),
+			nextScored: () => oldestScored(reports).goto(),
+			mark: () => userRepo.update(pageOwner,x=>x.special=true),
+
 			// owner/user based
 			owner:pageOwner,
 			gallery,
 			startingState,
 		};
-		CTX.reports = new UserReports(CTX);
-		// next Followed-missing lastVisit
-		CTX.next = () => window.location.href='/'+CTX.reports.followed.stale()[0].username+'/'
-		CTX.nextScored = (includeFresh) => {
-			const users = includeFresh 
-				? CTX.reports.scored.all()
-				: CTX.reports.scored.stale();
-			if(!includeFresh)
-				console.log(`${users.length} are stale.`);
-			if(0<users.length)
-				setTimeout(()=>window.location.href='/'+users[0].username+'/',1000);
-		}
-		CTX.mark = () => CTX.userRepo.update(CTX.owner,x=>x.special=true);
 
 		addCopyButton(pageOwner);
 
@@ -1127,9 +1181,8 @@
 		let missingStandIn = pageOwner != "thad_farris" ? pageOwner : "_missing_";
 	}
 
-
 	// Capture Starting State before anything modifies it.
-	const loadTimeMs = new Date().valueOf();
+	const loadTimeMs = storageTime.now();
 
 	if(window.location.pathname.startsWith("/explore/locations"))
 		initLocationPage();
