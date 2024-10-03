@@ -82,12 +82,8 @@ unsafeWindow.console.image = function(url, height = 100) {
 	};
 	image.src = url;
 };
-Object.assign(console,{
-	print: function (...args) { queueMicrotask (console.log.bind (console, ...args)); },
-});
-//console.print = function (...args) { queueMicrotask (console.log.bind (console, ...args)); }
 
-
+console.print = function (...args) { queueMicrotask (console.log.bind (console, ...args)); },
 unsafeWindow.JSON.format = function(s){ return JSON.stringify(JSON.parse(s),null,'\t'); }
 
 // const { get, set, update, createStore } = await import('https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm');
