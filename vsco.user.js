@@ -21,6 +21,17 @@
 
 	const storageTime = EpochTime.UnixTime;
 
+	let formatDate = (function(){
+		function pad(i){ return (i<10?'0':'')+i; }
+		const y=x=>x.getFullYear(), m=x=>pad(x.getMonth()+1), d=x=>pad(x.getDate());
+		const h=x=>pad(x.getHours()), n=x=>pad(x.getMinutes()), s=x=>pad(x.getSeconds());
+		return {
+			YMD :         (x) => `${y(x)}-${m(x)}-${d(x)}`, // img caption, failure date
+			YM :          (x) => `${y(x)}-${m(x)}`, // grouping images by month
+			forFilename : (x) => [y(x),m(x),d(x),h(x),n(x),s(x)].join(''),
+		};
+	})();
+
 	console.print = function (...args) { queueMicrotask (console.log.bind (console, ...args)); }
 
 	function throwExp(msg){ console.trace(); throw msg; } 
@@ -99,10 +110,247 @@
 		return deferred;
 	}
 
-	// ===== ::ui  =====
+	// ===================
+	// ====== Models =====
+	// ===================
+
+	class CalendarModel{
+		username;
+		byMonth; // { yearMonth: MonthModel, }
+		byYears; // { year: YearModel[], }
+		constructor( user ){
+			this.user = user;
+			this.title = user.username;
+			new Observable(this)
+				.define('selectedMonths',[])
+				.define('isLoading',undefined);
+		}
+		async loadAsync(){
+
+			this.isLoading = true;  // observable
+
+			const imageStream = this.user.fetch.fetchGalleryImagesAsync();
+			const allImages = await Array.fromAsync( imageStream );
+
+			// group images by Month and build a Month Model
+			// byMonth = {'2010-06':ImageModel[], '2010-06':ImageModel[]}
+			const groups = groupBy(allImages, img => formatDate.YM(storageTime.toDate(img.uploadDate)) )
+			this.byMonth ={};
+			for(let yearMonth in groups){
+				const mm = new MonthModel(yearMonth,groups[yearMonth]);
+				mm.listen('hasFocus',(x) => this._syncFocusMonth(x));
+				this.byMonth[yearMonth] = mm;
+			}
+
+			this._sortedMonthKeys = Object.keys(this.byMonth).sort();
+			this._count = this._sortedMonthKeys.length;
+
+			let monthsByYear = groupBy( Object.keys(this.byMonth), x=>x.split('-')[0] ); // grouped by year
+			this.byYear = {};
+			for(let year in monthsByYear){
+				const ym = new YearModel(year,this.byMonth); // !!!
+				ym.listen('hasFocus',({host,hasFocus}) => {
+					if(!hasFocus) return;
+					this._blurFocusYear();
+					this._focusYear = host;
+					this._selectMonths(host.months);
+				} )
+				this.byYear[year] = ym;
+			}
+
+			this.isLoading = false; // observable
+
+		}
+		selectAll(){ this._selectMonthByKeyFilter( k => true, true ); }
+		selectYear(year){ 
+			this._selectMonthByKeyFilter( k=>k.startsWith(year) );
+		}
+		selectMonthOfEveryYear(month){ 
+			this._selectMonthByKeyFilter( k=>k.endsWith(month), true );
+		}
+		_selectMonthByKeyFilter(keyFilter,reverse=false){ 
+			const months = this._sortedMonthKeys.filter(keyFilter).map(k=>this.byMonth[k])
+			if(reverse) months.reverse();
+			this._selectMonths(months); 
+		}
+		_selectMonths(months){
+			this._blurFocusMonth();
+			this._focusMonth = undefined;
+			for(let mm of months) mm.hasFocus = false; // hack - show it as visited
+			this.selectedMonths = months;
+		}
+		prev(){
+			const oldFocusIndex = (this._focusMonth === undefined)
+				? this._count
+				: this._sortedMonthKeys.indexOf(this._focusMonth.key);
+			this._setFocus( oldFocusIndex-1 );
+		}
+		next(){
+			const oldFocusIndex = (this._focusMonth === undefined)
+				? -1
+				: this._sortedMonthKeys.indexOf(this._focusMonth.key);
+			this._setFocus( oldFocusIndex+1 );
+		}
+		_setFocus( focusIndex ){
+			if(focusIndex < 0 || this._count <= focusIndex){
+				console.log('off end');
+				return;
+			}
+			const focusKey = this._sortedMonthKeys[focusIndex];
+			this.byMonth[ focusKey ].hasFocus = true;
+		}
+		// called by listener when hasFocus is changed.
+		_syncFocusMonth({host,hasFocus}){
+			if(!hasFocus) return;
+			this._blurFocusMonth();
+			this._focusMonth = host;
+			this.selectedMonths = [host];
+		}
+		_blurFocusMonth(){
+			if(this._focusMonth != null)
+				this._focusMonth.hasFocus = false;
+		}
+		_blurFocusYear(){
+			if(this._focusYear != null)
+				this._focusYear.hasFocus = false;
+		}
+	}
+
+	class Gallery{
+		rows; // ImageRowModel[]
+		constructor(){
+			new Observable(this).define('rows',[]);
+		}
+		closeFirst(){
+			// interact with model instead of view
+			const visibleModels = this.rows
+				.filter(m=>m && m.isVisible);
+			if(visibleModels.length) visibleModels[0].isVisible=false;
+		}
+		openLast(){
+			// interact with model instead of view
+			const visibleModels = this.rows
+				.filter(m=>m && !m.isVisible)
+				.reverse();
+			if(visibleModels.length) visibleModels[0].isVisible=true;
+		}
+	}
+
+	class ImageModel{
+		owner; height; width; 
+		responsiveUrl; videoUrl; url;
+		captureDate; uploadDate; imgDate;
+		constructor({owner,height,width,responsiveUrl,videoUrl,captureDate,uploadDate}){
+			Object.assign(this,{owner,height,width,responsiveUrl,videoUrl,captureDate,uploadDate});
+
+			this.imgDate = storageTime.toDate(captureDate||uploadDate);
+			this.localFileName = owner+' '+formatDate.forFilename(this.imgDate)+".jpg";
+
+			this.url = videoUrl&&('https://'+videoUrl) 
+				|| this.getResponsiveLink();
+
+			// status: notStarted, downloading, complete, errored, timeout
+			new Observable(this).define('downloadProgress',{status:'notStarted'});
+		}
+
+		toJSON(){
+			// only use the data we need for the constructor
+			const {owner,height,width,responsiveUrl,videoUrl,captureDate,uploadDate}=this;
+			return {owner,height,width,responsiveUrl,videoUrl,captureDate,uploadDate};
+		}
+
+		getResponsiveLink( boxSize ){
+			let match = this.responsiveUrl.match(/im.vsco.co\/aws-us-west-2\/(.*)/);
+			if( match !== null )
+				return boxSize
+					? 'https://im.vsco.co/aws-us-west-2/'+match[1]+'?w='+boxSize+'&amp;dpr=1' // !!! sometimes this has a size already in the url and then it redirects
+					: 'https://image-aws-us-west-2.vsco.co/'+match[1];
+
+			match = this.responsiveUrl.match(/im.vsco.co\/1\/(.*)/);
+			if( match !== null ) 
+				return 'https://im.vsco.co/1/'+match[1];
+
+			if( this.responsiveUrl.endsWith('?width=120') ) 
+				return this.responsiveUrl;
+
+			throw 'unable to rewrite Image Url for image: ' + orig;
+		}
+
+		downloadAsync(){
+			return new Promise((resolve,reject) => {
+				GM_download({ url:this.url, name:this.localFileName,
+					onprogress : ({loaded,total}) => {
+						console.log('%cPROGRESS','color:red;font-weight:bold;font-size:18px;');
+						this.downloadProgress = {status:'downloading',loaded,total};
+					},
+					onload : (x) => {
+						this.downloadProgress = {status:'complete'};
+						resolve(x)
+					},
+					onerror : (x) => { 
+						this.downloadProgress = {status:'errored',error:x};
+						reject(x)
+					},
+					ontimeout : x => {
+						this.downloadProgress = {status:'timeout'};
+						reject({"error":"timeout"});
+					}
+				}); // GM_download
+			}); // new Promise
+		} // downloadAsync
+
+	}
+
+	class ImageRowModel{
+		labelText;
+		images;
+		actions; // optional
+		constructor({labelText,images,actions={}}){
+			Object.assign(this,{labelText,images,actions});
+			new Observable(this).define('isVisible',true);
+		}
+	}
+
+	class MonthModel {
+		key; // "yyyy-mm"
+		images; // ImageModel[]
+		constructor(yearMonth,images=throwExp('mm images')){
+			this.key = yearMonth;
+			this.images = images;
+			new Observable(this).define('hasFocus',undefined);
+		}
+		toImageRow(){ 
+			const [year,month] = this.key.split('-');
+			return new ImageRowModel({
+				labelText:`${this.key} (${monthNames[month-1]})`,
+				images:this.images
+			});
+		}
+	}
+
+	class YearModel {
+		year;
+		sparse; // array 0..11, with possible undefineds
+		months; // array with only the months we have
+		constructor(year,byMonth){
+			this.year = year;
+			this.sparse = []; 
+			for(var i=1;i<=12;++i){
+				const monthKey = year+(i<10?"-0":"-")+i;
+				this.sparse.push( byMonth[ monthKey ] )
+			}
+			this.months = this.sparse.filter(x=>x!=undefined);
+			new Observable(this).define('hasFocus',undefined);
+		}
+	}
+
+	// ==================
+	// Begin: Views
+	// ==================
+
 	class Layout{
 		gallery;
-		constructor(userAccess){
+		constructor(userAccess,gallery){
 			const css = {
 				top			: {position:"fixed",top:"0px",left:'0px',width:'100%',height:"40px",'z-index':'3000',background:'rgba(255,255,255,0.9)',overflow:"auto"},
 				leftPanel	: {margin:0,padding:0,display:'inline-block'},
@@ -131,7 +379,7 @@
 
 			// bind to model
 			new ScanNewImagesMenu( this.$scanNewImagesDiv, userAccess );
-			this.gallery = new Gallery( this.$thumbDiv, this.$visibleRowProgress );
+			this.gallery = new GalleryView( this.$thumbDiv, this.$visibleRowProgress, gallery );
 			// next links
 			for(let link of [userAccess.needsReview(), userAccess.missingViewDate(), userAccess.toPrune()])
 				link.appendTo(this.$scanNext);
@@ -143,15 +391,20 @@
 		}
 	}
 
-	// ===== ::Gallery    (UI component, container div that holds image rows)
-	class Gallery {
+	class GalleryView {
 		rows; // ImageRowView[]
-		constructor( $thumbDiv, $progressDiv ){
+		model; // GalleryModel;
+		constructor( $thumbDiv, $progressDiv, model ){
 			new HasEvents(this);
 			this.$thumbDiv = $thumbDiv;
 			this.$progressDiv = $progressDiv;
+			this.model = model;
+			this.model.listen('rows',({rows}) => {
+				this._loadRows(rows);
+			})
 		}
-		loadRows(rowData){
+		loadRows(rowData){ this.model.rows = rowData; }
+		_loadRows(rowData){
 
 			this.$thumbDiv.empty();
 			window.scrollTo(0,0); // incase scrolled to bottom, scroll back to top
@@ -169,19 +422,6 @@
 
 			this._showCloseButton();
 			return this.loadRowsSequentially();
-		}
-		closeFirst(){
-			// interact with model instead of view
-			const visibleModels = (this.rows||[]).map(x=>x.model)
-				.filter(m=>m && m.isVisible);
-			if(visibleModels.length) visibleModels[0].isVisible=false;
-		}
-		openLast(){
-			// interact with model instead of view
-			const visibleModels = (this.rows||[]).map(x=>x.model)
-				.filter(m=>m && !m.isVisible)
-				.reverse();
-			if(visibleModels.length) visibleModels[0].isVisible=true;
 		}
 		_adjustCounts(deltaVisible,deltaTotalRowCount){
 			this.visibleRowCount += deltaVisible;
@@ -221,17 +461,6 @@
 		}
 	}
 
-	class ImageRowModel{
-		labelText;
-		images;
-		actions; // optional
-		constructor({labelText,images,actions={}}){
-			Object.assign(this,{labelText,images,actions});
-			new Observable(this).define('isVisible',true);
-		}
-	}
-
-	// ::ImageRow     (synchronously appends to $container)
 	class ImageRowView {
 
 		constructor(imageRowModel,$container){
@@ -271,12 +500,12 @@
 		}
 		load(){
 			// construct all of the image-thumb containers now
-			const thumbs = this.model.images.map(imgModel =>
+			const thumbNames = this.model.images.map(imgModel =>
 				new ImageThumbControl( imgModel, this.$imgContainer )
 			);
 
 			// load them later
-			return executePromisesInParallel( thumbs.map( t=>(()=>t.load()) ), 10 )
+			return executePromisesInParallel( thumbNames.map( t=>(()=>t.load()) ), 10 )
 				.then( ()=>{ this.trigger('loaded'); } );
 		}
 	}
@@ -310,6 +539,125 @@
 		}
 	}
 
+	// Displays 1 month cell in the CalendarView
+	function makeMonthView(model) { // MonthModel
+		const cellCss = {width: "30px", "padding":"2px","text-align":"center"};
+		const focusCss = {'background':'lightgray', 'border':'2px solid red'};
+		const blurCss  = {'background':'lightgray', 'border':'none'};
+		const $cell = $('<td>').css(cellCss);
+		if( model ){
+			$cell.text(model.images.length)
+				.data('yearMonth',model.key)
+				.attr('data-yearMonth',model.key)
+				.css({"cursor":"pointer"})
+				.on('click',()=>{ model.hasFocus = true; });
+			model
+				.listen('hasFocus', ({hasFocus}) => {
+					$cell.css(hasFocus ? focusCss : blurCss);
+				})
+		}
+		return $cell;
+	}
+
+	function makeHeaderRow(calendarModel){ // CalendarModel
+		let $row = $('<tr>').addClass('label');
+		const headerCss = {
+			cursor:'pointer',
+			"font-weight":"bold",
+			"text-align":"center",
+			width:"30px",
+		};
+		$('<td>').appendTo($row).text('*')
+			.css(headerCss)
+			.css({color:"black",'background':'white'})
+			.on('click',()=>calendarModel.selectAll() );
+		monthNames
+			.forEach((m,idx)=>$('<td>').appendTo($row).text(m)
+				.css(headerCss)
+				.css({color:colors.attribute,'background':monthColors[idx]})
+				.on('click', ()=>calendarModel.selectMonthOfEveryYear(idx+1))
+			)
+		return $row;
+	}
+
+	function makeYearView(yearModel) {
+		const {year,sparse} = yearModel;
+		const $year = $('<tr>').addClass('year');
+		$('<td>').text(year).appendTo($year)
+			.on('click', () => yearModel.hasFocus = true )
+			.css({width: "30px", "padding":"2px","font-weight":"bold",'cursor':'pointer'});// label
+		sparse.forEach( mm => makeMonthView(mm).appendTo($year) );
+		return $year;
+	}
+
+	class CalendarView {
+		constructor( model ){
+
+			// bind model
+			this.model = model;
+			this.model.listen('selectedMonths',({selectedMonths}) => {
+				scrollToTop(); setTimeout(scrollToTop, 2000);
+				gallery.rows = selectedMonths.map(mm => mm.toImageRow());
+			})
+			this.model.listen('isLoading',({isLoading}) => {
+				if(isLoading){
+					this.dataStatus = 'loading';
+					this._showSpinner();
+				} else {
+					this._generateResultRows();
+				}
+			})
+
+			// build view
+			$("<style type='text/css'> @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } </style>").appendTo("head");
+			// create table
+			this.$table = $('<table>').css({"font-size":"10px","table-collapse":"collapse"});
+			// top row
+			this.$topRow = $('<tr>').appendTo(this.$table).on('click',this._headerClick.bind(this))
+				.css({background:'#AAA'});
+			$('<td>').attr('colspan','12').html(model.title).appendTo( this.$topRow )
+				.css({width:'360px',height:'10px','text-align':'center',color:'white',"font-weight":"bold","font-size":"14px"});
+			this.$icon = $('<td>').appendTo( this.$topRow ).css({'text-align':"center",'width':'30px'});
+			this._showExpand();
+
+			return this.$table;
+		}
+
+		_showSpinner(){ this.$topRow.css('cursor','auto'); this.$icon.empty(); $('<div>').appendTo( this.$icon ).css({ 'display':'inline-block','border':'2px solid #CCC', 'border-top-color':'#08A', 'border-radius': '50%', 'width':'10px','height':'10px', 'animation':'spin 1s linear infinite'}); }
+		_showCollapse(){ this.$topRow.css('cursor','pointer'); this.$icon.html("-"); }
+		_showExpand(){ this.$topRow.css('cursor','pointer'); this.$icon.html("+"); }
+		_headerClick(){
+			switch(this.dataStatus){
+				case 'hidden': 
+					this.$table.find('tr.year,tr.label').show(); 
+					this.dataStatus='visible'; 
+					this._showCollapse();
+					break;
+
+				case 'visible': 
+					this.$table.find('tr.year,tr.label').hide(); 
+					this.dataStatus='hidden'; 
+					this._showExpand();
+					break;
+
+				case 'loading': /* do nothing */ break;
+
+				default: this.model.loadAsync(); break;
+			}
+		}
+		_generateResultRows(){
+			this._showCollapse(); 
+			this.dataStatus = "visible";
+			this.$table.append( makeHeaderRow( this.model ) );
+
+			Object.keys(this.model.byYear).sort().reverse()
+				.forEach( year => {
+					const ym = this.model.byYear[year];
+					makeYearView(ym).appendTo(this.$table);
+				});
+		}
+	}
+
 	function makeDownloadCountsControl(userCtx){
 		const $div = $('<div>');
 		$div.css({padding:"2px",border:"thin solid green"});
@@ -324,8 +672,7 @@
 		userCtx.on( 'imageDownloaded', updateUi );
 		return $div;
 	}
-
-	// ===== ::Progress (displays % and text) =====
+	
 	class ProgressBar{ // ui element
 		constructor($container,initialColor='#aaf',finalColor='#ccf'){
 			$container.css('position','relative');
@@ -393,14 +740,6 @@
 	// displays x of y on a bar element
 	class StepMonitor extends ProgressMonitor{
 		constructor(bar){ super(bar,progress=>progress.loaded+' of '+progress.total); }
-	}
-
-	function isDueToScanNewImages(data){ // predicate - not a fundamental part of UserData nor Counts
-		if( data.status!=UserStatus.following && data.status!=UserStatus.failed) return false;
-		const effectiveDownloadsInLastYear = data.downloadsInLastYear || 1; // $$$$$$$$$$$$$
-		const daysBetweenScans = Math.max( 0.75, 365/effectiveDownloadsInLastYear*0.35); // 35% of wait duration
-		const nextScanTime = Math.floor( daysBetweenScans*storageTime.DAYS ) + data._info.viewDate;
-		return nextScanTime < storageTime.now();
 	}
 
 	// ===== ::ScanNewImagesMenu =====
@@ -494,7 +833,7 @@
 
 			const self = this;
 
-			const rowData = users
+			gallery.rows = users
 				.sort(byDesc(user=>user.data.downloadsInLastYear).thenBy(user=>user.username))
 				.slice(0,take)
 				.map( user => { 
@@ -513,21 +852,9 @@
 					})
 					return irm;
 				});
-			thumbs.loadRows(rowData);
 		}
 
 	}
-
-	let formatDate = {
-		YMD : function (date)  { return formatDate.parts(date).slice(0,3).join('-'); },
-		YM : function (date)  { return formatDate.parts(date).slice(0,2).join('-'); },
-		YMDHM : function (date){ let p=formatDate.parts(date); return p[0]+'/'+p[1]+'/'+p[2]+' '+p[3]+':'+p[4]; },
-		forFilename : function(date){ return formatDate.parts(date).join(''); },
-		parts : function (date) {
-			let pad = i=> (i<10?'0':'')+i;
-			return [date.getFullYear(),pad(date.getMonth()+1),pad(date.getDate()),pad(date.getHours()),pad(date.getMinutes()),pad(date.getSeconds())];
-		}
-	};
 
 	/// ::User Status (following,ignore,etc)
 	function makeUserStatusControl(userCtx){
@@ -539,18 +866,6 @@
 		$select.val( userCtx.status );
 		return $select
 	}
-
-	function findStringBetween(src,prefix,suffix){
-		let startIndex = src.indexOf(prefix)+prefix.length;
-		if(startIndex==-1) return null;
-		let endIndex = src.indexOf(suffix,startIndex);
-		if(endIndex==-1) return null;
-		return src.substring(startIndex,endIndex);
-	}
-
-	// ==========================
-	// ==========================
-	// ==========================
 
 	class ImageThumbControl{ // single image
 		constructor(imgProps,$container){
@@ -632,8 +947,10 @@
 		}
 	}
 
-	//-------------------------------------
-	// ::UserAccess
+	// ===============
+	// Begin: Services
+	// ===============
+
 	class UserAccess {
 		constructor(){
 			this.repo = new SyncedPersistentDict('users');
@@ -777,7 +1094,14 @@
 			return result;
 		}
 
-		get isDueToScanNewImages(){ return isDueToScanNewImages(this.data); }
+		get isDueToScanNewImages(){ 
+			const {data} = this;
+			if( data.status!=UserStatus.following && data.status!=UserStatus.failed) return false;
+			const effectiveDownloadsInLastYear = data.downloadsInLastYear || 1; // $$$$$$$$$$$$$
+			const daysBetweenScans = Math.max( 0.75, 365/effectiveDownloadsInLastYear*0.35); // 35% of wait duration
+			const nextScanTime = Math.floor( daysBetweenScans*storageTime.DAYS ) + data._info.viewDate;
+			return nextScanTime < storageTime.now();
+		}
 
 		_update(action){
 			return this._access.repo.update( this.username, 
@@ -891,7 +1215,7 @@
 			const firstPageWithUsernameArray = await fetchFirstPageOfEachUser( newUsers ); // array of {user,images}
 			firstPageWithUsernameArray.sort(byDesc(x=>x.images.length).thenBy(x=>x.user.username));
 
-			const rowData = firstPageWithUsernameArray
+			gallery.rows = firstPageWithUsernameArray
 				.map(({user,images})=>{
 					const irm = new ImageRowModel({
 						labelText:user.username,
@@ -908,7 +1232,6 @@
 					})
 					return irm;
 				});
-			thumbs.loadRows(rowData);
 		}
 
 		async _scanAndSaveToCache(){
@@ -925,9 +1248,6 @@
 			console.log(x.join('\r\n'));
 		}
 	}
-
-	// =============================
-	// ::Fetching
 
 	class Fetcher {
 		constructor(username,useDocumentBody){
@@ -1011,10 +1331,17 @@
 		}
 
 		static extractPreloadedStateFromHtml(html){
-			let json = findStringBetween(html,'window.__PRELOADED_STATE__ = ','</script>'); // because string.match(regex) does not match unicode characters!
+			let json = Fetcher.findStringBetween(html,'window.__PRELOADED_STATE__ = ','</script>'); // because string.match(regex) does not match unicode characters!
 			if(json == null){ console.log('Unable to find preloaded state in:',html); throw 'no preloaded state found'; }
 			json = json.replaceAll(":undefined,",":null,");
 			return JSON.parse(json);
+		}
+		static findStringBetween(src,prefix,suffix){
+			let startIndex = src.indexOf(prefix)+prefix.length;
+			if(startIndex==-1) return null;
+			let endIndex = src.indexOf(suffix,startIndex);
+			if(endIndex==-1) return null;
+			return src.substring(startIndex,endIndex);
 		}
 
 		// returns array of ImageModel objects.
@@ -1035,325 +1362,6 @@
 
 	}
 
-	class ImageModel{
-		owner; height; width; 
-		responsiveUrl; videoUrl; url;
-		captureDate; uploadDate; imgDate;
-		constructor({owner,height,width,responsiveUrl,videoUrl,captureDate,uploadDate}){
-			Object.assign(this,{owner,height,width,responsiveUrl,videoUrl,captureDate,uploadDate});
-
-			this.imgDate = storageTime.toDate(captureDate||uploadDate);
-			this.localFileName = owner+' '+formatDate.forFilename(this.imgDate)+".jpg";
-
-			this.url = videoUrl&&('https://'+videoUrl) 
-				|| this.getResponsiveLink();
-
-			// status: notStarted, downloading, complete, errored, timeout
-			new Observable(this).define('downloadProgress',{status:'notStarted'});
-		}
-
-		toJSON(){
-			// only use the data we need for the constructor
-			const {owner,height,width,responsiveUrl,videoUrl,captureDate,uploadDate}=this;
-			return {owner,height,width,responsiveUrl,videoUrl,captureDate,uploadDate};
-		}
-
-		getResponsiveLink( boxSize ){
-			let match = this.responsiveUrl.match(/im.vsco.co\/aws-us-west-2\/(.*)/);
-			if( match !== null )
-				return boxSize
-					? 'https://im.vsco.co/aws-us-west-2/'+match[1]+'?w='+boxSize+'&amp;dpr=1' // !!! sometimes this has a size already in the url and then it redirects
-					: 'https://image-aws-us-west-2.vsco.co/'+match[1];
-
-			match = this.responsiveUrl.match(/im.vsco.co\/1\/(.*)/);
-			if( match !== null ) 
-				return 'https://im.vsco.co/1/'+match[1];
-
-			if( this.responsiveUrl.endsWith('?width=120') ) 
-				return this.responsiveUrl;
-
-			throw 'unable to rewrite Image Url for image: ' + orig;
-		}
-
-		downloadAsync(){
-			return new Promise((resolve,reject) => {
-				GM_download({ url:this.url, name:this.localFileName,
-					onprogress : ({loaded,total}) => {
-						console.log('%cPROGRESS','color:red;font-weight:bold;font-size:18px;');
-						this.downloadProgress = {status:'downloading',loaded,total};
-					},
-					onload : (x) => {
-						this.downloadProgress = {status:'complete'};
-						resolve(x)
-					},
-					onerror : (x) => { 
-						this.downloadProgress = {status:'errored',error:x};
-						reject(x)
-					},
-					ontimeout : x => {
-						this.downloadProgress = {status:'timeout'};
-						reject({"error":"timeout"});
-					}
-				}); // GM_download
-			}); // new Promise
-		} // downloadAsync
-
-	}
-
-	class YearModel {
-		year;
-		sparse; // array 0..11, with possible undefineds
-		months; // array with only the months we have
-		constructor(year,byMonth){
-			this.year = year;
-			this.sparse = []; 
-			for(var i=1;i<=12;++i){
-				const monthKey = year+(i<10?"-0":"-")+i;
-				this.sparse.push( byMonth[ monthKey ] )
-			}
-			this.months = this.sparse.filter(x=>x!=undefined);
-			new Observable(this).define('hasFocus',undefined);
-		}
-	}
-
-	class MonthModel {
-		key; // "yyyy-mm"
-		images; // ImageModel[]
-		constructor(yearMonth,images=throwExp('mm images')){
-			this.key = yearMonth;
-			this.images = images;
-			new Observable(this).define('hasFocus',undefined);
-		}
-		toImageRow(){ 
-			const [year,month] = this.key.split('-');
-			return new ImageRowModel({
-				labelText:`${this.key} (${monthNames[month-1]})`,
-				images:this.images
-			});
-		}
-	}
-
-	class CalendarModel{
-		username;
-		byMonth; // { yearMonth: MonthModel, }
-		byYears; // { year: YearModel[], }
-		constructor( user ){
-			this.user = user;
-			this.title = user.username;
-			new Observable(this)
-				.define('selectedMonths',[])
-				.define('isLoading',undefined);
-		}
-		async loadAsync(){
-
-			this.isLoading = true;  // observable
-
-			const imageStream = this.user.fetch.fetchGalleryImagesAsync();
-			const allImages = await Array.fromAsync( imageStream );
-
-			// group images by Month and build a Month Model
-			// byMonth = {'2010-06':ImageModel[], '2010-06':ImageModel[]}
-			const groups = groupBy(allImages, img => formatDate.YM(storageTime.toDate(img.uploadDate)) )
-			this.byMonth ={};
-			for(let yearMonth in groups){
-				const mm = new MonthModel(yearMonth,groups[yearMonth]);
-				mm.listen('hasFocus',(x) => this._syncFocusMonth(x));
-				this.byMonth[yearMonth] = mm;
-			}
-
-			this._sortedMonthKeys = Object.keys(this.byMonth).sort();
-			this._count = this._sortedMonthKeys.length;
-
-			let monthsByYear = groupBy( Object.keys(this.byMonth), x=>x.split('-')[0] ); // grouped by year
-			this.byYear = {};
-			for(let year in monthsByYear){
-				const ym = new YearModel(year,this.byMonth); // !!!
-				ym.listen('hasFocus',({host,hasFocus}) => {
-					if(!hasFocus) return;
-					this._blurFocusYear();
-					this._focusYear = host;
-					this._selectMonths(host.months);
-				} )
-				this.byYear[year] = ym;
-			}
-
-			this.isLoading = false; // observable
-
-		}
-		selectAll(){ this._selectMonthByKeyFilter( k => true, true ); }
-		selectYear(year){ 
-			this._selectMonthByKeyFilter( k=>k.startsWith(year) );
-		}
-		selectMonthOfEveryYear(month){ 
-			this._selectMonthByKeyFilter( k=>k.endsWith(month), true );
-		}
-		_selectMonthByKeyFilter(keyFilter,reverse=false){ 
-			const months = this._sortedMonthKeys.filter(keyFilter).map(k=>this.byMonth[k])
-			if(reverse) months.reverse();
-			this._selectMonths(months); 
-		}
-		_selectMonths(months){
-			this._blurFocusMonth();
-			this._focusMonth = undefined;
-			for(let mm of months) mm.hasFocus = false; // hack - show it as visited
-			this.selectedMonths = months;
-		}
-		prev(){
-			const oldFocusIndex = (this._focusMonth === undefined)
-				? this._count
-				: this._sortedMonthKeys.indexOf(this._focusMonth.key);
-			this._setFocus( oldFocusIndex-1 );
-		}
-		next(){
-			const oldFocusIndex = (this._focusMonth === undefined)
-				? -1
-				: this._sortedMonthKeys.indexOf(this._focusMonth.key);
-			this._setFocus( oldFocusIndex+1 );
-		}
-		_setFocus( focusIndex ){
-			if(focusIndex < 0 || this._count <= focusIndex){
-				console.log('off end');
-				return;
-			}
-			const focusKey = this._sortedMonthKeys[focusIndex];
-			this.byMonth[ focusKey ].hasFocus = true;
-		}
-		// called by listener when hasFocus is changed.
-		_syncFocusMonth({host,hasFocus}){
-			if(!hasFocus) return;
-			this._blurFocusMonth();
-			this._focusMonth = host;
-			this.selectedMonths = [host];
-		}
-		_blurFocusMonth(){
-			if(this._focusMonth != null)
-				this._focusMonth.hasFocus = false;
-		}
-		_blurFocusYear(){
-			if(this._focusYear != null)
-				this._focusYear.hasFocus = false;
-		}
-	}
-
-	// Displays 1 month cell in the CalendarView
-	function makeMonthView(model) { // MonthModel
-		const cellCss = {width: "30px", "padding":"2px","text-align":"center"};
-		const focusCss = {'background':'lightgray', 'border':'2px solid red'};
-		const blurCss  = {'background':'lightgray', 'border':'none'};
-		const $cell = $('<td>').css(cellCss);
-		if( model ){
-			$cell.text(model.images.length)
-				.data('yearMonth',model.key)
-				.attr('data-yearMonth',model.key)
-				.css({"cursor":"pointer"})
-				.on('click',()=>{ model.hasFocus = true; });
-			model
-				.listen('hasFocus', ({hasFocus}) => {
-					$cell.css(hasFocus ? focusCss : blurCss);
-				})
-		}
-		return $cell;
-	}
-
-	function makeHeaderRow(calendarModel){ // CalendarModel
-		let $row = $('<tr>').addClass('label');
-		const headerCss = {
-			cursor:'pointer',
-			"font-weight":"bold",
-			"text-align":"center",
-			width:"30px",
-		};
-		$('<td>').appendTo($row).text('*')
-			.css(headerCss)
-			.css({color:"black",'background':'white'})
-			.on('click',()=>calendarModel.selectAll() );
-		monthNames
-			.forEach((m,idx)=>$('<td>').appendTo($row).text(m)
-				.css(headerCss)
-				.css({color:colors.attribute,'background':monthColors[idx]})
-				.on('click', ()=>calendarModel.selectMonthOfEveryYear(idx+1))
-			)
-		return $row;
-	}
-
-	function makeYearView(yearModel) {
-		const {year,sparse} = yearModel;
-		const $year = $('<tr>').addClass('year');
-		$('<td>').text(year).appendTo($year)
-			.on('click', () => yearModel.hasFocus = true )
-			.css({width: "30px", "padding":"2px","font-weight":"bold",'cursor':'pointer'});// label
-		sparse.forEach( mm => makeMonthView(mm).appendTo($year) );
-		return $year;
-	}
-
-	class CalendarView {
-		constructor( model ){
-
-			// bind model
-			this.model = model;
-			this.model.listen('selectedMonths',({selectedMonths}) => {
-				scrollToTop(); setTimeout(scrollToTop, 2000);
-				let rowData = selectedMonths.map(mm => mm.toImageRow());
-				thumbs.loadRows( rowData );
-			})
-			this.model.listen('isLoading',({isLoading}) => {
-				if(isLoading){
-					this.dataStatus = 'loading';
-					this._showSpinner();
-				} else {
-					this._generateResultRows();
-				}
-			})
-
-			// build view
-			$("<style type='text/css'> @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } </style>").appendTo("head");
-			// create table
-			this.$table = $('<table>').css({"font-size":"10px","table-collapse":"collapse"});
-			// top row
-			this.$topRow = $('<tr>').appendTo(this.$table).on('click',this._headerClick.bind(this))
-				.css({background:'#AAA'});
-			$('<td>').attr('colspan','12').html(model.title).appendTo( this.$topRow )
-				.css({width:'360px',height:'10px','text-align':'center',color:'white',"font-weight":"bold","font-size":"14px"});
-			this.$icon = $('<td>').appendTo( this.$topRow ).css({'text-align':"center",'width':'30px'});
-			this._showExpand();
-
-			return this.$table;
-		}
-
-		_showSpinner(){ this.$topRow.css('cursor','auto'); this.$icon.empty(); $('<div>').appendTo( this.$icon ).css({ 'display':'inline-block','border':'2px solid #CCC', 'border-top-color':'#08A', 'border-radius': '50%', 'width':'10px','height':'10px', 'animation':'spin 1s linear infinite'}); }
-		_showCollapse(){ this.$topRow.css('cursor','pointer'); this.$icon.html("-"); }
-		_showExpand(){ this.$topRow.css('cursor','pointer'); this.$icon.html("+"); }
-		_headerClick(){
-			switch(this.dataStatus){
-				case 'hidden': 
-					this.$table.find('tr.year,tr.label').show(); 
-					this.dataStatus='visible'; 
-					this._showCollapse();
-					break;
-
-				case 'visible': 
-					this.$table.find('tr.year,tr.label').hide(); 
-					this.dataStatus='hidden'; 
-					this._showExpand();
-					break;
-
-				case 'loading': /* do nothing */ break;
-
-				default: this.model.loadAsync(); break;
-			}
-		}
-		_generateResultRows(){
-			this._showCollapse(); 
-			this.dataStatus = "visible";
-			this.$table.append( makeHeaderRow( this.model ) );
-
-			Object.keys(this.model.byYear).sort().reverse()
-				.forEach( year => {
-					const ym = this.model.byYear[year];
-					makeYearView(ym).appendTo(this.$table);
-				});
-		}
-	}
 	function scrollToTop(){document.body.scrollTop = document.documentElement.scrollTop = 0;}
 
 	function fetchFirstPageOfEachUser(users){ // !! this might be more link-related than fetch-related
@@ -1371,8 +1379,7 @@
 			Object.assign(this,{label,nextUrl,count});
 		}
 		goto(){
-			const {label,count,nextUrl} = this;
-			const msg = `${count} ${label}.`;
+			const {label,count,nextUrl} = this, msg = `${count} ${label}.`;
 			console.print(msg);
 			saveNotification(msg);
 			if(nextUrl)
@@ -1381,7 +1388,7 @@
 		// UI stuff
 		appendTo($host){
 			const {label,nextUrl,count} = this;
-			if(!count) return;
+			if(!nextUrl) return;
 			$('<div>')
 				.text(`${label}: ${count}`)
 				.css({'text-decoration':'underline','cursor':'pointer','font-size':'12px'})
@@ -1460,11 +1467,10 @@
 	// Services / repositories / models
 	const userAccess = new UserAccess();
 	const loadTimeNum = storageTime.now();
+	const gallery = new Gallery();
 
 	// UI / Views - general
-	const ui = new Layout( userAccess );
-	const thumbs = ui.gallery;
-
+	const ui = new Layout( userAccess, gallery );
 
 	// Current User
 	const currentUser = userAccess.get( userAccess.currentUsername );
@@ -1477,8 +1483,8 @@
 	const importer = new Importer( ui.$import );
 
 	const keyPressActions = {
-		"79": /* o */ () => thumbs.openLast(),
-		"88": /* x */ () => thumbs.closeFirst(),
+		"79": /* o */ () => gallery.openLast(),
+		"88": /* x */ () => gallery.closeFirst(),
 		"36": /* home */ () => scrollToTop(),
 		"85": /* u */ function({ctrlKey,shiftKey}){ // Save Users
 			if(ctrlKey && shiftKey){
@@ -1511,11 +1517,13 @@
 				logStartingState();
 				// show First Page
 				const firstPageImages = await currentUser.fetch.fetchFirstPageImages();
-				if(firstPageImages.length>0)
-					thumbs.loadRows([new ImageRowModel({ 
+				if(firstPageImages.length>0){
+					const imageRow = new ImageRowModel({ 
 						labelText: 'galley page-1 images',
 						images:firstPageImages
-					})])
+					});
+					gallery.rows = [imageRow];
+				}
 				calendar.loadAsync();
 				break;
 
@@ -1532,7 +1540,7 @@
 
 				if(currentUser.newImages.length>0){
 					const newImagesRow = new ImageRowModel({ labelText : 'new images', images:currentUser.newImages })
-					thumbs.loadRows([newImagesRow])
+					gallery.rows = [newImagesRow];
 					currentUser.clearNewImages();
 				}
 				break;
