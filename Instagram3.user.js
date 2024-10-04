@@ -546,7 +546,7 @@
 	// When visiting someones page (aka their 'Posts' tab)
 	// checks if we are following them and if so, saves following=true status to userRepo
 	class VisitingUserTracker {
-		constructor({userRepo}){ this._userRepo = userRepo; }
+		constructor(userRepo){ this._userRepo = userRepo; }
 		track = (snoopRequest) => {
 			const {url,body,responseText} = snoopRequest;
 			if(url.pathname=='/graphql/query' && new URLSearchParams(body).get('fb_api_req_friendly_name')=='PolarisProfilePageContentDirectQuery'){
@@ -1108,7 +1108,7 @@
 			mark: () => userRepo.update(pageOwner,x=>x.special=true),
 
 			// owner/user based
-			owner:pageOwner,
+			pageOwner,
 			gallery,
 			startingState,
 		};
@@ -1127,7 +1127,7 @@
 			snooper.addHandler( extractor.handle );
 		snooper.addHandler( new FollowerScrollerTracker(userRepo).track );
 		snooper.addHandler( new UnfollowTracker(userRepo).track );
-		snooper.addHandler( new VisitingUserTracker(CTX).track );
+		snooper.addHandler( new VisitingUserTracker(userRepo).track );
 
 		snooper.addHandler(x=>{
 			if(x.handled) return;
