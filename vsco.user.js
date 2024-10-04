@@ -4,7 +4,7 @@
 // @version      1
 // @description  Efficient VSCO Gallery surfer
 // @author       Dean Rettig
-// @match        http*://vsco.co/*/gallery
+// @match        http*://vsco.co/*
 // @require      https://code.jquery.com/jquery-3.3.1.min.js
 // @require      file://C:/[monkeyBarsFolder]/epoch_time.js
 // @require      file://C:/[monkeyBarsFolder]/observable.js
@@ -110,9 +110,9 @@
 		return deferred;
 	}
 
-	// ===================
-	// ====== Models =====
-	// ===================
+	// =====  Begin: Models  =====
+	// =====  Begin: Models  =====
+	// =====  Begin: Models  =====
 
 	class CalendarModel{
 		username;
@@ -344,9 +344,9 @@
 		}
 	}
 
-	// ==================
-	// Begin: Views
-	// ==================
+	// =====  Begin: Views  =====
+	// =====  Begin: Views  =====
+	// =====  Begin: Views  =====
 
 	class Layout{
 		gallery;
@@ -380,6 +380,7 @@
 			// bind to model
 			new ScanNewImagesMenu( this.$scanNewImagesDiv, userAccess );
 			this.gallery = new GalleryView( this.$thumbDiv, this.$visibleRowProgress, gallery );
+			new Importer( this.$import );
 			// next links
 			for(let link of [userAccess.needsReview(), userAccess.missingViewDate(), userAccess.toPrune()])
 				link.appendTo(this.$scanNext);
@@ -805,9 +806,10 @@
 			this._$newImages.text('images:'+this._newImageUsers.length);
 		}
 		scanReady(){
+			const numToScan = 100;
 			const toScan = this._readyToScanUsers
 				.sort(by(user=>user.data.viewDate))
-				.slice(0,100); // only scan 200 oldest
+				.slice(0,numToScan); // only scan 200 oldest
 			const unexecutedPromiseGenerators = toScan
 				.map( user => ( ()=>user.scanForNewImagesAsync() ) );
 			const $all = executePromisesInParallel( unexecutedPromiseGenerators );
@@ -827,9 +829,10 @@
 		}
 
 		_showNewImages(){
-			const pageSize=25;
+			const pageSize=25,allowOverflow=5;
 			const users = this._newImageUsers;
-			const tmp = users.length%pageSize, take = tmp<5?tmp+pageSize:tmp;
+			const countOnPage = users.length%pageSize; 
+			const take = countOnPage < allowOverflow ? countOnPage + pageSize : countOnPage;
 
 			const self = this;
 
@@ -947,9 +950,38 @@
 		}
 	}
 
-	// ===============
-	// Begin: Services
-	// ===============
+	class Importer{
+		constructor($import){
+
+			const importFileAsync = async (file,key) => {
+				localStorage[key] = await this.readFileAsync(file);
+				console.log(`${key} loaded from file.`);
+			}
+
+			$import.on('change',function(evt) {
+				for(const file of this.files){
+					switch(file.name){
+						case 'localStorage.users.json': importFileAsync(file,'users'); break;
+						case 'localStorage.graph.json': importFileAsync(file,'graph'); break;
+						case 'localStorage.common.csv': importFileAsync(file,'common'); break;
+						default: alert('Unexpected file: '+file.name ); break;
+					}
+				}
+			})
+		}
+		readFileAsync(file) {
+			return new Promise((resolve,reject)=>{
+				var reader = new FileReader();
+				reader.onload = () => resolve( reader.result );
+				reader.onerror = (error) => reject( error );
+				reader.readAsText(file);
+			})
+		}
+	}
+
+	// =====  Begin: Services  =====
+	// =====  Begin: Services  =====
+	// =====  Begin: Services  =====
 
 	class UserAccess {
 		constructor(){
@@ -970,13 +1002,13 @@
 		get allUsers(){ return this.repo.keys().map(username => this.get(username)); }
 		// main user
 		get(username){ return this._cache.hasOwnProperty(username) ? this._cache[username] : (this._cache[username]=new UserCtx(username,this)); }
-		get currentUsername(){ return unsafeWindow.location.href.match(/(?<=vsco.co\/).*(?=\/gallery)/)[0]; }
+		get pageOwner(){ return (unsafeWindow.location.href.match(/(?<=vsco.co\/).*(?=\/gallery)/)||[])[0]; }
 
 		// Higher level
 		needsReview(){
-			const currentUsername = this.currentUsername;
+			const pageOwner = this.pageOwner;
 			const users = this.allUsers
-				.filter(user=>user.username!=currentUsername && user.data.status==UserStatus.shouldReview);
+				.filter(user=>user.username!=pageOwner && user.data.status==UserStatus.shouldReview);
 			function rnd(i){ return Math.floor(Math.random() * i); }
 			return new NextLink({
 				label:'for review',
@@ -986,11 +1018,11 @@
 		}
 		missingViewDate(sortLongestOutageFirst=false){
 			// this.repo.sync(); // save viewDate before we scan
-			const currentUsername = this.currentUsername;
+			const pageOwner = this.pageOwner;
 			const users = Object.entries(JSON.parse(localStorage.users))
 				.filter(([u,v])=>2<=v.stars&&v.stars<=5 // 1 is 'ignored'
 						&& v.viewDate==undefined
-						&& u != currentUsername // this may be called before current .viewDate is set.
+						&& u != pageOwner // this may be called before current .viewDate is set.
 					)
 				.map(x=>new LastYear(x))
 				.sort(sortLongestOutageFirst
@@ -1004,13 +1036,13 @@
 			});
 		}
 		toPrune(yearsWithoutDownload=4){
-			const currentUsername = this.currentUsername;
+			const pageOwner = this.pageOwner;
 			// userAccess.repo.sync(); // save viewDate before we scan
 			const earliestEmptyYear = new Date().getFullYear() - yearsWithoutDownload;
 			const toPrune = Object.entries(JSON.parse(localStorage.users))
 				.filter(([u,v])=>2<=v.stars&&v.stars<=5 // 1 is 'ignored'
 					&& v.viewDate !== undefined // was viewed
-					&& u != currentUsername // this may be called before current .viewDate is set.
+					&& u != pageOwner // this may be called before current .viewDate is set.
 				)
 				.map(x=>new LastYear(x))
 				.filter( ({lastYear}) => lastYear<earliestEmptyYear )
@@ -1059,17 +1091,17 @@
 			this.trigger('imageDownloaded');
 		}
 
-		get isCurrentUser(){ return this._access.currentUsername == this.username; }
+		get isPageOwner(){ return this._access.pageOwner == this.username; }
 
 		// ui items
 		rename(newName){ this._access.repo.rename(this.username,newName); this.username=newName; }
 
-		get fetch(){ return new Fetcher(this.username, this.isCurrentUser ); }
+		get fetch(){ return new Fetcher(this.username, this.isPageOwner ); }
 
 		async scanForNewImagesAsync(){
 			try{
 				const newImages = await this._fetchNewImagesAsync();
-				this._update( data=>data.scanForNewImagesComplete() );
+				this._update( data=>data.setViewDateAsCurrent() );
 				if(newImages.length>0)
 					this._access.newImageRepo.update(this.username,newImageGroup=>{
 						newImages.forEach( img => newImageGroup[img.responsiveUrl]=img ); // adds each image to the group
@@ -1097,7 +1129,7 @@
 		get isDueToScanNewImages(){ 
 			const {data} = this;
 			if( data.status!=UserStatus.following && data.status!=UserStatus.failed) return false;
-			const effectiveDownloadsInLastYear = data.downloadsInLastYear || 1; // $$$$$$$$$$$$$
+			const effectiveDownloadsInLastYear = data.downloadsInLastYear || 1;
 			const daysBetweenScans = Math.max( 0.75, 365/effectiveDownloadsInLastYear*0.35); // 35% of wait duration
 			const nextScanTime = Math.floor( daysBetweenScans*storageTime.DAYS ) + data._info.viewDate;
 			return nextScanTime < storageTime.now();
@@ -1158,7 +1190,12 @@
 			else this._info.failure = {count:1,first:storageTime.now()};
 		}
 
-		scanForNewImagesComplete(){
+		setViewDateAsCurrent(){
+			// Save the old View Date in case we got logged out and are only scanning 8 images
+			const oldViewDates = JSON.parse(sessionStorage["oldViewDates"]||"{}");
+			oldViewDates[this.username] = this._info.viewDate;
+			sessionStorage["oldViewDates"] = JSON.stringify(oldViewDates,null,'\t');
+
 			this._info.viewDate = storageTime.now();
 			delete this._info.failure;
 		}
@@ -1379,7 +1416,7 @@
 			Object.assign(this,{label,nextUrl,count});
 		}
 		goto(){
-			const {label,count,nextUrl} = this, msg = `${count} ${label}.`;
+			const {label,count,nextUrl} = this, msg = `${label}: ${count}`;
 			console.print(msg);
 			saveNotification(msg);
 			if(nextUrl)
@@ -1397,35 +1434,6 @@
 		}
 	}
 
-	class Importer{
-		constructor($import){
-
-			const importFileAsync = async (file,key) => {
-				localStorage[key] = await this.readFileAsync(file);
-				console.log(`${key} loaded from file.`);
-			}
-
-			$import.on('change',function(evt) {
-				for(const file of this.files){
-					switch(file.name){
-						case 'localStorage.users.json': importFileAsync(file,'users'); break;
-						case 'localStorage.graph.json': importFileAsync(file,'graph'); break;
-						case 'localStorage.common.csv': importFileAsync(file,'common'); break;
-						default: alert('Unexpected file: '+file.name ); break;
-					}
-				}
-			})
-		}
-		readFileAsync(file) {
-			return new Promise((resolve,reject)=>{
-				var reader = new FileReader();
-				reader.onload = () => resolve( reader.result );
-				reader.onerror = (error) => reject( error );
-				reader.readAsText(file);
-			})
-		}
-	}
-
 	function saveNotification(msg){
 		const lines = getNotifications();
 		lines.push(msg);
@@ -1436,7 +1444,6 @@
 	}
 	for(let msg of getNotifications()) console.print(`%c${msg}`,msgCss)
 	sessionStorage.msgs = '';
-
 
 	class LastYear{
 		constructor([u,v]){
@@ -1450,6 +1457,7 @@
 			return (keys.length==0)  ? defaultYear : Math.max(...(keys));
 		}
 	}
+
 	function goToFirstUser(users){
 		if(users.length>0)
 			setTimeout(()=>window.location.href=`/${users[0].username}/gallery`,2000);
@@ -1462,8 +1470,6 @@
 		a.click();
 	}
 
-
-
 	// Services / repositories / models
 	const userAccess = new UserAccess();
 	const loadTimeNum = storageTime.now();
@@ -1471,16 +1477,6 @@
 
 	// UI / Views - general
 	const ui = new Layout( userAccess, gallery );
-
-	// Current User
-	const currentUser = userAccess.get( userAccess.currentUsername );
-	const calendar = new CalendarModel( currentUser );
-	const startingState = structuredClone(currentUser.data._info);
-
-	// UI / view - currentUser
-	ui.showCurrentUser(currentUser, calendar);
-
-	const importer = new Importer( ui.$import );
 
 	const keyPressActions = {
 		"79": /* o */ () => gallery.openLast(),
@@ -1494,78 +1490,13 @@
 			}
 		}
 	};
-	if( calendar ){
-		Object.assign(keyPressActions,{
-			"37": /*left*/ () => calendar.prev(),
-			"39": /*right*/ () => calendar.next(),
-			// "38": /*up*/ break;
-			// "40": /*down*/ break;
-		});
-	}
-
 	unsafeWindow.addEventListener('keydown',function({which,repeat,ctrlKey,altKey,shiftKey}){
 		if(!repeat)
 			(keyPressActions[which] || (() => console.debug('which',which)))({ctrlKey,shiftKey});
 	});
 
-	// Init page - assume we have a user
-	function logStartingState(){ console.print('starting state => %c'+JSON.stringify(startingState,null,'\t'),'color:blue;'); }
-	(async function(){
-		switch( currentUser.status ){
-			case UserStatus.new:
-			case UserStatus.shouldReview:
-				logStartingState();
-				// show First Page
-				const firstPageImages = await currentUser.fetch.fetchFirstPageImages();
-				if(firstPageImages.length>0){
-					const imageRow = new ImageRowModel({ 
-						labelText: 'galley page-1 images',
-						images:firstPageImages
-					});
-					gallery.rows = [imageRow];
-				}
-				calendar.loadAsync();
-				break;
-
-			case UserStatus.following:
-				logStartingState();
-				// Show New Images !
-				if(startingState.viewDate===undefined){
-					console.print('%cNo View Date found',importantCss);
-					const lastYear = Object.keys(startingState.dl).reverse()[0]||storageTime.toDate(loadTimeNum).getYear();
-					console.print(`Downloads for ${lastYear}: %c${startingState.dl[lastYear]}`,downloadCountCss);
-					calendar.loadAsync();
-				}
-				await currentUser.scanForNewImagesAsync(); // Sets the View Date which we NEED
-
-				if(currentUser.newImages.length>0){
-					const newImagesRow = new ImageRowModel({ labelText : 'new images', images:currentUser.newImages })
-					gallery.rows = [newImagesRow];
-					currentUser.clearNewImages();
-				}
-				break;
-
-			case UserStatus.ignore:
-				logStartingState();
-				console.print(`%cstatus=Ignored`,importantCss);
-				break;
-
-			case UserStatus.failed:
-				logStartingState();
-				console.print(`%cstatus=Failed`,importantCss);
-				break;
-
-			default:
-				logStartingState();
-				console.print(`%cUnknown status [${currentUser.status}]`,'color:#F88;background-color:black;');
-				break;
-		}
-
-	})();
-
 	// ::unsafeWindow
 	unsafeWindow.users = userAccess;
-	unsafeWindow.user = currentUser;
 	unsafeWindow.report = {
 		status : function(status=throwExp('must supply status')){
 			return userAccess.allUsers
@@ -1587,7 +1518,6 @@
 
 	const CMD = unsafeWindow.cmd = {
 		owner: document.location.href.match(/vsco.co.([^\/]+)/)[1],
-		currentUser,
 		missingViewDate: function(sortLongestOutageFirst=false){
 			userAccess.missingViewDate( sortLongestOutageFirst ).goto();
 		},
@@ -1608,11 +1538,81 @@
 		downloads: []
 	}
 
+	// -----  Init User  -----
+	const matchesUser = unsafeWindow.location.href.match(/(?<=vsco.co\/).*(?=\/gallery)/);
+	if(matchesUser){
+		// Current User
+		const currentUser = userAccess.get( userAccess.pageOwner );
+		const calendar = new CalendarModel( currentUser );
+		const startingState = structuredClone(currentUser.data._info);
+
+		// UI / view - currentUser
+		ui.showCurrentUser(currentUser, calendar);
+		
+		Object.assign(keyPressActions,{
+			"37": /*left*/ () => calendar.prev(),
+			"39": /*right*/ () => calendar.next(),
+			// "38": /*up*/ break;
+			// "40": /*down*/ break;
+		});
+
+		// Init page - assume we have a user
+		function logStartingState(){ console.print('starting state => %c'+JSON.stringify(startingState,null,'\t'),'color:blue;'); }
+		(async function(){
+			switch( currentUser.status ){
+				case UserStatus.new:
+				case UserStatus.shouldReview:
+					logStartingState();
+					// show First Page
+					const firstPageImages = await currentUser.fetch.fetchFirstPageImages();
+					if(firstPageImages.length>0){
+						const imageRow = new ImageRowModel({ 
+							labelText: 'galley page-1 images',
+							images:firstPageImages
+						});
+						gallery.rows = [imageRow];
+					}
+					calendar.loadAsync();
+					break;
+
+				case UserStatus.following:
+					logStartingState();
+					// Show New Images !
+					if(startingState.viewDate===undefined){
+						console.print('%cNo View Date found',importantCss);
+						const lastYear = Object.keys(startingState.dl).reverse()[0]||storageTime.toDate(loadTimeNum).getYear();
+						console.print(`Downloads for ${lastYear}: %c${startingState.dl[lastYear]}`,downloadCountCss);
+						calendar.loadAsync();
+					}
+					await currentUser.scanForNewImagesAsync(); // Sets the View Date which we NEED
+
+					if(currentUser.newImages.length>0){
+						const newImagesRow = new ImageRowModel({ labelText : 'new images', images:currentUser.newImages })
+						gallery.rows = [newImagesRow];
+						currentUser.clearNewImages();
+					}
+					break;
+
+				case UserStatus.ignore:
+					logStartingState();
+					console.print(`%cstatus=Ignored`,importantCss);
+					break;
+
+				case UserStatus.failed:
+					logStartingState();
+					console.print(`%cstatus=Failed`,importantCss);
+					break;
+
+				default:
+					logStartingState();
+					console.print(`%cUnknown status [${currentUser.status}]`,'color:#F88;background-color:black;');
+					break;
+			}
+
+		})();
+
+		unsafeWindow.user = currentUser;
+		CMD.user = currentUser;
+	}
+
 })();
-
-/*
-
-Performance
-	If user under-performing (not upload photo 6 photos in last year) then archive them
-
-*/
