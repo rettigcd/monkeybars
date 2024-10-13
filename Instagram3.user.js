@@ -1038,7 +1038,7 @@
 
 		// snoop
 		const extractors = [
-			new Location1Posts(),
+			new Location1Posts({startingState,locRepo}),
 			new Location2Posts(),
 		];
 		for(let extractor of extractors)
