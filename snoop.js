@@ -4,14 +4,14 @@
 
 
 class SnoopRequest{
-	constructor({method,url,body,responseText,func}){
-		const readonly = {url,responseText,body,method,func,id:uuidv4()};
+	constructor({method,url,body,responseText,headers,func}){
+		const readonly = {url,responseText,body,method,func,headers,id:uuidv4()};
 		for(let prop in readonly)
 			Object.defineProperty(this,prop,{value:readonly[prop]});
 	}
 	toJSON(){
-		const {url,responseText,body} = this;
-		const result = {url:url.toString(),responseText};
+		const {url,responseText,body,method} = this;
+		const result = {method,url:url.toString(),responseText};
 		if(body) result.body=body;
 		return result;
 	}
@@ -29,14 +29,17 @@ function uuidv4() {
 function makeNewFetch(origFetch,loadHandlers){
 	return function(url,options){
 		const promise = origFetch(url,options);
-		const {method,body} = options || {};
+		const {method,body,headers} = options || {};
 		const urlObj = new URL(url,unsafeWindow.location);
-		loadHandlers.forEach(function(callback){
+		if(loadHandlers.length)
 			promise
 				.then( response => response.clone().text() )
-				.then( responseText => callback(new SnoopRequest({method,url:urlObj,body,responseText,func:'fetch'})) );
-		});
-
+				.then( responseText => {
+					const record = new SnoopRequest({method,url:urlObj,body,responseText,headers,func:'fetch'})
+					loadHandlers.forEach(function(callback){
+						try{ callback( record ); } catch( err ){ console.error(err); }
+					});
+				} );
 		return promise;
 	}
 }
@@ -59,13 +62,21 @@ function makeNewXMLHttpRequest(origConstructor,loadHandlers){
 			return origSend.call(xhr,body);
 		};
 
+		// xhr.setRequestHeader('Authorization', 'Bearer your_api_key');
+		const origSetHeader = xhr.setRequestHeader;
+		xhr.setRequestHeader = function(key,value){
+			(origSetHeader.bind(xhr))(key, value);
+			if(!('_headers' in xhr)) xhr._headers = {}
+			xhr._headers[key] = value;
+		}
+
 		xhr.addEventListener('load', ()=>{
-			const {responseText,_openArgs:[method,url,sync,user,pw],_sendBody:body} = xhr;
+			const {responseText,_openArgs:[method,url,sync,user,pw],_sendBody:body,_headers:headers} = xhr;
 			const refUrl = new URL(unsafeWindow.location.href);
 			const urlObj = new URL(url,refUrl);
-			const record = new SnoopRequest({method,url:urlObj,body,responseText,func:'XMLHttpRequest'});
+			const record = new SnoopRequest({method,url:urlObj,body,responseText,headers,func:'XMLHttpRequest'});
 			loadHandlers.forEach(function(callback){
-				callback( record );
+				try{ callback( record ); } catch( err ){ console.error(err); }
 			});
 		});
 
