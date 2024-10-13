@@ -2,9 +2,9 @@
 // @name         SNL Standby Line - TEST
 // @namespace    http://tampermonkey.net/
 // @version      1
-// @description  Make individual Instagram images more accessible.
+// @description  Test script that requests SNL Standby Line tickets
 // @author       Dean Rettig
-// @require      file://C:/Users/rettigcd/Sync/Documents/grease monkey/snl.user.js
+// @require      file://C:/[folder]/snl.user.js
 // @match        https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF*
 // @grant        GM_download
 // @grant        unsafeWindow
