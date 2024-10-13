@@ -278,20 +278,28 @@
 
 		downloadAsync(){
 			return new Promise((resolve,reject) => {
+				const id = setTimeout(()=>{
+					this.downloadProgress = {status:'timeout'};
+					reject('timeout');
+				},5000);
+				function cancelTimeout(){ clearTimeout(id); }
 				GM_download({ url:this.url, name:this.localFileName,
 					onprogress : ({loaded,total}) => {
 						console.log('%cPROGRESS','color:red;font-weight:bold;font-size:18px;');
 						this.downloadProgress = {status:'downloading',loaded,total};
 					},
 					onload : (x) => {
+						cancelTimeout();
 						this.downloadProgress = {status:'complete'};
 						resolve(x)
 					},
 					onerror : (x) => { 
+						cancelTimeout();
 						this.downloadProgress = {status:'errored',error:x};
 						reject(x)
 					},
 					ontimeout : x => {
+						cancelTimeout();
 						this.downloadProgress = {status:'timeout'};
 						reject({"error":"timeout"});
 					}
