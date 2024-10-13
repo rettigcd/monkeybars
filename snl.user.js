@@ -2,103 +2,224 @@
 // @name         SNL Standby Line
 // @namespace    http://tampermonkey.net/
 // @version      1
-// @description  Make individual Instagram images more accessible.
+// @description  Snag SNL Standby Line tickes.
 // @author       Dean Rettig
-// @require      file://C:/Users/rettigcd/src/monkeybars/snl.user.js
-// @match        https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF*
+// @run-at       document-start
+// @require      file://C:/[folder]/observable.js
+// @require      file://C:/[folder]/snoop.js
+// @require      file://C:/[folder]/storage.js
+// @require      file://C:/[folder]/snl.user.js
+// @match        https://bookings-us.qudini.com/booking-widget/events/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=nbc.com
 // @grant        GM_download
 // @grant        unsafeWindow
 // ==/UserScript==
 
-// https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/choose
+// https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/choose (NBC / SNL)
 
-// https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/18875
-// https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/18876
-
-// https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/18932
-// https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/18933
-
+// Find test case by googling "https://bookings-us.qudini.com/booking-widget/events" with the quotes
+// https://bookings-us.qudini.com/booking-widget/events/Y283RE67JM8#/event/choose
+// https://bookings-us.qudini.com/booking-widget/events/DBY5E5JLLXG#/event/choose
 
 (function(){
 
-	const SEC = 1000; // mS
-	const MIN = 60*SEC;
-	const HOUR = 60*MIN;
-	const DAYS = 24*HOUR;
+	const SECONDS = 1000; // mS
+	const MINUTES = 60*SECONDS;
+	const HOURS = 60*MINUTES;	
+	const DAYS = 24*HOURS;
 
 	console.print = function (...args) { queueMicrotask (console.log.bind (console, ...args)); }
 
-	//==================
-	// ::Status Bar
-	//==================
-	const status = document.body.appendChild(document.createElement('p'));
-	Object.assign(status.style,{position:'fixed',top:'0px',right:'0px',backgroundColor:'#ddf',zIndex:1000});
-	function create(){
-		const span = status.appendChild(document.createElement('span'));
-		Object.assign(span.style,{border:'thin solid black',padding:'5px'});
-		span.pass = function(text){ this.innerHTML=text; this.style.backgroundColor='green'; }
-		span.fail = function(text){ this.innerHTML=text; this.style.backgroundColor='red'; }
-		return span;
+	const css = {
+		topBar: {position:'fixed',top:'0px',right:'0px',backgroundColor:'#ddf',zIndex:1000},
+		subBar: {margin:0},
+		status: {border:'thin solid black',padding:'2px 4px',"font-size":"12px"},
+		success: {color:"white", backgroundColor:'green'},
+		fail: {color:"white", backgroundColor:'red'},
+		input: {width:"100px"}
 	}
 
-	// Buttons
-	const buttons = document.body.appendChild(document.createElement('p'));
-	Object.assign(buttons.style,{position:'fixed',top:'25px',right:'0px',backgroundColor:'#ddf',zIndex:1000});
+	const goTime = (function getNextThursday10Am(){
+		const date = new Date();
+		const daysFromNow = ((7+4)-date.getDay())%7;
+		const targetDate = new Date(date.valueOf() + daysFromNow * DAYS);
+		const yyyy = targetDate.getFullYear(), mm = targetDate.getMonth(), dd = targetDate.getDate();
+		return new Date(yyyy,mm,dd,10,0,0,0); // (my clock is ahead by 582ms per https://time.gov)
+	})(), nowMs = new Date().valueOf();
+	function goStamp(){ return new Date().valueOf()-goTime.valueOf(); }
+	function nowStamp(){ return new Date().valueOf()-nowMs;}
 
-	// ==================================
-	// Create a button to fill LATER DATA
-	// ==================================
-//	const fill = buttons.appendChild(document.createElement('button'));
-//	Object.assign(fill.style,{fontSize:'24px',padding:'5px'});
-//	fill.innerHTML = '* Fill Other Person *';
-//	fill.addEventListener("click", function(){
-//		let inputs = [...document.querySelectorAll('input')]
-//			.filter(function(i){
-//				const type = (i.getAttribute('type')||'').toLowerCase();
-//				return i.value == '' 
-//					&& (type =='text')
-//					&& i.getAttribute('aria-Label') != 'Search venue'
-//					&& !i.id.includes('datepicker');
-//			});
-//		if(inputs.length == 0)
-//			inputs = [...document.querySelectorAll('input')]
-//				.filter(function(i){
-//					const type = (i.getAttribute('type')||'').toLowerCase();
-//					return i.value == '' 
-//						&& (type == '' || type =='text')
-//						&& i.getAttribute('aria-Label') != 'Search venue'
-//						&& !i.id.includes('datepicker');
-//				});
-//
-//		console.debug(`Found ${inputs.length} inputs`,inputs)
-//		if(inputs.length == 1)
-//			inputs[0].value = 'Karen Gardinsky'
-//		else if(2<=inputs.length){
-//			const first = inputs.filter(i=>elementIs(i,'first') ) || inputs[0];
-//			const last = inputs.filter(i=>elementIs(i,'last') ) || inputs[1];
-//			first.value = 'Karen';
-//			last.value = 'Gardinsky';
-//		}
-//	});
+	const snooper = new RequestSnooper().enableLogging({});
+	unsafeWindow.snooper = snooper;
 
+	class MyConfig{
+		constructor(repo){
+			this.repo = repo;
 
+			const obs = new Observable(this);
+			// Form values
+			'firstName,lastName,email,phone,groupSize,show'.split(',').forEach(prop=>{
+				obs.define(prop,'');
+			})
+			// Options
+			obs.define('configOptions',[]);
+			obs.define('showOptions',[]);
+			// config name
+			obs.define('name','')
+			this.listen('name',(x)=>this._nameChanged(x));
+			// default
+			obs.define('isDefault');
+		}
+		addUser(){
+			const newLabel = prompt('Enter name for new config');
+			if(!newLabel) return;
+			this.configOptions = [...this.configOptions,newLabel];
+			this.name = newLabel;
+			this.saveUser();
+		}
+		removeName(){
+			const {name} = this;
+			if(!name) return;
+			if(prompt(`Please confirm deleting '${name}' by typing the word 'delete'`) != 'delete') return;
+			
+			const index = this.configOptions.indexOf(name);
+			if (index !== -1)
+				this.configOptions = this.configOptions.filter((el,i)=>i != index);
+			this.repo.remove(name);
+			console.log('removed',name);
+		}
+		saveUser(){
+			const {firstName,lastName,phone,email,groupSize,show} = this;
+			this.repo.update(this.name,x=>Object.assign(x,{firstName,lastName,phone,email,groupSize,show}));
+			if(this.isDefaut)
+				localStorage.curConfig = this.name;
+			console.log('user saved');
+		}
+		toJSON(){
+			const {firstName,lastName,phone,email,show} = this;
+			return {firstName,lastName,phone,email,show};
+		}
+		_nameChanged({newValue}){
+			const x = this.repo.get(newValue);
+			Object.assign(this,x);
+			this.isDefault = (localStorage.curConfig == newValue);
+		}
+	}
+
+	class El {
+		constructor(x){ this.el = typeof x == "string" ? document.createElement(x) : x; }
+		css(style){ Object.assign(this.el.style,style); return this; }
+		text(text){ this.el.innerText = text; return this; }
+		appendTo(host){ host.appendChild(this.el); return this; }
+		attr(name,val){ this.el.setAttribute(name,val); return this; }
+		on(eventName,handler){ this.el.addEventListener(eventName,handler); return this;}
+	}
+	class OptionEl extends El { constructor(text){ super('option'); this.text(text); } }
+	class InputEl extends El { 
+		constructor(type='text'){ 
+			super('input'); 
+			this.attr('type',type);
+		}
+		bind(host,prop){
+			const input = this.el;
+			input.value = host[prop];
+			this.on('input',()=> host[prop]=input.value );
+			host.listen(prop,({newValue})=>{ if(input.value != newValue) input.value = newValue; });
+			return this;
+		}
+	}
+	class CheckboxEl extends InputEl {
+		constructor(){super('checkbox');}
+		bind(host,prop){
+			const cb = this.el;
+			cb.checked = host[prop];
+			this.on('click',()=> host[prop]=cb.checked );
+			host.listen(prop,({newValue})=>{ if(cb.checked != newValue) cb.checked = newValue; });
+			return this;
+		}
+	}
+	class SelectEl extends El { 
+		constructor(){ super('select'); this._options={};}
+		addTextOption(optText){ const o = new OptionEl(optText).el; this._options[optText]=o; this.el.add(o); return this; }
+		addTextOptions(optTextArr){ optTextArr.forEach( text=>this.addTextOption(text) ); return this; }
+		removeTextOption(optText){ const o = this._options[optText]; this.el.remove(o.index); delete this._options[optText]; return this; }
+		bind(host,prop){
+			const select = this.el;
+			select.value = host[prop];
+			this.on('change',()=>host[prop]=select.value );
+			host.listen(prop,({newValue})=>{ 
+				if(select.value != newValue) select.value = newValue; 
+			});
+			return this;
+		}
+		bindOptions(host,prop){
+			// assuming it is empty, we don't have to pre-remove anything
+			this.addTextOptions(host[prop]);
+			host.listen(prop,({oldValue,newValue})=>{
+				console.log(111,oldValue,newValue);
+				for(let o of oldValue) if(!newValue.includes(o)) this.removeTextOption(o);
+				for(let n of newValue) if(!oldValue.includes(n)) this.addTextOption(n);
+			});
+			return this;
+		}
+	}
+
+	function showConfig(config,topBar){
+		const inputBar = new El('p').css(css.subBar).css({background:"#aaf"}).text('Config: ').appendTo(topBar).el;
+		new SelectEl().css({}).bindOptions(config,'configOptions').bind(config,'name').appendTo(inputBar);
+		new El('button').appendTo(inputBar).text('➕').on('click',()=>config.addAddUser());
+		new El('button').appendTo(inputBar).text('➖').on('click',()=>config.removeName());
+		new InputEl().css(css.input).attr('placeholder','first').bind(config,'firstName').appendTo(inputBar);
+		new InputEl().css(css.input).attr('placeholder','last').bind(config,'lastName').appendTo(inputBar);
+		new InputEl().css(css.input).attr('placeholder','phone').bind(config,'phone').appendTo(inputBar);
+		new InputEl().css({width:"200px"}).attr('placeholder','email').bind(config,'email').appendTo(inputBar);
+		new InputEl().css({width:"50px"}).attr('placeholder','1-4').bind(config,'groupSize').appendTo(inputBar);
+		new SelectEl().css({}).appendTo(inputBar).bindOptions(config,'showOptions').bind(config,'show');
+		new CheckboxEl('checkbox').css({height:"18px",width:"18px",'vertical-align':'top'}).bind(config,'isDefault').appendTo(inputBar).el;
+		new El('button').appendTo(inputBar).text('💾').on('click',()=>config.saveUser());
+	}
+
+	class ShowDiv{
+		div; label;
+		constructor(div){
+			this.div=div;
+			this.label=div.getAttribute('aria-label');
+		}
+		static findCurrentAsync(timeout=1*SECONDS){
+			return new Promise((resolve,reject)=>{
+				const timeoutTime = new Date().valueOf() + timeout;
+				const timerId = setInterval(()=>{
+					const shows = ShowDiv.findCurrent();
+					if(shows.length || timeoutTime < new Date().valueOf()){
+						resolve(shows);
+						clearInterval(timerId);
+					}
+				},100)
+			})
+		}
+		static findCurrent(){
+			return [...document.querySelectorAll('div[aria-label]')]
+				.map(div=>new ShowDiv(div))
+				.filter(({label})=>label);
+		}
+	}
 	//==================
 	// ::Refresh
 	//==================
 	class RefreshStrategy {
-		constructor({pre,target,postInterval,postRetryPeriod}){
+		constructor(target,statusBar){
 			this.target = target;
-			this.pre = pre; // in Milliseconds
-			this.postInterval = postInterval || 2;
-			this.postRetryPeriod = postRetryPeriod || 2*MIN;
-			this.timerStatus = create();
-			Object.assign(this.timerStatus.style,{color:'black',backgroundColor:'white'});
-			if(pre[pre.length-1] != 0) pre.push(0);
+			this.pre = [60*MINUTES,45*MINUTES,30*MINUTES,15*MINUTES,5*MINUTES,2*MINUTES,1*MINUTES,20*SECONDS,5*SECONDS,0];
+
+			this.postInterval = 2*SECONDS;
+			this.postRetryPeriod = 2*MINUTES;
+			this.timerStatus = new El('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar).el;
+			if(this.pre[this.pre.length-1] != 0) this.pre.push(0);
 			// pre must be in descending order, and should end with 0
 
 		}
 		scheduleNext(){
+			console.print(`Go time: %c${this.target.toDateString()} ${this.target.toLocaleString()}`,'background-color:#AAF;')
 			const delay = this.getDelay();
 			if(delay != null){
 				const targetRefreshTime = new Date( new Date().valueOf() + delay );
@@ -115,7 +236,7 @@
 			this.timerStatus.innerHTML=`Time:${time} Target: ${targetSec} Refresh: ${refreshSec}`;
 		}
 		formatSeconds(mS){
-			const allRemainingTenths = Math.floor(mS * 10 / SEC);
+			const allRemainingTenths = Math.floor(mS * 10 / SECONDS);
 			const tenths = allRemainingTenths % 10;
 			const totalSeconds = (allRemainingTenths-tenths) / 10;
 			let seconds = totalSeconds %60;
@@ -146,59 +267,85 @@
 		getOffsetFromTarget(){ return new Date().valueOf() - this.target.valueOf(); }
 	}
 
-
 	//==================
 	// ::Submit
 	//==================
-	class SubmitPage {
 
-		constructor( {formValues,show} ){
+	class Status{
+		success;
+		text;
+		constructor(success,text){this.success=success;this.text=text;}
+		static pass(text){ return new Status(true,text); }
+		static fail(text){ return new Status(false,text); }
+	}
+
+	class Submitter {
+
+		constructor(config){
+
+			this.config = config;
 
 			this.startMonitorTime = new Date().valueOf(); // record when start monitoring
 
-			const {firstName,lastName,email,phone,groupSize} = formValues;
-
-			status.innerHTML = '';
-			this.attemptStatus = create();
-			this.showStatus = create();
-
-			// Phase 1
-			this.grpSizeStatus = create(); // group Size
-			this.beStatus = create();
-
-			// Phase 2
-			this.firstStatus = create();
-			this.lastStatus = create();
-			this.phoneStatus = create();
-			this.emailStatus = create();
-			this.cbStatus = create();
-			this.submitStatus = create();
-			this.show = show;
+			this.status = {}
+			new Observable(this.status).define('attempt').define('show')
+				.define('groupSize').define('bookEvent')
+				.define('firstName').define('lastName').define('email').define('mobileNumber')
+				.define('cb').define('submit');
 
 			this.foundShow = false;
 			this.submittedForm = false;
 			this.finders = {
 				// Phase 1
-				groupSize: () => this.setGroupSize(groupSize,this.grpSizeStatus),
-				groupSize2: () => this.validateGroupSize(groupSize,this.grpSizeStatus),
-				bookEvent: () => this.bookEvent(this.beStatus),
+				setGroupSize:      () => this.setGroupSize(this.config.groupSize),
+				validateGroupSize: () => this.validateGroupSize(this.config.groupSize),
+				bookEvent:         () => this.bookEvent(),
+
 				// Phase 2
-				first: ()=> this.setTextValue('first',firstName,this.firstStatus),
-				last: ()=> this.setTextValue('last',lastName,this.lastStatus),
-				phone: ()=> this.setTextValue('mail',email,this.emailStatus),
-				email: ()=> this.setTextValue('mobile',phone,this.phoneStatus), // "mobileNumber"
-				privacyAgreement: () => this.checkPrivacyAgreement(this.cbStatus)
+				first: ()=> this.setTextValue('firstName',this.config.firstName),
+				last: ()=>  this.setTextValue('lastName',this.config.lastName),
+				email: ()=> this.setTextValue('email',this.config.email),
+				mobileNumber: ()=> this.setTextValue('mobileNumber',this.config.phone),
+
+				privacyAgreement: () => this.checkPrivacyAgreement(),
 			};
 
-			// stop button
-			const stop = this.attemptStatus;// buttons.appendChild(document.createElement('button'));
-			Object.assign(stop.style,{cursor:'pointer'});
-			stop.innerHTML = '* STOP *';
-			stop.addEventListener("click", this.stop.bind(this))
+		}
+
+		showInStatusBar(statusBar){
+			statusBar.innerHTML = '';
+			const {status} = this;
+
+			function create(prop){
+				const span = new El('span').css(css.status).appendTo(statusBar).el;
+				if(prop)
+					status.listen(prop,({newValue})=>{ 
+						span.innerHTML=newValue.text;
+						Object.assign(span.style,newValue.success?css.success:css.fail);
+					});
+				return span;
+			}
+
+			const attemptStatus = create();
+			Object.assign(attemptStatus.style,{cursor:'pointer'});
+			attemptStatus.addEventListener("click", this.stop.bind(this))
+			this.status.listen('attempt',({attempt})=>{
+				if(attempt == "stopped"){
+					attemptStatus.innerHTML = 'Stopped';
+					attemptStatus.style.color='red';
+				} else {
+					attemptStatus.style.color='green';
+					attemptStatus.style.backgroundColor = 'white';
+					attemptStatus.innerHTML = attempt;
+				}
+			});
+			"show,groupSize,bookEvent,firstName,lastName,mobileNumber,email,cb,submit".split(',').forEach(create);
+			return this;
 		}
 
 		monitor(){
-			console.debug('Monitoring... %cSUBMIT','background-color:#0F0');
+			console.print('%cattempting to submit page...','color:green;');
+
 			this.attempt = 0;
 			this.intervalId = setInterval(this.onTick.bind(this),200);
 
@@ -221,51 +368,49 @@
 			}
 
 			// if no finders are left, try to submit the form
-			if( Object.keys(this.finders) == 0 && this.submittedForm==false){
+			const isReadyToSubmit = Object.keys(this.finders) == 0 || !(this._findSubmitButton()||{}).disabled;
+			if( isReadyToSubmit && !this.submittedForm){
 				this.submittedForm = this.submitForm();
 				if(this.submittedForm) this.stop();
 			}
 
-			if(++this.attempt == 500){
+			const maxAttempts = 500;
+			if(++this.attempt == maxAttempts){
 				this.stop();
-				this.attemptStatus.innerHTML = 'Stopped';
-				this.attemptStatus.style.color='red';
-			} else {
-				this.attemptStatus.style.color='green';
-				this.attemptStatus.style.backgroundColor = 'white';
-				this.attemptStatus.innerHTML = `Attempt ${this.attempt}`;
-			}
+				this.status.attempt="stopped";
+			} else
+				this.status.attempt=`Attempt ${this.attempt} of ${maxAttempts}`;
 		}
 
 		stop(){ clearInterval(this.intervalId); }
 
 		selectShow(){ // return null if unsuccessful
-			const divs = [...document.querySelectorAll('div[aria-label]')];
-			const div = divs.find(div=>(div.getAttribute('aria-label')||'').includes(this.show));
-			if(div == undefined){
-				const ariaLabels = divs.map(d=>d.getAttribute('aria-label')).join(',')
-				// console.debug(`No match in ${divs.length} div[aria-label]s: [${ariaLabels}] for show [${this.show}]`);
-				this.showStatus.fail(`No div[aria-label] match in ${divs.length} divs`);
-
-				// After N second reload the page.
-				const now = new Date().valueOf();
-				if( this.startMonitorTime + 2 * SEC < now )
-					location.reload(true);
-				return;
+			if(this.config.show){
+				const show = ShowDiv.findCurrent()
+					.find( ({label})=>label.includes(this.config.show) );
+				if(show){
+					try{ show.div.click(); }catch(err){}
+					this.status.show = Status.pass(`Show selected.`);
+					return true;
+				}
 			}
 
-			try{ div.click(); }catch(err){}
-			this.showStatus.pass(`Show selected.`);
-			return true;
+			this.status.show = Status.fail(`'${this.config.show}' not found.`);
+
+			// After N second reload the page.
+			const now = new Date().valueOf();
+			if( this.startMonitorTime + 2000 * SECONDS < now )
+				location.reload(true);
 		}
 
 		// Fills in the Form Text + triggers 
 		// Triggers validatio nvia events
-		setTextValue(sub,value,status){
+		setTextValue(sub,value){
 			try{
 				const matches = this.inputs.filter(i=>elementIs(i,sub) );
+
 				if(matches.length != 1){
-					status.fail(`'${sub}': ${matches.length} matches`);
+					this.status[sub] = Status.fail(`'${sub}': (${matches.length})`);
 					return false;
 				}
 				const match = matches[0];
@@ -273,7 +418,7 @@
 				match.dispatchEvent(new Event('change'));
 				match.dispatchEvent(new Event('blur'));
 
-				status.pass(`${sub} set.`);
+				this.status[sub] = Status.pass(`${sub} set.`)
 				return true;
 			}
 			catch(ex){
@@ -284,9 +429,11 @@
 		// GroupSize - Part 1
 		// Open Group-Size dropdown and clicks groups size
 		// once it thinks it has succeeded, it stops trying - gives user the ability to intercede
-		setGroupSize(size,status){
+		setGroupSize(size){
 			try{
-				const groupSizeDiv = this.getGroupSizeDiv(status);
+				const groupSizeDiv = this.getGroupSizeDiv();
+				if(groupSizeDiv ==null)
+					this.status.groupSize = Status.fail('group-size not found.');
 				if(groupSizeDiv == null) return false;
 
 				// -----------------
@@ -300,9 +447,10 @@
 				// -----------------
 				// CLICK - Find option & Set it!
 				const options = [...groupSizeDiv.querySelectorAll('div.group-size-dropdown ul.dropdown-menu li a')];
-				const index = size-1; // assuming size=1 is in index=0
+				const index = Math.max(+size,1)-1; // assuming size=1 is in index=0 // missing or negative size, use 1
 				if(!(index < options.length)){
-					status.fail(`Too few Grp-Size Options: ${options.length}`);
+					this.status.groupSize = Status.fail(`Too few Grp-Size Options: ${options.length}`);
+					// status.fail(`Too few Grp-Size Options: ${options.length}`);
 					return false;
 				}
 				options[index].click();
@@ -319,18 +467,22 @@
 		// GroupSize - Part 2
 		// Checks if the select-group-size action succeeded
 		// Does not actually Do anything, allows user to intercede
-		validateGroupSize(size,status){
+		validateGroupSize(size){
 			try{
-				const groupSizeDiv = this.getGroupSizeDiv(status);
-				if(groupSizeDiv == null) return false;
+				const groupSizeDiv = this.getGroupSizeDiv();
+				if(groupSizeDiv ==null){
+					this.status.groupSize = Status.fail('group-size not found.');
+					return null;
+				}
 
 				// check if it was set
 				const btns = [...groupSizeDiv.querySelectorAll('button')];
 				const changed = btns.length==2 && btns[0].innerHTML == size;
-				if(changed)
-					status.pass("Grp-Size Set");
-				else 
-					status.fail("Grp-Size NOT Set");
+				if(changed){
+					this.status.groupSize = Status.pass("Grp-Size Set")
+				} else {
+					this.status.groupSize = Status.fail("Grp-Size NOT Set")
+				}
 				return changed;
 			}
 			catch(er){
@@ -339,217 +491,214 @@
 
 		}
 
-		getGroupSizeDiv(status){
-			const groupSizeDiv = document.querySelector('div.group-size div.group-size-dropdown');
-			if(groupSizeDiv ==null)
-				status.fail('group-size-dropdown not found.');
-			return groupSizeDiv;
+		getGroupSizeDiv(){
+			return document.querySelector('div.group-size div.group-size-dropdown');
 		}
 
-		bookEvent(status){
-			// const btn = document.querySelector('button.btn-book-event'); // old
-			const btn = document.querySelector('button.btn-complete'); // new
+		// Step 1 - After selecting group size
+		bookEvent(){
+			const btn = document.querySelector('button.btn-book-event');
 			if(btn == null){
-				status.fail('Book-Event btn not found');
+				this.status.bookEvent = Status.fail('Book-Event not found');
 				return false;
 			}
 			if(btn.click) btn.click();
 			if(btn.triggerHandler) btn.triggerHandler('click');
-			status.pass('Book-Event clicked');
+			this.status.bookEvent = Status.pass('Book-Event clicked');
 			return true;
 		}
 
-		checkPrivacyAgreement(status){
+		checkPrivacyAgreement(){
 			try{
 				const checkBox = document.querySelector('#privacy-agreement');
 				if(checkBox == null){
-					status.fail('privacy-agreement cb not found.');
+					this.status.cb = Status.fail('privacy-agreement not found.');
+					// status.fail('privacy-agreement not found.');
 					return false;
 				}
 				checkBox.checked = true;
 				checkBox.dispatchEvent(new Event('change'));
 				checkBox.dispatchEvent(new Event('click'));
-				status.pass('checked privacy-agreement');
+				this.status.cb = Status.pass('checked privacy-agreement');
+				// status.pass('checked privacy-agreement');
 				return true;
 			}
 			catch(ex){
 				console.error('checkPrivacyAgreement',ex);
-				status.fail('CB exception.');
+				// status.fail('CB exception.');
+				this.status.cb = Status.fail('CB exception.');
 			}
 			return false;
 		}
 
+		// Step 2 - After filling out all user information.
 		submitForm(){
 
-			const submitButton = document.querySelector('div.details button.btn-book-event');
+			const submitButton = this._findSubmitButton();
 			if(submitButton == null){
-				this.submitStatus.fail('no submit found');
+				this.status.submit = Status.fail('no submit found');
 				return;
 			}
 			if( submitButton.disabled ){
-				this.submitStatus.fail('submit is disabled');
+				this.status.submit = Status.fail('submit is disabled');
 				return false;
 			}
 
-			const now = new Date().toString();
-			console.print(`submitting at ${now}`);
-			this.submitStatus.pass(`submitting... at ${now}`);
+			const now = new Date().toLocaleString();
+			this.status.submit = Status.pass(`submitting... at ${now}`);
+			console.print(`submitting at ${now}`,nowStamp(),goStamp());
 			submitButton.click();
 			return true;
 		}
+		_findSubmitButton(){ return document.querySelector('button.btn-complete'); }
 	}
 
 	function elementIs(el,type){
 		const combined = (el.name||'') + (el.id||'');
-		return combined.toLowerCase().includes(type);
+		const result = combined.toLowerCase().includes(type.toLowerCase());
+		if(result)
+			console.log('elIs',type,el.name,el.id);
+		return result;
 	}
 
-	function getNextThursday10Am(){
-		const date = new Date();
-		const daysFromNow = ((7+4)-date.getDay())%7;
-		const targetDate = new Date(date.valueOf() + daysFromNow * DAYS);
-		const yyyy = targetDate.getFullYear(), mm = targetDate.getMonth(), dd = targetDate.getDate();
-		return new Date(yyyy,mm,dd,10,0,2,0); // 2 second delay, 1 second was too fast (my clock is ahead by 582ms per https://time.gov)
+	// Run on Page-Load to know what state we are in.
+	function showCountAsync(timeout = 2*SECONDS){
+		// wait for either:
+		return new Promise((resolve,reject)=>{
+			// the shows to appear on the snooper
+			snooper.addHandler(x => {
+				const {url:{pathname},responseText} = x;
+				if(pathname.includes('/booking-widget/event/events/')){
+					stop('snoop',JSON.parse(responseText).length);
+					x.handled = "events";
+				}
+			} );
+			// the DIVs to appear
+			const timerId = setInterval(()=>{ const count = ShowDiv.findCurrent().length; if(count) stop('div',count); },100);
+			// or the timeout
+			const timeoutId = setTimeout(()=>stop('timeout',0), timeout);
+			function stop(reason,val){ 
+				resolve(val); 
+				clearInterval(timerId); 
+				clearTimeout(timeoutId);
+				console.log('Initial show counts:',val,reason,nowStamp(),goStamp());
+			}
+		})
+		// OR
+		// UI widgets to appear
+		// OR TIMEOUT
 	}
-	const nextThursdayGoTime = getNextThursday10Am();
 
-	const liveShow = "LIVE SHOW"; // LIVE SHOW STANDBY - Saturday Night Live
-	const dressRehearsal = "DRESS REHEARSAL"; // DRESS REHEARSAL STANDBY - Saturday Night Live
+	class Waiter {
+		constructor(orgId){this.orgId=orgId;}
 
-	// =================
-	// :: CONFIGS
-	// =================
-
-	const refreshStrategy = new RefreshStrategy({
-		pre: [60*MIN,45*MIN,30*MIN,15*MIN,5*MIN,2*MIN,1*MIN,20*SEC,5*SEC,0],
-		target: nextThursdayGoTime,
-		postInterval: 2*SEC,
-		postRetryPeriod: 2*MIN
-	});
-
-	const kevinConfig = { refreshStrategy,
-		show:liveShow,
-		formValues: {
-			firstName:'Kevin',
-			lastName:'Rettig',
-			email:'krettig@gmail.com',
-			phone:'9372419474',
-			groupSize: 3
+		reloadWhenShowsAppear(timeout=3*SECONDS){
+			const waiter = this;
+			console.print(`Waiting ${timeout}ms for shows to appear`);
+			const intervalId = setInterval(async function() {
+				try{
+					const shows = await waiter.fetchShowsAsync();
+					console.log(`${shows.length} shows`);
+					if(shows.length) done();
+				} catch (err){ }
+			},250);
+			const timeoutId = setTimeout(done, timeout);
+			function done(){ clearTimeout(timeoutId); clearInterval(intervalId); waiter.reload(); }
 		}
-	};
 
-	const karenConfig = { refreshStrategy,
-		show:liveShow, // liveShow  dressRehearsal
-		formValues: {
-			firstName:'Karen',
-			lastName:'Gardinsky',
-			email:'kgardinsky@gmail.com',
-			phone:'740-255-0887',
-			groupSize: 3
+		async fetchShowsAsync(){
+			const response = await fetch(`https://bookings-us.qudini.com/booking-widget/event/events/${this.orgId}`);
+			if(!response.ok) throw "bad response";
+			return await response.json();
 		}
-	};
-
-	const chrisConfig = { refreshStrategy,
-		show:liveShow, // liveShow  dressRehearsal
-		formValues: {
-			firstName:'Christopher',
-			lastName:'Rettig',
-			email:'rettigcd@gmail.com',
-			phone:'513-470-0774',
-			groupSize: 2
-		}
-	};
-
-	const deanConfig = { refreshStrategy,
-		show:dressRehearsal, // liveShow  dressRehearsal
-		formValues: {
-			firstName:'Dean',
-			lastName:'Rettig',
-			email:'dean.rettig@infernored.com',
-			phone:'513-338-7390',
-			groupSize: 2
-		}
-	};
-
-	const testConfig = { 
-		// for testing, use a new Refresh strategy with custom target
-		refreshStrategy: new RefreshStrategy({
-			pre: [60*MIN,45*MIN,30*MIN,15*MIN,5*MIN,2*MIN,1*MIN,20*SEC,5*SEC,0],
-			target: nextThursdayGoTime.valueOf() + 3*MIN < new Date().valueOf()  // if(after go-time)
-				? new Date(new Date().valueOf() + 1 * MIN )  // add 1 minute
-				: nextThursdayGoTime, // go-time
-			postInterval: 2*SEC,
-			postRetryPeriod: 2*MIN
-		}),
-		show:dressRehearsal, 
-		formValues: {
-			firstName:'Christopher',
-			lastName:'Rettig',
-			email:'rettigcd@gmail.com',
-			phone:'513-470-0774',
-			groupSize: 2
-		}
-	};
-
-	const configs = {
-		test : testConfig,
-		dean : deanConfig,
-		kevin : kevinConfig,
-		karen : karenConfig,
-		chris : chrisConfig
-	};
-
-	const configKey = localStorage.curConfig || 'test';
-
-	const config = configs[configKey];
-	console.print(`Using Config: %c[${configKey}] for [${config.show}]`,'background-color:#AAF;font-size:16px;')
-	console.print(JSON.stringify(config.formValues,null,'\t'))
-	console.print(`Go time: %c${config.refreshStrategy.target.toDateString()} ${config.refreshStrategy.target.toLocaleString()}`,'background-color:#AAF;')
-
-	if( new Date().valueOf() < config.refreshStrategy.target.valueOf() ){
-		config.refreshStrategy.scheduleNext();
-	} else {
-		const page = new SubmitPage( config );
-		page.monitor();
+		reload(){ location.reload(); }
 	}
+
+	// ===============
+	// ::Init
+	// ===============
+	async function initPageAsync(){
+
+		const liveShow = "LIVE SHOW"; // LIVE SHOW STANDBY - Saturday Night Live
+		const dressRehearsal = "DRESS REHEARSAL"; // DRESS REHEARSAL STANDBY - Saturday Night Live
+		const snlOrgId = "B9KIOO7ZIQF";
+		const [,orgId,eventId] = document.location.href.match(/events\/([^#]+)#\/event\/(.*)/);
+		const isSnl = orgId == snlOrgId;
+		const configRepo = new SyncedPersistentDict(orgId);
+		const myConfig = new MyConfig( configRepo );
+		const waiter = new Waiter(orgId);
+	
+		myConfig.showOptions = ["[none]",liveShow,dressRehearsal];
+		myConfig.configOptions = configRepo.keys();
+		myConfig.name = localStorage.curConfig;
+	
+		console.print(`Using Config: %c[${myConfig.name}] for [${myConfig.show}]`,'background-color:#AAF;font-size:16px;')
+		console.print(JSON.stringify(myConfig,null,'\t'))
+
+		// wait for shows to load
+		const hasShows = await showCountAsync();
+
+		// UI
+		const topBar = new El('div').css(css.topBar).appendTo( document.body ).el;
+		const statusBar = new El('p').css(css.subBar).appendTo(topBar).el;
+		showConfig(myConfig,topBar);
+
+		if(hasShows){
+			const submitter = new Submitter(myConfig).showInStatusBar(statusBar);
+			if(!isSnl)
+				submitter._findSubmitButton = function(){
+					return { 
+						get disabled(){ const btn = document.querySelector('button.btn-complete'); return btn==null || btn.disabled; },
+						click:function(){ console.log("!!! SUBMITTED !!!"); }
+					};
+				}
+			submitter.monitor();
+		} else if( new Date().valueOf() < goTime.valueOf() )
+			new RefreshStrategy( goTime, statusBar ).scheduleNext();
+		else
+			waiter.reloadWhenShowsAppear(3*SECONDS);
+
+		unsafeWindow.test = {
+			waiter : {
+				fetch: async function(){
+					try{
+						const shows = await waiter.fetchShowsAsync();
+						console.log(`%cFound ${shows.length} Shows`,'color:green');
+					} catch(err){
+						console.error(err);
+					}
+				},
+				reload: function(){ waiter.reload(); },
+				timesOut: function(){
+					const start = new Date();
+					let fetchCounts = 0;
+					const waiter = new Waiter(orgId);
+					waiter.fetchShowsAsync = () => { fetchCounts++; return Promise.resolve([]) };
+					waiter.reload = function(){ this.done=new Date(); console.log('RELOAD', fetchCounts, this.done.valueOf()-start.valueOf()); };
+					waiter.reloadWhenShowsAppear(3*SECONDS);
+				},
+				findsShows: function(){ // after 1.5 seconds
+					const start = new Date();
+					let fetchCounts = 0;
+					const waiter = new Waiter(orgId);
+					const findShowsAfter = new Date().valueOf() + 1500;
+					waiter.fetchShowsAsync = () => { 
+						fetchCounts++;
+						const delta = new Date().valueOf() - findShowsAfter, shows = 0<delta ? ["show"] : [];
+						return Promise.resolve( shows );
+					};
+					waiter.reload = function(){ this.done=new Date(); console.log('RELOAD', fetchCounts, this.done.valueOf()-start.valueOf()); };
+					waiter.reloadWhenShowsAppear(3*SECONDS);
+				}
+			}
+		}
+
+	};
+	initPageAsync();
 
 	queueMicrotask (console.debug.bind (console, '%cSNL Standby - loaded','background-color:#DFD;')); // Last line of file
 
 })();
-
-/*
-
-===  TODO / TOFIX  ===
-
-* Display Form Fields in top
-* Make it easier to change configurations. // Drop down?
-* Don't click Book-Event unless the GroupSize is correct.
-* if checkbox btn not found, console.log( all checboxes.outerHTML )
-
-===  Example html  ===
-
-<button 
-	class="btn btn-info btn-book-event pull-right btn-focus" 
-	ng-click="$ctrl.onBookEvent(attendee)" 
-	ng-disabled="attendee.groupSize > $ctrl.booking.event.slotsAvailable" 
-	ng-show="$ctrl.booking.event.slotsAvailable > 0" 
-	analytics-on="click" 
-	tabindex="1" 
-	analytics-event="Book Event Button Event Details" 
-	analytics-label="Event Booking: book event button" 
-	role="button" 
-	aria-labelledby="book-event-label">
-	<span translate="" id="book-event-label"><span class="ng-scope">Book Standby Reservation</span></span>
-</button>
-<input id="privacy-agreement" type="checkbox" ng-click="$ctrl.togglePrivacy()" ng-model="$ctrl.privacyAgreed" aria-checked="$ctrl.privacyAgreed" aria-required="true" aria-label="I confirm and acknowledge. " required="" name="I confirm and acknowledge. " role="button" class="ng-dirty ng-valid-parse ng-not-empty ng-valid ng-valid-required ng-touched">
-
-NOTES
-	tried 1 second after, didn't work, wait 2 seconds
-	If we should find forms but can't (all read) for 2 seconds, reload
-	Took me some time to relize page didn't load.
-
-	Log the entire DOCUMENT when the submit button isn't found so we can figure out why.
-
-	Record video at bottom of screen so we can see "Done" or "Submit" button
-
-*/
+// TODO: 
+//	Test Target Time
+//	Consider not reloading at target time but just enable Waiter
