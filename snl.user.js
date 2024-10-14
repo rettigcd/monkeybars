@@ -167,7 +167,7 @@
 	function showConfig(config,topBar){
 		const inputBar = new El('p').css(css.subBar).css({background:"#aaf"}).text('Config: ').appendTo(topBar).el;
 		new SelectEl().css({}).bindOptions(config,'configOptions').bind(config,'name').appendTo(inputBar);
-		new El('button').appendTo(inputBar).text('➕').on('click',()=>config.addAddUser());
+		new El('button').appendTo(inputBar).text('➕').on('click',()=>config.addUser());
 		new El('button').appendTo(inputBar).text('➖').on('click',()=>config.removeName());
 		new InputEl().css(css.input).attr('placeholder','first').bind(config,'firstName').appendTo(inputBar);
 		new InputEl().css(css.input).attr('placeholder','last').bind(config,'lastName').appendTo(inputBar);
@@ -207,8 +207,9 @@
 	// ::Refresh
 	//==================
 	class RefreshStrategy {
-		constructor(target,statusBar){
+		constructor(target,statusBar,waiter){
 			this.target = target;
+			this.waiter = waiter;
 			this.pre = [60*MINUTES,45*MINUTES,30*MINUTES,15*MINUTES,5*MINUTES,2*MINUTES,1*MINUTES,20*SECONDS,5*SECONDS,0];
 
 			this.postInterval = 2*SECONDS;
@@ -220,17 +221,24 @@
 		}
 		scheduleNext(){
 			console.print(`Go time: %c${this.target.toDateString()} ${this.target.toLocaleString()}`,'background-color:#AAF;')
-			const delay = this.getDelay();
+			const {delay,status} = this.getDelay();
 			if(delay != null){
 				const targetRefreshTime = new Date( new Date().valueOf() + delay );
 				console.print(`Scheduling page refresh for %c${targetRefreshTime.toLocaleTimeString()}`,'background-color:#dfd');
-				setTimeout( ()=> location.reload(true), delay );
+				setTimeout( ()=> { 
+					switch(status){
+						case 'before': location.reload(); break;
+						case 'go': this.waiter.reloadWhenShowsAppear(timeout=3*SECONDS); break;
+						case 'after': this.waiter.reloadWhenShowsAppear(timeout=3*SECONDS); break;
+						default: break;
+					}
+				}, delay );
 			}
 			setInterval( this.showRemainingTime.bind(this), 100 )
 		}
 
 		showRemainingTime(){
-			const refreshSec = this.formatSeconds( this.getDelay() );
+			const refreshSec = this.formatSeconds( this.getDelay().delay );
 			const targetSec = this.formatSeconds( -this.getOffsetFromTarget() );
 			const time = new Date().toLocaleTimeString();
 			this.timerStatus.innerHTML=`Time:${time} Target: ${targetSec} Refresh: ${refreshSec}`;
@@ -250,17 +258,20 @@
 
 			if(offset < 0){
 				const nextRefresh = this.pre.find(s=>offset+s<0); // find 1st that is still before target
-				return (-offset) - nextRefresh // (now-target) - (refreshTime-target)
+				return {
+					delay:(-offset)-nextRefresh,   // (now-target) - (refreshTime-target)
+					status: nextRefresh == 0 ? 'go' : 'before',
+				};
 			}
 
 			if( offset < this.postRetryPeriod ){
-				return this.postInterval;
+				return {delay:this.postInterval, status: 'after'};
 			}
 
 			// Exceeded try period
 			const secondsAfterRetry = (offset - this.postRetryPeriod)/1000;
 			console.print(`${secondsAfterRetry} sec after retry period. not scheduling reload`);
-			return null;
+			return {delay:null,status:'timeout'};
 		}
 
 		// + is after, - is before
@@ -400,7 +411,7 @@
 			// After N second reload the page.
 			const now = new Date().valueOf();
 			if( this.startMonitorTime + 2000 * SECONDS < now )
-				location.reload(true);
+				location.reload();
 		}
 
 		// Fills in the Form Text + triggers 
@@ -418,7 +429,7 @@
 				match.dispatchEvent(new Event('change'));
 				match.dispatchEvent(new Event('blur'));
 
-				this.status[sub] = Status.pass(`${sub} set.`)
+				this.status[sub] = Status.pass(`${sub} &#x2714;`)
 				return true;
 			}
 			catch(ex){
@@ -479,7 +490,7 @@
 				const btns = [...groupSizeDiv.querySelectorAll('button')];
 				const changed = btns.length==2 && btns[0].innerHTML == size;
 				if(changed){
-					this.status.groupSize = Status.pass("Grp-Size Set")
+					this.status.groupSize = Status.pass("Grp-Size &#x2714;")
 				} else {
 					this.status.groupSize = Status.fail("Grp-Size NOT Set")
 				}
@@ -504,7 +515,7 @@
 			}
 			if(btn.click) btn.click();
 			if(btn.triggerHandler) btn.triggerHandler('click');
-			this.status.bookEvent = Status.pass('Book-Event clicked');
+			this.status.bookEvent = Status.pass('Book-Event &#x2714;');
 			return true;
 		}
 
@@ -513,19 +524,16 @@
 				const checkBox = document.querySelector('#privacy-agreement');
 				if(checkBox == null){
 					this.status.cb = Status.fail('privacy-agreement not found.');
-					// status.fail('privacy-agreement not found.');
 					return false;
 				}
 				checkBox.checked = true;
 				checkBox.dispatchEvent(new Event('change'));
 				checkBox.dispatchEvent(new Event('click'));
 				this.status.cb = Status.pass('checked privacy-agreement');
-				// status.pass('checked privacy-agreement');
 				return true;
 			}
 			catch(ex){
 				console.error('checkPrivacyAgreement',ex);
-				// status.fail('CB exception.');
 				this.status.cb = Status.fail('CB exception.');
 			}
 			return false;
@@ -545,7 +553,7 @@
 			}
 
 			const now = new Date().toLocaleString();
-			this.status.submit = Status.pass(`submitting... at ${now}`);
+			this.status.submit = Status.pass(`submitting &#x2714;`);
 			console.print(`submitting at ${now}`,nowStamp(),goStamp());
 			submitButton.click();
 			return true;
@@ -556,8 +564,6 @@
 	function elementIs(el,type){
 		const combined = (el.name||'') + (el.id||'');
 		const result = combined.toLowerCase().includes(type.toLowerCase());
-		if(result)
-			console.log('elIs',type,el.name,el.id);
 		return result;
 	}
 
@@ -581,7 +587,7 @@
 				resolve(val); 
 				clearInterval(timerId); 
 				clearTimeout(timeoutId);
-				console.log('Initial show counts:',val,reason,nowStamp(),goStamp());
+				console.print('Initial show counts:',val,reason,nowStamp(),goStamp());
 			}
 		})
 		// OR
@@ -645,16 +651,18 @@
 
 		if(hasShows){
 			const submitter = new Submitter(myConfig).showInStatusBar(statusBar);
-			if(!isSnl)
+			if(!isSnl){
+				const oldFinder = submitter._findSubmitButton;
 				submitter._findSubmitButton = function(){
 					return { 
-						get disabled(){ const btn = document.querySelector('button.btn-complete'); return btn==null || btn.disabled; },
+						get disabled(){ const btn = oldFinder(); return btn==null || btn.disabled; },
 						click:function(){ console.log("!!! SUBMITTED !!!"); }
 					};
 				}
+			}
 			submitter.monitor();
 		} else if( new Date().valueOf() < goTime.valueOf() )
-			new RefreshStrategy( goTime, statusBar ).scheduleNext();
+			new RefreshStrategy( goTime, statusBar, waiter ).scheduleNext();
 		else
 			waiter.reloadWhenShowsAppear(3*SECONDS);
 
@@ -690,6 +698,9 @@
 					waiter.reload = function(){ this.done=new Date(); console.log('RELOAD', fetchCounts, this.done.valueOf()-start.valueOf()); };
 					waiter.reloadWhenShowsAppear(3*SECONDS);
 				}
+			},
+			refresh : {
+
 			}
 		}
 
@@ -699,6 +710,22 @@
 	queueMicrotask (console.debug.bind (console, '%cSNL Standby - loaded','background-color:#DFD;')); // Last line of file
 
 })();
-// TODO: 
-//	Test Target Time
-//	Consider not reloading at target time but just enable Waiter
+/*
+TODO: 
+	Test Target Time
+	Test checkbox
+	Consider not reloading at target time but just enable Waiter
+
+Given: soon target time
+When: cross target
+Then: engaves waiter, which reloads
+
+Currently: If Shows, submit them.     
+	CON: can't test reload while there is a show
+
+Switch To: If before target, Reload.  
+	CON: could possibly be show and not see it.
+	CON: can't test form selection
+
+
+*/
