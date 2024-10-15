@@ -204,45 +204,57 @@
 		}
 	}
 	//==================
-	// ::Refresh
+	// ::Waiter
 	//==================
-	class RefreshStrategy {
-		constructor(target,statusBar,waiter){
-			this.target = target;
-			this.waiter = waiter;
-			this.pre = [60*MINUTES,45*MINUTES,30*MINUTES,15*MINUTES,5*MINUTES,2*MINUTES,1*MINUTES,20*SECONDS,5*SECONDS,0];
+	class Waiter {
+		constructor(orgId){
+			this.orgId=orgId;
+			this.pre = [60*MINUTES,45*MINUTES,30*MINUTES,15*MINUTES,5*MINUTES,2*MINUTES,1*MINUTES,20*SECONDS,10*SECONDS,0];
+
+			new Observable(this).define('delay').define('phase');
 
 			this.postInterval = 2*SECONDS;
 			this.postRetryPeriod = 2*MINUTES;
-			this.timerStatus = new El('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar).el;
 			if(this.pre[this.pre.length-1] != 0) this.pre.push(0);
 			// pre must be in descending order, and should end with 0
-
 		}
-		scheduleNext(){
+	
+		// == Phase 1 - waiting for target goTime ==
+		scheduleNext(target,showAppearTimeout=3*SECONDS){ // starts time for next reload / or monitor for shows
+			this.target = target;
 			console.print(`Go time: %c${this.target.toDateString()} ${this.target.toLocaleString()}`,'background-color:#AAF;')
-			const {delay,status} = this.getDelay();
-			if(delay != null){
-				const targetRefreshTime = new Date( new Date().valueOf() + delay );
-				console.print(`Scheduling page refresh for %c${targetRefreshTime.toLocaleTimeString()}`,'background-color:#dfd');
-				setTimeout( ()=> { 
-					switch(status){
-						case 'before': location.reload(); break;
-						case 'go': this.waiter.reloadWhenShowsAppear(timeout=3*SECONDS); break;
-						case 'after': this.waiter.reloadWhenShowsAppear(timeout=3*SECONDS); break;
-						default: break;
-					}
-				}, delay );
-			}
-			setInterval( this.showRemainingTime.bind(this), 100 )
+			const {delay,phase} = this.getDelay(); this.delay = delay; this.phase = phase;
+			if(delay === undefined) return;
+			const targetRefreshTime = new Date( new Date().valueOf() + delay );
+			console.print(`Scheduling page refresh for %c${targetRefreshTime.toLocaleTimeString()}`,'background-color:#dfd');
+			// update delay
+			const intervalId = setInterval( () => {
+				const {delay,phase} = this.getDelay();  this.delay = delay; this.phase = phase; // status is go, before, after, timeout
+				this.refreshSec = this.formatSeconds( delay );
+				this.targetSec = this.formatSeconds( -this.getOffsetFromTarget() );
+			}, 100 )
+			setTimeout( ()=> {
+				switch(phase){
+					case 'before': this.reload(); break;
+					case 'go': this.reloadWhenShowsAppear(showAppearTimeout); break;
+					case 'after': this.reloadWhenShowsAppear(showAppearTimeout); break;
+					default: break;
+				}
+				clearInterval( intervalId );
+			}, delay );
+			return this;
 		}
 
-		showRemainingTime(){
-			const refreshSec = this.formatSeconds( this.getDelay().delay );
-			const targetSec = this.formatSeconds( -this.getOffsetFromTarget() );
-			const time = new Date().toLocaleTimeString();
-			this.timerStatus.innerHTML=`Time:${time} Target: ${targetSec} Refresh: ${refreshSec}`;
+		displayRemainingTime(statusBar){
+			const timerStatus = new El('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar).el;
+			this.listen('delay',({delay})=> {
+				const refreshSec = this.formatSeconds( delay );
+				const targetSec = this.formatSeconds( -this.getOffsetFromTarget() );
+				timerStatus.innerHTML=`Time:${new Date().toLocaleTimeString()} Target: ${targetSec} Refresh: ${refreshSec} Phase: ${this.phase}`;
+			})
+			return this;
 		}
+
 		formatSeconds(mS){
 			const allRemainingTenths = Math.floor(mS * 10 / SECONDS);
 			const tenths = allRemainingTenths % 10;
@@ -260,22 +272,56 @@
 				const nextRefresh = this.pre.find(s=>offset+s<0); // find 1st that is still before target
 				return {
 					delay:(-offset)-nextRefresh,   // (now-target) - (refreshTime-target)
-					status: nextRefresh == 0 ? 'go' : 'before',
+					phase: nextRefresh == 0 ? 'go' : 'before',
 				};
 			}
 
 			if( offset < this.postRetryPeriod ){
-				return {delay:this.postInterval, status: 'after'};
+				return {delay:this.postInterval, phase: 'after'};
 			}
 
 			// Exceeded try period
-			const secondsAfterRetry = (offset - this.postRetryPeriod)/1000;
-			console.print(`${secondsAfterRetry} sec after retry period. not scheduling reload`);
-			return {delay:null,status:'timeout'};
+			return {delay:undefined,phase:'timeout'};
 		}
 
 		// + is after, - is before
 		getOffsetFromTarget(){ return new Date().valueOf() - this.target.valueOf(); }
+
+		// == Phase 2 - waiting for shows ==
+		reloadWhenShowsAppear(timeout=3*SECONDS){
+			this.watchingForShowsStart = new Date().valueOf();
+			const waiter = this;
+			console.print(`Waiting ${timeout}ms for shows to appear`);
+			const intervalId = setInterval(async function() {
+				try{
+					const shows = await waiter.fetchShowsAsync();
+					console.log(`${shows.length} shows`);
+					if(shows.length) done();
+				} catch (err){ }
+			},250);
+			const timeoutId = setTimeout(done, timeout);
+			function done(){ clearTimeout(timeoutId); clearInterval(intervalId); waiter.reload(); }
+		}
+
+		async fetchShowsAsync(){
+			const response = await fetch(`https://bookings-us.qudini.com/booking-widget/event/events/${this.orgId}`);
+			if(!response.ok) throw "bad response";
+			return await response.json();
+		}
+
+		reload(){ location.reload(); }
+
+		// for testing
+		stubReload(){
+			this.reload = function(){
+				this.done=new Date();
+				if(this.watchingForShowsStart)
+					console.log(`Show-watch duration: ${this.done.valueOf()-this.watchingForShowsStart}`);
+				console.log("%cRELOAD",'background:red;color:white;border:2px solid black;');
+			};
+			return this;
+		}
+
 	}
 
 	//==================
@@ -401,24 +447,19 @@
 					.find( ({label})=>label.includes(this.config.show) );
 				if(show){
 					try{ show.div.click(); }catch(err){}
-					this.status.show = Status.pass(`Show selected.`);
+					this.status.show = Status.pass('`Show selected.');
 					return true;
 				}
 			}
 
 			this.status.show = Status.fail(`'${this.config.show}' not found.`);
-
-			// After N second reload the page.
-			const now = new Date().valueOf();
-			if( this.startMonitorTime + 2000 * SECONDS < now )
-				location.reload();
 		}
 
 		// Fills in the Form Text + triggers 
 		// Triggers validatio nvia events
 		setTextValue(sub,value){
 			try{
-				const matches = this.inputs.filter(i=>elementIs(i,sub) );
+				const matches = this.inputs.filter(i=>i.name == sub );
 
 				if(matches.length != 1){
 					this.status[sub] = Status.fail(`'${sub}': (${matches.length})`);
@@ -559,12 +600,19 @@
 			return true;
 		}
 		_findSubmitButton(){ return document.querySelector('button.btn-complete'); }
-	}
 
-	function elementIs(el,type){
-		const combined = (el.name||'') + (el.id||'');
-		const result = combined.toLowerCase().includes(type.toLowerCase());
-		return result;
+		// for testing:
+		stubSubmit(){
+			console.print('%cstubbing out the submit button.','color:red;');
+			const oldFinder = this._findSubmitButton;
+			this._findSubmitButton = function(){
+				return { 
+					get disabled(){ const btn = oldFinder(); return btn==null || btn.disabled; },
+					click:function(){ console.log("%c!!! SUBMITTED !!!","background:red;font-size:16px;padding:3px;font-weight:bold;color:white;"); }
+				};
+			}
+		}
+
 	}
 
 	// Run on Page-Load to know what state we are in.
@@ -590,34 +638,6 @@
 				console.print('Initial show counts:',val,reason,nowStamp(),goStamp());
 			}
 		})
-		// OR
-		// UI widgets to appear
-		// OR TIMEOUT
-	}
-
-	class Waiter {
-		constructor(orgId){this.orgId=orgId;}
-
-		reloadWhenShowsAppear(timeout=3*SECONDS){
-			const waiter = this;
-			console.print(`Waiting ${timeout}ms for shows to appear`);
-			const intervalId = setInterval(async function() {
-				try{
-					const shows = await waiter.fetchShowsAsync();
-					console.log(`${shows.length} shows`);
-					if(shows.length) done();
-				} catch (err){ }
-			},250);
-			const timeoutId = setTimeout(done, timeout);
-			function done(){ clearTimeout(timeoutId); clearInterval(intervalId); waiter.reload(); }
-		}
-
-		async fetchShowsAsync(){
-			const response = await fetch(`https://bookings-us.qudini.com/booking-widget/event/events/${this.orgId}`);
-			if(!response.ok) throw "bad response";
-			return await response.json();
-		}
-		reload(){ location.reload(); }
 	}
 
 	// ===============
@@ -632,7 +652,7 @@
 		const isSnl = orgId == snlOrgId;
 		const configRepo = new SyncedPersistentDict(orgId);
 		const myConfig = new MyConfig( configRepo );
-		const waiter = new Waiter(orgId);
+		const waiter = new Waiter( orgId )
 	
 		myConfig.showOptions = ["[none]",liveShow,dressRehearsal];
 		myConfig.configOptions = configRepo.keys();
@@ -640,6 +660,7 @@
 	
 		console.print(`Using Config: %c[${myConfig.name}] for [${myConfig.show}]`,'background-color:#AAF;font-size:16px;')
 		console.print(JSON.stringify(myConfig,null,'\t'))
+		console.print(`Is SNL: ${isSnl}`);
 
 		// wait for shows to load
 		const hasShows = await showCountAsync();
@@ -651,18 +672,11 @@
 
 		if(hasShows){
 			const submitter = new Submitter(myConfig).showInStatusBar(statusBar);
-			if(!isSnl){
-				const oldFinder = submitter._findSubmitButton;
-				submitter._findSubmitButton = function(){
-					return { 
-						get disabled(){ const btn = oldFinder(); return btn==null || btn.disabled; },
-						click:function(){ console.log("!!! SUBMITTED !!!"); }
-					};
-				}
-			}
+			if(!isSnl) submitter.stubSubmit();
 			submitter.monitor();
 		} else if( new Date().valueOf() < goTime.valueOf() )
-			new RefreshStrategy( goTime, statusBar, waiter ).scheduleNext();
+			waiter.scheduleNext(goTime).displayRemainingTime(statusBar);
+			// waiter.stubReload().scheduleNext(new Date(new Date().valueOf()+10*SECONDS),5*SECONDS).displayRemainingTime(statusBar);
 		else
 			waiter.reloadWhenShowsAppear(3*SECONDS);
 
@@ -678,30 +692,30 @@
 				},
 				reload: function(){ waiter.reload(); },
 				timesOut: function(){
-					const start = new Date();
 					let fetchCounts = 0;
 					const waiter = new Waiter(orgId);
 					waiter.fetchShowsAsync = () => { fetchCounts++; return Promise.resolve([]) };
-					waiter.reload = function(){ this.done=new Date(); console.log('RELOAD', fetchCounts, this.done.valueOf()-start.valueOf()); };
+					waiter.stubReload();
 					waiter.reloadWhenShowsAppear(3*SECONDS);
 				},
 				findsShows: function(){ // after 1.5 seconds
-					const start = new Date();
+					const findShowsAfter = new Date().valueOf() + 1500;
 					let fetchCounts = 0;
 					const waiter = new Waiter(orgId);
-					const findShowsAfter = new Date().valueOf() + 1500;
 					waiter.fetchShowsAsync = () => { 
 						fetchCounts++;
 						const delta = new Date().valueOf() - findShowsAfter, shows = 0<delta ? ["show"] : [];
 						return Promise.resolve( shows );
 					};
-					waiter.reload = function(){ this.done=new Date(); console.log('RELOAD', fetchCounts, this.done.valueOf()-start.valueOf()); };
+					waiter.stubReload();
 					waiter.reloadWhenShowsAppear(3*SECONDS);
+				},
+				hitsTargetAndFinds: function(){
+					const start = new Date().valueOf();
+					waiter.stubReload();
+					waiter.scheduleNext(new Date(start + 3*SECONDS));
 				}
 			},
-			refresh : {
-
-			}
 		}
 
 	};
