@@ -16,7 +16,7 @@ class SyncedPersistentDict{
 		this.containsKey = function(key) { load(); return dict.hasOwnProperty(key); }
 		this.get = function(key) { load(); return dict.hasOwnProperty(key) ? dict[key] : newValueGenerator(); }
 		// Update functions
-		this.rename = function(oldKey,newKey){ updateDict( d=>{d[newKey]=d[oldKey]; delete d[oldKey]; } ); }
+		this.rename = function(oldKey,newKey){ updateDict( d=>{ if(oldKey in d) { d[newKey]=d[oldKey]; delete d[oldKey]; console.log(`Renamed [${oldKey}] to [${newKey}]`) }  else console.log(`${oldKey} not found.`); } ); }
 		this.remove = function(key){ updateDict(d=>delete d[key]); }
 		this.update = function(key,updater){ updateDict( d => {if(!d[key]) d[key]=newValueGenerator(); updater(d[key]); } ) }
 		this.sync = sync;
