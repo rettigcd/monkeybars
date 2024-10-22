@@ -770,6 +770,13 @@
 		});
 	}
 
+	// Convert string to a # from 0..1
+	function strToFloat(str){
+		function cc(a,i=0){ return a.charCodeAt(i);}
+		const v = [0,1,2].map(i=>{const k=str[i],[b,o] = ('0'<=k&&k<'9')?['0',1]:('a'<=k&&k<'z')?['a',11]:[k,0]; return cc(str,i)-cc(b)+o; });
+		return (v[0]*37*37 + v[1]*37 + v[2])/(37*37*37);
+	}
+
 	// ===============
 	// === Reports ===
 	// ===============
@@ -784,7 +791,8 @@
 			'4':(x)=>2*WEEKS,
 			'5':(x)=>1*WEEKS,
 		})[x.score](x) || 6*MONTHS;
-		return (x.lastVisit||0) + timeframe;
+		return (x.lastVisit||0) + timeframe 
+			+ Math.floor((strToFloat(x.username) - .5) * 4 * DAYS); // spread out over 4 days
 	}
 	function withinLast(timestamp,threshold){ return loadTimeMs <= (timestamp||0) + threshold; }
 	const filters = {
