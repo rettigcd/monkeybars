@@ -92,22 +92,18 @@
 
 	// ===== Promises =====
 
-	function executePromisesInParallel(asyncActions,parallelCount=8){
-		const deferred = $.Deferred();
+	function executePromisesInParallelAsync(asyncActions,parallelCount=8,progressCallback=function(){}){
 		const status = {loaded:0,total:asyncActions.length};
+		progressCallback(status);
 		asyncActions=asyncActions.slice(); // make copy so we can modify
-
 		async function processAsync(){
 			while(0<asyncActions.length){
 				try{ await (asyncActions.shift())(); } catch (error) { console.log(error); }
 				++status.loaded;
-				deferred.notify(status);
+				progressCallback(status);
 			}
-			if(status.loaded == status.total) deferred.resolve();
 		}
-
-		while(parallelCount--) processAsync();
-		return deferred;
+		return Promise.all( Array.from({length:parallelCount},()=>processAsync()) );
 	}
 
 	// =====  Begin: Models  =====
@@ -276,6 +272,7 @@
 			throw 'unable to rewrite Image Url for image: ' + orig;
 		}
 
+		// Downloads image to "Downloads" folder
 		downloadAsync(){
 			return new Promise((resolve,reject) => {
 				const id = setTimeout(()=>{
@@ -408,12 +405,11 @@
 			this.$thumbDiv = $thumbDiv;
 			this.$progressDiv = $progressDiv;
 			this.model = model;
-			this.model.listen('rows',({rows}) => {
-				this._loadRows(rows);
-			})
+			this.model.listen('rows',({rows}) => this._showRowViewsAsync(rows) );
 		}
 		loadRows(rowData){ this.model.rows = rowData; }
-		_loadRows(rowData){
+
+		async _showRowViewsAsync(rowData){
 
 			this.$thumbDiv.empty();
 			window.scrollTo(0,0); // incase scrolled to bottom, scroll back to top
@@ -430,8 +426,10 @@
 			});
 
 			this._showCloseButton();
-			return this.loadRowsSequentially();
+			for(let rowView of this.rows)
+				await rowView.loadAsync();
 		}
+
 		_adjustCounts(deltaVisible,deltaTotalRowCount){
 			this.visibleRowCount += deltaVisible;
 			this.totalRowCount += deltaTotalRowCount;
@@ -440,24 +438,6 @@
 			this.$progressDiv.text(`${this.visibleRowCount} of ${this.totalRowCount} rows`);
 		}
 
-		// Load the images, 1 row at a time, from top to bottom so we can work with top row while bottom rows are loading.
-		loadRowsSequentially(){
-			// !!! seems like this could be rewritten generically as RunPromises in sequence.
-			let rows = this.rows.slice();
-			let $deferred = $.Deferred();
-			let progress = { loaded:0, total:rows.length };
-
-			function showNextRow(){
-				if(rows.length){
-					const loadComplete = rows.shift().load();
-					loadComplete.then(function(){ progress.loaded++; $deferred.notify(progress); })
-					loadComplete.then(showNextRow);
-				} else
-					$deferred.resolve(); // .reject()
-			}
-			showNextRow();
-			return $deferred.promise();
-		}
 		_showCloseButton(){
 			const buttonCss = {'border':'3px outset black','padding':'3px','margin':'2px','background':'gray'}
 			this._$closeButton = $('<button>').appendTo(this.$thumbDiv).text('close all').css(buttonCss)
@@ -507,15 +487,15 @@
 		close(){
 			this.model.isVisible = false;
 		}
-		load(){
+		async loadAsync(){
 			// construct all of the image-thumb containers now
 			const thumbNames = this.model.images.map(imgModel =>
 				new ImageThumbControl( imgModel, this.$imgContainer )
 			);
 
 			// load them later
-			return executePromisesInParallel( thumbNames.map( t=>(()=>t.load()) ), 10 )
-				.then( ()=>{ this.trigger('loaded'); } );
+			await executePromisesInParallelAsync( thumbNames.map( t=>(()=>t.loadAsync()) ), 10 );
+			this.trigger('loaded');
 		}
 	}
 
@@ -704,16 +684,7 @@
 			this._bar = bar;
 			this._textFormatter = textFormatter;
 		}
-		monitor($deferred){ // binds to a deferred object.
-			this._bar.percent = 0;
-			this._bar.text = '...';
-			$deferred.then(
-				()=>this._bar.close(), // complete
-				()=>this._bar.close(), // fail
-				progress=>this._progress(progress)
-			);
-		}
-		monitor2(imageModel){
+		monitorImageModel(imageModel){
 			this._bar.percent = 0;
 			this._bar.text = '...';
 			imageModel.listen('downloadProgress', ({downloadProgress})=>{
@@ -725,30 +696,22 @@
 						this._bar.close();
 						break;
 					case 'downloading':
-						const {downloaded,total} = downloadProgress;
-						this._progress({downloaded,total}); 
+						const {loaded,total} = downloadProgress;
+						this._progress({loaded,total}); 
 						break;
 					default: console.log('well this is akward...'); break;
 				}
 			});
 		}
-		_progress(progress){
-			this._bar.percent = ProgressMonitor.progressToPercent(progress);
-			this._bar.text = this._textFormatter(progress);
+		_progress({loaded,total,error}){
+			this._bar.percent = ProgressMonitor.progressToPercent({loaded,total});
+			this._bar.text = this._textFormatter({loaded,total});
+			if(loaded == total || error)
+				this._bar.close();
 		}
 		static progressToPercent({loaded,total}) { 
 			return Math.floor((loaded/total*100)+0.5);
 		}
-	}
-
-	// displays file-download progress on a ProgressBar
-	class FileDownloadMonitor extends ProgressMonitor{
-		constructor(bar){ super(bar,progress=>Math.floor(progress.loaded/1000+0.5)+' of '+Math.floor(progress.total/1000+0.5)+'KB'); }
-	}
-
-	// displays x of y on a bar element
-	class StepMonitor extends ProgressMonitor{
-		constructor(bar){ super(bar,progress=>progress.loaded+' of '+progress.total); }
 	}
 
 	// ===== ::ScanNewImagesMenu =====
@@ -772,7 +735,7 @@
 					function(){$(this).css(css.hover);},
 					function(){$(this).css(css.normal);}
 				)
-				.on('click',()=>this.scanReady());
+				.on('click',()=>this.scanReadyAsync());
 			$('<span> / </span>').appendTo(this.$div);
 			this._$newImages = $('<span>').appendTo(this.$div).css(css.normal)
 				.hover(
@@ -813,21 +776,22 @@
 		_displayNewImageCount(){
 			this._$newImages.text('images:'+this._newImageUsers.length);
 		}
-		scanReady(){
+		async scanReadyAsync(){
 			const numToScan = 100;
 			const toScan = this._readyToScanUsers
 				.sort(by(user=>user.data.viewDate))
 				.slice(0,numToScan); // only scan 200 oldest
 			const unexecutedPromiseGenerators = toScan
 				.map( user => ( ()=>user.scanForNewImagesAsync() ) );
-			const $all = executePromisesInParallel( unexecutedPromiseGenerators );
-			new StepMonitor(new ProgressBar(this._$ready)).monitor($all);
 
-			const refreshThis = () => {
-				this._refreshReadyCount();
-				this._refreshNewImageCount();
+			const monitor = new ProgressMonitor( new ProgressBar(this._$ready), ({loaded,total})=>loaded+' of '+total );
+			try{
+				await executePromisesInParallelAsync( unexecutedPromiseGenerators, 8, (x)=>monitor._progress(x) );
+			} catch(err){
+				console.log(err);
 			}
-			$all.then(refreshThis,refreshThis);
+			this._refreshReadyCount();
+			this._refreshNewImageCount();
 		}
 
 		_clearNewImages(username){
@@ -922,21 +886,28 @@
 				this._showCheckmark();
 
 		}
-		load(){ // load image
-			const $imgLoaded = $.Deferred();
-			const retrySuffix = this.failures ? ('f='+this.failures) : '';
-			this.$img.on('load',() => { delete this.failures; $imgLoaded.resolve(); })
-				.on('error',(err)=>{ this.failures = (this.failures || 0)+1; $imgLoaded.reject(); })
-				.attr('src',this.$img.data('src') + retrySuffix )
-			return $imgLoaded.promise();
+		loadAsync(){ // load image
+			return new Promise((resolve,reject)=>{
+				const retrySuffix = this.failures ? ('f='+this.failures) : '';
+				const timerId = setTimeout(function(){reject("timeout");}, 5000);
+				this.$img
+					.on('load',() => { delete this.failures; resolve(); clearTimeout(timerId); })
+					.on('error',(err)=>{ this.failures = (this.failures || 0)+1; reject(); clearTimeout(timerId); })
+					.attr('src',this.$img.data('src') + retrySuffix );
+			});
 		}
 		onClick(event){
 			event.preventDefault();
 			this.download();
 		}
 		async download(){
-			const monitor = new FileDownloadMonitor( new ProgressBar(this._$wrapper) );
-			monitor.monitor2(this.model);
+
+			// displays file-download progress on a ProgressBar
+			const monitor = new ProgressMonitor( 
+				new ProgressBar(this._$wrapper), 
+				({loaded,total})=>Math.floor(loaded/1000+0.5)+' of '+Math.floor(total/1000+0.5)+'KB'
+			);
+			monitor.monitorImageModel(this.model);
 
 			try{
 				await this.model.downloadAsync();
@@ -1257,7 +1228,7 @@
 				.filter( user=>user.status == UserStatus.new );
 			console.log(`Scanning 1st page of ${newUsers.length} users.`);
 
-			const firstPageWithUsernameArray = await fetchFirstPageOfEachUser( newUsers ); // array of {user,images}
+			const firstPageWithUsernameArray = await fetchFirstPageOfEachUserAsync( newUsers ); // array of {user,images}
 			firstPageWithUsernameArray.sort(byDesc(x=>x.images.length).thenBy(x=>x.user.username));
 
 			gallery.rows = firstPageWithUsernameArray
@@ -1409,13 +1380,14 @@
 
 	function scrollToTop(){document.body.scrollTop = document.documentElement.scrollTop = 0;}
 
-	function fetchFirstPageOfEachUser(users){ // !! this might be more link-related than fetch-related
+	async function fetchFirstPageOfEachUserAsync(users){ // !! this might be more link-related than fetch-related
 		let userImages = [];
 		var threads = users.map(function(user){
 			return () => user.fetch.fetchFirstPageImages()
 				.then( images => userImages.push({ user, images }) );
 		});
-		return executePromisesInParallel(threads).then(x=>userImages); // when all threads are done, return the updated list
+		await executePromisesInParallelAsync(threads)
+		return userImages;
 	}
 
 	class NextLink{ 
@@ -1471,7 +1443,7 @@
 			setTimeout(()=>window.location.href=`/${users[0].username}/gallery`,2000);
 	}
 
-	function saveTextToFile(text,filename){
+	function saveTextToFile({text,filename}){
 		var a = document.createElement("a");
 		a.href = "data:text,"+text;
 		a.download = filename;
@@ -1493,7 +1465,7 @@
 		"85": /* u */ function({ctrlKey,shiftKey}){ // Save Users
 			if(ctrlKey && shiftKey){
 				const filename = `vsco.localStorage.users ${formatDate.forFilename(new Date())}.json`;
-				saveTextToFile(localStorage.users,filename);
+				saveTextToFile({text:localStorage.users,filename});
 				console.log("localStorage.users save to "+filename);
 			}
 		}
@@ -1531,17 +1503,6 @@
 		},
 		nextToPrune: function(yearsWithoutDownload=4){
 			userAccess.toPrune( yearsWithoutDownload ).goto();
-		},
-		convertToUnix: function(){
-			const dict = JSON.parse(localStorage.users);
-			Object.values(dict).forEach(u=>{
-				if(u.viewDate) u.viewDate = unixTime.toNum( u.viewDate );
-				if(u.failure) u.failure.first = unixTime.toNum( u.failure.first );
-				return u;
-			});
-			const json = '{\r\n'+Object.entries(dict).sort((a,b)=>a[0]<b[0]?-1:1).map(a=>a.map(JSON.stringify).join(':')).join(',\r\n')+'\r\n}';
-			localStorage.users = json; console.log('transition to Unix time complete');
-			// GM_setClipboard(json, "text", () => console.log("Updated Users saved to clipboard!"));
 		},
 		downloads: []
 	}
