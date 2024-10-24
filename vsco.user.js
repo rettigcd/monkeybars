@@ -5,7 +5,7 @@
 // @description  Efficient VSCO Gallery surfer
 // @author       Dean Rettig
 // @match        http*://vsco.co/*
-// @require      https://code.jquery.com/jquery-3.3.1.min.js
+// @require      file://C:/[monkeyBarsFolder]/dom.js
 // @require      file://C:/[monkeyBarsFolder]/epoch_time.js
 // @require      file://C:/[monkeyBarsFolder]/observable.js
 // @require      file://C:/[monkeyBarsFolder]/storage.js
@@ -257,18 +257,26 @@
 
 		getResponsiveLink( boxSize ){
 			let match = this.responsiveUrl.match(/im.vsco.co\/aws-us-west-2\/(.*)/);
-			if( match !== null )
+			if( match !== null ){
+				this.urlStyle = 1;
 				return boxSize
 					? 'https://im.vsco.co/aws-us-west-2/'+match[1]+'?w='+boxSize+'&amp;dpr=1' // !!! sometimes this has a size already in the url and then it redirects
-					: 'https://image-aws-us-west-2.vsco.co/'+match[1];
+//					: 'https://image-aws-us-west-2.vsco.co/'+match[1]; // the full images used to be stored at this alternative host
+					: 'https://im.vsco.co/aws-us-west-2/'+match[1]; // but now they are the same server as resposneive URL
+			}
 
 			match = this.responsiveUrl.match(/im.vsco.co\/1\/(.*)/);
-			if( match !== null ) 
+			if( match !== null ){
+				this.urlStyle = 2;
 				return 'https://im.vsco.co/1/'+match[1];
+			}
 
-			if( this.responsiveUrl.endsWith('?width=120') ) 
+			if( this.responsiveUrl.endsWith('?width=120') ){
+				this.urlStyle = 3;
 				return this.responsiveUrl;
+			}
 
+			this.urlStyle = 4;
 			throw 'unable to rewrite Image Url for image: ' + orig;
 		}
 
@@ -280,6 +288,7 @@
 					reject('timeout');
 				},5000);
 				function cancelTimeout(){ clearTimeout(id); }
+
 				GM_download({ url:this.url, name:this.localFileName,
 					onprogress : ({loaded,total}) => {
 						console.log('%cPROGRESS','color:red;font-weight:bold;font-size:18px;');
@@ -293,6 +302,9 @@
 					onerror : (x) => { 
 						cancelTimeout();
 						this.downloadProgress = {status:'errored',error:x};
+						x.urlStyle = this.urlStyle;
+						x.origUrl = this.responsiveUrl;
+						x.dlUrl = this.url;
 						reject(x)
 					},
 					ontimeout : x => {
@@ -355,7 +367,7 @@
 
 	class Layout{
 		gallery;
-		constructor(userAccess,gallery){
+		constructor(userAccess,galleryModel){
 			const css = {
 				top			: {position:"fixed",top:"0px",left:'0px',width:'100%',height:"40px",'z-index':'3000',background:'rgba(255,255,255,0.9)',overflow:"auto"},
 				leftPanel	: {margin:0,padding:0,display:'inline-block'},
@@ -367,43 +379,49 @@
 				progress	: {display:'inline-block', width:"150px", height:"15px","font-size":"12px", padding:'2px',color:'#060'},
 			};
 
-			this.$top = $('<div>').prependTo('body').css(css.top);
-			this.$leftPanel = $('<div>').appendTo(this.$top).css(css.leftPanel);
-			this.$userStatusDiv = $('<div>').appendTo(this.$leftPanel).css(css.star);
-			this.$userDownloadCountsDiv = $('<div>').appendTo(this.$leftPanel).css(css.counts);
-			this.$scanNewImagesDiv = $('<div>').appendTo(this.$leftPanel).css(css.userLink);
-			this.$visibleRowProgress = $('<div>').appendTo(this.$leftPanel).css(css.progress);
+			// prependTo, appendTo, insertAfter
 
-			this.$calendar = $('<div>').appendTo(this.$top).css(css.calendar);
-			this.$scanNext = $('<div>').appendTo(this.$top).css(css.next);
-			this.$thumbDiv = $('<div>').insertAfter(this.$top);
+			const top = newEl('div').css(css.top);
+			const leftPanel = newEl('div').css(css.leftPanel).appendTo(top);
 
-			let $spacer = $('<div>').prependTo('body').css("height",css.top.height);
-			setInterval(()=>$spacer.css('height',this.$top.height()),2000); // !!! ? does top height change?
-			this.$import = $('<input>').appendTo('body').attr('type','file').attr('multiple',true);
+			this.userStatusDiv = newEl('div').css(css.star).appendTo(leftPanel);
+			this.userDownloadCountsDiv = newEl('div').css(css.counts).appendTo(leftPanel);
+
+			const scanNewImagesDiv = newEl('div').css(css.userLink).appendTo(leftPanel);
+			const visibleRowProgress = newEl('div').css(css.progress).appendTo(leftPanel);
+
+			this.calendarEl = newEl('div').css(css.calendar).appendTo(top);
+			const scanNextEl = newEl('div').css(css.next).appendTo(top);
+			const thumbDiv = newEl('div');
+
+			const spacerEl = newEl('div').css({"height":css.top.height});
+			setInterval(()=>spacerEl.css({'height':top.style.height}),2000); // !!! ? does top height change?
+			const fileImport = newEl('input').appendTo(document.body).attr('type','file').attr('multiple',true);
+
+			document.body.prepend(spacerEl,top,thumbDiv);
 
 			// bind to model
-			new ScanNewImagesMenu( this.$scanNewImagesDiv, userAccess );
-			this.gallery = new GalleryView( this.$thumbDiv, this.$visibleRowProgress, gallery );
-			new Importer( this.$import );
+			new ScanNewImagesMenu( scanNewImagesDiv, userAccess );
+			this.gallery = new GalleryView( thumbDiv, visibleRowProgress, galleryModel );
+			new Importer( fileImport );
 			// next links
 			for(let link of [userAccess.needsReview(), userAccess.missingViewDate(), userAccess.toPrune()])
-				link.appendTo(this.$scanNext);
+				link.appendTo(scanNextEl);
 		}
 		showCurrentUser(userCtx, calendar){
-			this.$userStatusDiv.append( makeUserStatusControl( userCtx ) );
-			this.$userDownloadCountsDiv.append( makeDownloadCountsControl(userCtx) );
-			this.$calendar.append( new CalendarView( calendar ) );
+			this.userStatusDiv.append( makeUserStatusControl( userCtx ) );
+			this.userDownloadCountsDiv.append( makeDownloadCountsControl(userCtx) );
+			this.calendarEl.appendChild( new CalendarView( calendar ) );
 		}
 	}
 
 	class GalleryView {
 		rows; // ImageRowView[]
 		model; // GalleryModel;
-		constructor( $thumbDiv, $progressDiv, model ){
+		constructor( thumbDiv, progressDiv, model ){
 			new HasEvents(this);
-			this.$thumbDiv = $thumbDiv;
-			this.$progressDiv = $progressDiv;
+			this.thumbDiv = thumbDiv;
+			this.progressDiv = progressDiv;
 			this.model = model;
 			this.model.listen('rows',({rows}) => this._showRowViewsAsync(rows) );
 		}
@@ -411,10 +429,10 @@
 
 		async _showRowViewsAsync(rowData){
 
-			this.$thumbDiv.empty();
+			this.thumbDiv.innerHTML='';
 			window.scrollTo(0,0); // incase scrolled to bottom, scroll back to top
 			this.rows = rowData.map(x=>{ 
-				return new ImageRowView(x,this.$thumbDiv);
+				return new ImageRowView(x,this.thumbDiv);
 			});
 
 			this.visibleRowCount = 0;
@@ -434,13 +452,13 @@
 			this.visibleRowCount += deltaVisible;
 			this.totalRowCount += deltaTotalRowCount;
 			if(this.totalRowCount == 0)
-				this._$closeButton.remove();
-			this.$progressDiv.text(`${this.visibleRowCount} of ${this.totalRowCount} rows`);
+				this._closeButton.remove();
+			this.progressDiv.innerText = `${this.visibleRowCount} of ${this.totalRowCount} rows`;
 		}
 
 		_showCloseButton(){
 			const buttonCss = {'border':'3px outset black','padding':'3px','margin':'2px','background':'gray'}
-			this._$closeButton = $('<button>').appendTo(this.$thumbDiv).text('close all').css(buttonCss)
+			this._closeButton = newEl('button').appendTo(this.thumbDiv).setText('close all').css(buttonCss)
 				.on('click',()=>this._closeAllRows());
 		}
 		_closeAllRows() {
@@ -452,22 +470,22 @@
 
 	class ImageRowView {
 
-		constructor(imageRowModel,$container){
+		constructor(imageRowModel,container){
 			new HasEvents(this);
 			this.model = imageRowModel;
 
 			const rowCss = { "display":"flex","flex-direction":"row","justify-content":"flex-start", background:colors.galleryRowBg};
-			this.$rowDiv = $('<div>').css(rowCss).appendTo($container);
-			const $closeTab = $('<div>').css({'width':'30px','border-top':'thin solid #808'}).appendTo(this.$rowDiv);
-			const $subContainer = $('<div>').appendTo(this.$rowDiv).css({'width':'100%'});
-			const label = new ImageRowLabelView( $subContainer, this.model.labelText );
-			this.$imgContainer = $('<div>').appendTo($subContainer);
+			const rowDiv = newEl('div').css(rowCss).appendTo(container);
+			const closeTab = newEl('div').css({'width':'30px','border-top':'thin solid #808'}).appendTo( rowDiv );
+			const subContainer = newEl('div').css({'width':'100%'}).appendTo(rowDiv);
+			const label = new ImageRowLabelView( subContainer, this.model.labelText );
+			this.imgContainer = newEl('div').appendTo(subContainer);
 
 			this.model.listen('isVisible',({isVisible})=>{
 				if(isVisible)
-					this.$rowDiv.show()
+					rowDiv.style.display=rowCss.display;
 				else{
-					this.$rowDiv.hide()
+					rowDiv.style.display="none";
 					this.trigger('closed');
 				}
 			})
@@ -475,7 +493,7 @@
 			// Events
 			this.on('loaded',()=>{
 				label.enable();
-				$closeTab
+				closeTab
 					.css({"cursor":"pointer","background":"#CCF"})
 					.on('click',()=> this.close())
 			});
@@ -490,7 +508,7 @@
 		async loadAsync(){
 			// construct all of the image-thumb containers now
 			const thumbNames = this.model.images.map(imgModel =>
-				new ImageThumbControl( imgModel, this.$imgContainer )
+				new ImageThumbControl( imgModel, this.imgContainer )
 			);
 
 			// load them later
@@ -500,7 +518,7 @@
 	}
 
 	class ImageRowLabelView {
-		constructor($container,text){
+		constructor(container,text){
 			new HasEvents(this);
 			const labelCss = {
 				"font-size":"20px",
@@ -510,7 +528,7 @@
 				"text-align":"left",
 				"width":"100%",
 				"padding":"2px 10px"};
-			this.$labelDiv = $('<div>').text( text ).css(labelCss).addClass('imageRowLabel').appendTo($container);
+			this.labelDiv = newEl('div').setText( text ).css(labelCss).addClass('imageRowLabel').appendTo(container);
 			this._buttons=[];
 		}
 		enable(){
@@ -518,7 +536,7 @@
 		}
 		_enableButton(btn){
 			const buttonCss = {'cursor':'pointer','border':'outset','margin':'10px','display':'inline-block','font-size':'10px'};
-			$('<span>').text(btn.text).appendTo(this.$labelDiv).css(buttonCss)
+			newEl('span').setText(btn.text).appendTo(this.labelDiv).css(buttonCss)
 				.on('click',(e)=>{e.stopPropagation();this.trigger(btn.eventName);} );
 		}
 		addButton(text,onClickHandler){
@@ -533,50 +551,48 @@
 		const cellCss = {width: "30px", "padding":"2px","text-align":"center"};
 		const focusCss = {'background':'lightgray', 'border':'2px solid red'};
 		const blurCss  = {'background':'lightgray', 'border':'none'};
-		const $cell = $('<td>').css(cellCss);
+		const cell = newEl('td').css(cellCss);
 		if( model ){
-			$cell.text(model.images.length)
-				.data('yearMonth',model.key)
-				.attr('data-yearMonth',model.key)
+			cell.setText(model.images.length)
 				.css({"cursor":"pointer"})
 				.on('click',()=>{ model.hasFocus = true; });
 			model
 				.listen('hasFocus', ({hasFocus}) => {
-					$cell.css(hasFocus ? focusCss : blurCss);
+					cell.css(hasFocus ? focusCss : blurCss);
 				})
 		}
-		return $cell;
+		return cell;
 	}
 
 	function makeHeaderRow(calendarModel){ // CalendarModel
-		let $row = $('<tr>').addClass('label');
+		let row = newEl('tr').addClass('label');
 		const headerCss = {
 			cursor:'pointer',
 			"font-weight":"bold",
 			"text-align":"center",
 			width:"30px",
 		};
-		$('<td>').appendTo($row).text('*')
+		newEl('td').appendTo(row).setText('*')
 			.css(headerCss)
 			.css({color:"black",'background':'white'})
 			.on('click',()=>calendarModel.selectAll() );
 		monthNames
-			.forEach((m,idx)=>$('<td>').appendTo($row).text(m)
+			.forEach((m,idx)=>newEl('td').appendTo(row).setText(m)
 				.css(headerCss)
 				.css({color:colors.attribute,'background':monthColors[idx]})
 				.on('click', ()=>calendarModel.selectMonthOfEveryYear(idx+1))
 			)
-		return $row;
+		return row;
 	}
 
 	function makeYearView(yearModel) {
 		const {year,sparse} = yearModel;
-		const $year = $('<tr>').addClass('year');
-		$('<td>').text(year).appendTo($year)
+		const yearEl = newEl('tr').addClass('year');
+		newEl('td').setText(year).appendTo(yearEl)
 			.on('click', () => yearModel.hasFocus = true )
 			.css({width: "30px", "padding":"2px","font-weight":"bold",'cursor':'pointer'});// label
-		sparse.forEach( mm => makeMonthView(mm).appendTo($year) );
-		return $year;
+		sparse.forEach( mm => makeMonthView(mm).appendTo(yearEl) );
+		return yearEl;
 	}
 
 	class CalendarView {
@@ -598,84 +614,85 @@
 			})
 
 			// build view
-			$("<style type='text/css'> @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } </style>").appendTo("head");
+			addStyleSheet('@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }');
+
 			// create table
-			this.$table = $('<table>').css({"font-size":"10px","table-collapse":"collapse"});
+			this.table = newEl('table').css({"font-size":"10px","table-collapse":"collapse"});
 			// top row
-			this.$topRow = $('<tr>').appendTo(this.$table).on('click',this._headerClick.bind(this))
-				.css({background:'#AAA'});
-			$('<td>').attr('colspan','12').html(model.title).appendTo( this.$topRow )
+			this.topRow = newEl('tr').appendTo(this.table).on('click',()=>this._headerClick()).css({background:'#AAA'});
+			newEl('td').attr('colspan','12').setText(model.title).appendTo( this.topRow )
 				.css({width:'360px',height:'10px','text-align':'center',color:'white',"font-weight":"bold","font-size":"14px"});
-			this.$icon = $('<td>').appendTo( this.$topRow ).css({'text-align':"center",'width':'30px'});
+			this.iconTd = newEl('td').css({'text-align':"center",'width':'30px'}).appendTo( this.topRow );
 			this._showExpand();
 
-			return this.$table;
+			return this.table;
 		}
 
-		_showSpinner(){ this.$topRow.css('cursor','auto'); this.$icon.empty(); $('<div>').appendTo( this.$icon ).css({ 'display':'inline-block','border':'2px solid #CCC', 'border-top-color':'#08A', 'border-radius': '50%', 'width':'10px','height':'10px', 'animation':'spin 1s linear infinite'}); }
-		_showCollapse(){ this.$topRow.css('cursor','pointer'); this.$icon.html("-"); }
-		_showExpand(){ this.$topRow.css('cursor','pointer'); this.$icon.html("+"); }
 		_headerClick(){
 			switch(this.dataStatus){
-				case 'hidden': 
-					this.$table.find('tr.year,tr.label').show(); 
-					this.dataStatus='visible'; 
-					this._showCollapse();
-					break;
-
-				case 'visible': 
-					this.$table.find('tr.year,tr.label').hide(); 
-					this.dataStatus='hidden'; 
-					this._showExpand();
-					break;
-
+				case 'hidden':  this._displayRows(true); this.dataStatus='visible'; this._showCollapse(); break;
+				case 'visible': this._displayRows(false); this.dataStatus='hidden'; this._showExpand(); break;
 				case 'loading': /* do nothing */ break;
-
 				default: this.model.loadAsync(); break;
 			}
 		}
+		_displayRows(shouldDisplay){ const display=shouldDisplay?"":"none"; [...this.table.querySelectorAll('tr.year,tr.label')].forEach(x=>x.style.display=display); }
+		_showSpinner(){ this.topRow.css({'cursor':'auto'}); this.iconTd.innerHTML=''; newEl('div').appendTo( this.iconTd ).css({ border:"2px solid #dde", "border-top":"2px solid blue", 'border-radius':'50%', width:'16px',height:'16px', animation:'spin 2s linear infinite' });}
+		_showCollapse(){ this.topRow.css({'cursor':'pointer'}); this.iconTd.innerText="➖"; } // 🔺➖
+		_showExpand(){ this.topRow.css({'cursor':'pointer'}); this.iconTd.innerText="➕"; } // 🔻➕
 		_generateResultRows(){
 			this._showCollapse(); 
 			this.dataStatus = "visible";
-			this.$table.append( makeHeaderRow( this.model ) );
+			makeHeaderRow( this.model ).appendTo( this.table );
 
 			Object.keys(this.model.byYear).sort().reverse()
 				.forEach( year => {
 					const ym = this.model.byYear[year];
-					makeYearView(ym).appendTo(this.$table);
+					makeYearView(ym).appendTo(this.table);
 				});
 		}
 	}
 
 	function makeDownloadCountsControl(userCtx){
-		const $div = $('<div>');
-		$div.css({padding:"2px",border:"thin solid green"});
+		const div = newEl('div').css({padding:"2px",border:"thin solid green"});
 		function updateUi() {
 			const {data} = userCtx;
-			$div.html( "&#x2193 "+data.downloadsInLastYear );
+			div.innerText = `↓ ${data.downloadsInLastYear}`;
 			const byYear = Object.entries(data.byYear).sort(byDesc(x=>x[0])).map(x=>x[0]+':'+x[1]);
 			if( byYear.length > 0)
-				$div.attr('title',byYear.join(' '));
+				div.setAttribute('title',byYear.join(' '));
 		}
 		updateUi();
 		userCtx.on( 'imageDownloaded', updateUi );
-		return $div;
+		return div;
 	}
 	
 	class ProgressBar{ // ui element
-		constructor($container,initialColor='#aaf',finalColor='#ccf'){
-			$container.css('position','relative');
+		constructor(container,initialColor='#aaf',finalColor='#ccf'){
+			const $container = newEl(container).css({'position':'relative'});
 			this.initialColor = initialColor; this.finalColor=finalColor;
-			this.$progress = $('<div>').appendTo($container).hide()
-				.css({position:'absolute',top:'0',left:'-'+$container.css('left-margin'),height:"16px",width:'100%',margin:$container.css('margin')})
-				.css({'text-align':'right','vertical-align':'middle',padding:'1px 4px','font-family':'Verdana','font-size':'10px','white-space':'nowrap'});
+
+			const css = {
+				position:'absolute', top:'0', 
+				height:"16px",width:'100%',
+				'text-align':'right', 'vertical-align':'middle',
+				padding:'1px 4px',
+				'font-family':'Verdana','font-size':'10px',
+				'white-space':'nowrap',
+				display:'none',
+
+				left:'-'+$container.style['left-margin'],
+				margin:$container.style['margin']
+			};
+
+			this.progressDiv = newEl('div').appendTo($container).css(css);
 		}
-		set text(value){ this.$progress.text( value ); }
+		set text(value){ this.progressDiv.innerText = value; }
 		set percent(pct){ // 0..100
-			let fc=this.finalColor,ic=this.initialColor;
-			this.$progress.css({'background-image':`repeating-linear-gradient(to right, ${fc}, ${fc} ${pct}%, ${ic} ${pct}%, ${ic})`,'display':'block'});
+			const fc=this.finalColor,ic=this.initialColor;
+			this.progressDiv.css({'background-image':`repeating-linear-gradient(to right, ${fc}, ${fc} ${pct}%, ${ic} ${pct}%, ${ic})`,'display':'block'});
 		}
-		close(){ this.$progress.remove(); }
+		close(){ this.progressDiv.remove(); }
 	}
 
 	// displays generic progress-object on a ProgressBar using custom text and % complete bar
@@ -716,42 +733,28 @@
 
 	// ===== ::ScanNewImagesMenu =====
 	class ScanNewImagesMenu{
-		constructor($div,userAccess){ 
-			this.$div = $div;
+		constructor(div,userAccess){ 
+			this.div = div;
 			this._setUsersByStar(userAccess);
 		}
 
 		_setUsersByStar( userAccess ){
 			this._userAccess = userAccess;
 
-			this.$div.empty();
-			const css={
-				normal:{border:'thin dashed white',cursor:"pointer"},
-				hover:{border:'thin dashed gray'},
-			}
+			this.div.innerHtml='';
+			addStyleSheet('.scanButton{cursor:pointer;} .scanButton:hover{border: thin dashed gray;}');
 
-			this._$ready = $('<span>').appendTo(this.$div).css(css.normal)
-				.hover(
-					function(){$(this).css(css.hover);},
-					function(){$(this).css(css.normal);}
-				)
-				.on('click',()=>this.scanReadyAsync());
-			$('<span> / </span>').appendTo(this.$div);
-			this._$newImages = $('<span>').appendTo(this.$div).css(css.normal)
-				.hover(
-					function(){$(this).css(css.hover);},
-					function(){$(this).css(css.normal);}
-				)
-				.on('click',()=>this._showNewImages());
+			this._readySpan = newEl('span').addClass('scanButton').on('click',()=>this.scanReadyAsync()).appendTo(this.div);
+			newEl('span').setText(' / ').appendTo(this.div);
+			this._newImagesSpan = newEl('span').addClass('scanButton').on('click',()=>this._showNewImages()).appendTo(this.div);
 
 			this._refreshReadyCount();
 			this._refreshNewImageCount();
 		}
 
 		_refreshReadyCount(){
-			this._readyToScanUsers = this._userAccess.allUsers
-				.filter( user=>user.isDueToScanNewImages );
-			this._$ready.text('due:'+this._readyToScanUsers.length);
+			this._readyToScanUsers = this._userAccess.allUsers.filter( user=>user.isDueToScanNewImages );
+			this._readySpan.innerText = 'due:'+this._readyToScanUsers.length;
 		}
 
 		_refreshNewImageCount(){
@@ -774,7 +777,7 @@
 			this._displayNewImageCount();
 		}
 		_displayNewImageCount(){
-			this._$newImages.text('images:'+this._newImageUsers.length);
+			this._newImagesSpan.innerText='images:'+this._newImageUsers.length;
 		}
 		async scanReadyAsync(){
 			const numToScan = 100;
@@ -784,7 +787,7 @@
 			const unexecutedPromiseGenerators = toScan
 				.map( user => ( ()=>user.scanForNewImagesAsync() ) );
 
-			const monitor = new ProgressMonitor( new ProgressBar(this._$ready), ({loaded,total})=>loaded+' of '+total );
+			const monitor = new ProgressMonitor( new ProgressBar(this._readySpan), ({loaded,total})=>loaded+' of '+total );
 			try{
 				await executePromisesInParallelAsync( unexecutedPromiseGenerators, 8, (x)=>monitor._progress(x) );
 			} catch(err){
@@ -833,17 +836,18 @@
 
 	/// ::User Status (following,ignore,etc)
 	function makeUserStatusControl(userCtx){
-		const $select = $('<select>')
-			.on('click', function(){ userCtx.status = $(this).val(); } );
-		Object.entries(UserStatus)
-			.filter(([text,value])=>value!=UserStatus.failed)
-			.forEach(([text,value])=>$select.append(`<option value="${value}">${text}</option>`));
-		$select.val( userCtx.status );
-		return $select
+		return newSelect()
+			.on('click', function(){ userCtx.status = this.value; } )
+			.chain(x=>{
+				Object.entries(UserStatus)
+					.filter(([text,value])=>value!=UserStatus.failed)
+					.forEach(([text,value])=>x.addOption(newOption(text,value)));
+				x=>x.value=userCtx.status;
+			});
 	}
 
 	class ImageThumbControl{ // single image
-		constructor(imgProps,$container){
+		constructor(imgProps,container){
 
 			const boxSize = 250;
 			this.model = imgProps;
@@ -861,26 +865,24 @@
 			const dateCss = {color:colors.attribute}
 			this._imgProps = imgProps;
 
-			// wrapper
-			this._$wrapper = $('<div>').appendTo($container).css(containerCss);
-
-			// metadata caption
-			function makeDateString(ticks){ return (ticks===null) ? 'N/A' : formatDate.YMD( storageTime.toDate(ticks) ); }
-			this._$wrapper.append(
-				$('<br>'),
-				$('<span>').html(imgProps.width+' x '+imgProps.height).css(imageSizeCss),
-				$('<span>').html(makeDateString(imgProps.uploadDate)).css(dateCss).attr('title','Taken: '+makeDateString(imgProps.captureDate)), // date
-			);
-
-			const $link = $('<a>')
-				.attr('href',this.model.url)
-				.on('click',(event)=>this.onClick(event))
-				.prependTo(this._$wrapper);
-
-			this.$img = $('<img>')
+			this.img = newEl('img')
 				.css((imgProps.height > imgProps.width) ? {'height':boxSize+'px'} : {'width':boxSize+"px"})
-				.data('src',imgProps.getResponsiveLink(boxSize))
-				.appendTo( $link );
+				.attr('data-src',imgProps.getResponsiveLink(boxSize));
+			// wrapper
+			function makeDateString(x){ return (x===null) ? 'N/A' : formatDate.YMD( storageTime.toDate(x)); }
+			this._wrapperDiv = newEl('div').appendTo(container).css(containerCss);
+
+			this._wrapperDiv.append(
+				newEl('a')
+					.attr('href',this.model.url)
+					.on('click',(event)=>this.onClick(event))
+					.chain(l=>l.appendChild(this.img)),
+				newEl('br'),
+				// metadata caption
+				newEl('span').css(imageSizeCss).setText(imgProps.width+' x '+imgProps.height),
+				newEl('span').css(dateCss).attr('title','Taken: '+makeDateString(imgProps.captureDate))
+					.setText( makeDateString(imgProps.uploadDate) )
+			);
 
 			if(this.model.downloadProgress.status=='complete')
 				this._showCheckmark();
@@ -890,10 +892,10 @@
 			return new Promise((resolve,reject)=>{
 				const retrySuffix = this.failures ? ('f='+this.failures) : '';
 				const timerId = setTimeout(function(){reject("timeout");}, 5000);
-				this.$img
+				this.img
 					.on('load',() => { delete this.failures; resolve(); clearTimeout(timerId); })
 					.on('error',(err)=>{ this.failures = (this.failures || 0)+1; reject(); clearTimeout(timerId); })
-					.attr('src',this.$img.data('src') + retrySuffix );
+					.attr('src',this.img.getAttribute('data-src') + retrySuffix );
 			});
 		}
 		onClick(event){
@@ -904,7 +906,7 @@
 
 			// displays file-download progress on a ProgressBar
 			const monitor = new ProgressMonitor( 
-				new ProgressBar(this._$wrapper), 
+				new ProgressBar(this._wrapperDiv), 
 				({loaded,total})=>Math.floor(loaded/1000+0.5)+' of '+Math.floor(total/1000+0.5)+'KB'
 			);
 			monitor.monitorImageModel(this.model);
@@ -923,9 +925,9 @@
 			console.print('Image saved.');
 		}
 		_showCheckmark(){
-			$('<span>').html('&check;')
+			newEl('span').setText('✓')
 				.css({position:'absolute',top:'0',right:'10px',display:'inline-block','background-color':'white',border:'thin solid black',padding:'3px'})
-				.appendTo(this._$wrapper.css({position:'relative'}));
+				.appendTo(this._wrapperDiv);
 		}
 	}
 
@@ -1086,7 +1088,8 @@
 						newImages.forEach( img => newImageGroup[img.responsiveUrl]=img ); // adds each image to the group
 					});
 			} catch( error ){
-				console.error(error,'Failed to load '+this.username);
+				console.log('Failed to load '+this.username);
+				console.error(error);
 				this._update( data => data.loadFailed() );
 			}
 		}
@@ -1282,6 +1285,7 @@
 			do{
 				imgs = await this._fetchCollectionImagesOnPage(++pageNum);
 				allImages.push(...imgs);
+				console.log('links...',pageNum,imgs.length,imgs.length==maxImagesPerPage);
 			} while(imgs.length==maxImagesPerPage);
 			return allImages;
 		}
@@ -1306,10 +1310,10 @@
 			let nextCursor = siteMedia.nextCursor;
 			while(nextCursor){
 				let response = await fetch(
-					'https://vsco.co/api/3.0/medias/profile?'+$.param({site_id:siteId,limit:14,show_only:0,cursor:nextCursor}),
+					'https://vsco.co/api/3.0/medias/profile?'+new URLSearchParams({site_id:siteId,limit:14,show_only:0,cursor:nextCursor}).toString(),
 					{headers:{"Authorization":"Bearer "+token}}
 				);
-				let json = await response.clone().json();
+				let json = await response.clone().json(); // ??? can we remove the .clone() ?
 				let newImgs = json.media
 					.map(({image:i}) => new ImageModel({
 						owner : i.perma_subdomain,
@@ -1320,6 +1324,8 @@
 						uploadDate : storageTime.toNum(i.upload_date),
 					}))
 					.sort(byDesc(x=>x.uploadDate));
+				// json.media.forEach(x=>{ if(x.image.responsive_url.includes('62b262bb4dac692d146dbab9')){ console.log(123,x); } })
+
 				for(let img of newImgs) yield img;
 				nextCursor = json.next_cursor;
 			}
@@ -1335,11 +1341,12 @@
 		async _fetchGalleryPageHtml(){
 			return this._useDocumentBody
 				? document.querySelector('body').outerHTML
-				: await $.ajax({url: this.galleryUrl });
+				: await (await fetch( this.galleryUrl )).text();
 		}
 
-		_fetchCollectionPageHtml(pageNum){
-			return $.ajax({url: this.collectionUrl(pageNum) });
+		async _fetchCollectionPageHtml(pageNum){
+			const resp = await fetch( this.collectionUrl(pageNum) );
+			return await resp.text();
 		}
 
 		async _fetchCollectionImagesOnPage(pageNum){
@@ -1403,14 +1410,14 @@
 				setTimeout(()=>window.location.href=nextUrl,2000);
 		}
 		// UI stuff
-		appendTo($host){
+		appendTo(host){
 			const {label,nextUrl,count} = this;
 			if(!nextUrl) return;
-			$('<div>')
-				.text(`${label}: ${count}`)
+			newEl('div')
+				.setText(`${label}: ${count}`)
 				.css({'text-decoration':'underline','cursor':'pointer','font-size':'12px'})
 				.on('click',() => document.location.href = nextUrl )
-				.appendTo($host)
+				.appendTo(host)
 		}
 	}
 
