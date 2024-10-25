@@ -55,6 +55,10 @@
 	const monthColors = [colors.winter,colors.winter,colors.spring,colors.spring,colors.spring,colors.summer,colors.summer,colors.summer,colors.fall,colors.fall,colors.fall,colors.winter];
 	const monthNames = "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec".split(',');
 
+	const css = {
+		spinner: { border:"2px solid", "border-color":"#ddf #ddf #44f #00f", 'border-radius':'50%', width:'16px',height:'16px', animation:'spin 2s linear infinite' },
+	};
+
 	// ===== LINQ =====
 	function makeCompareFunction(){
 		const subCompareFuncs = [];
@@ -637,7 +641,7 @@
 			}
 		}
 		_displayRows(shouldDisplay){ const display=shouldDisplay?"":"none"; [...this.table.querySelectorAll('tr.year,tr.label')].forEach(x=>x.style.display=display); }
-		_showSpinner(){ this.topRow.css({'cursor':'auto'}); this.iconTd.innerHTML=''; newEl('div').appendTo( this.iconTd ).css({ border:"2px solid #dde", "border-top":"2px solid blue", 'border-radius':'50%', width:'16px',height:'16px', animation:'spin 2s linear infinite' });}
+		_showSpinner(){ this.topRow.css({'cursor':'auto'}); this.iconTd.innerHTML=''; newEl('div').appendTo( this.iconTd ).css(css.spinner);}
 		_showCollapse(){ this.topRow.css({'cursor':'pointer'}); this.iconTd.innerText="➖"; } // 🔺➖
 		_showExpand(){ this.topRow.css({'cursor':'pointer'}); this.iconTd.innerText="➕"; } // 🔻➕
 		_generateResultRows(){
