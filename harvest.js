@@ -44,13 +44,9 @@
 			const proj = el.parentNode.querySelector('.entry-project');
 			var img = document.createElement('IMG');
 			img.src=icon || standInIcon;
-			img.style.height="32px";
-			img.style.padding="4px 8px";
-			img.style.margin="2px";
+			Object.assign(img.style, {height:"32px",padding:"4px 8px",margin:"2px"});
 			proj.insertBefore(img, proj.firstChild); 
-			el.hasImage = true;
 			img.addEventListener('click',()=>{
-				// if(!confirm('Set Project Icon')) return;
 				const newIcon = prompt("Select new icon URL for "+title, icon);
 				if(newIcon==null) return;
 				icon = newIcon;
