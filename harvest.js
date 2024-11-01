@@ -40,7 +40,7 @@
 		localStorage.icons = JSON.stringify(icons,null,'\t');
 	}
 
-	function addEntryImage(el){
+	function addProjectIcon(el){
 		const clean = el.innerText.replace("\n", ""), title = clean.substring(1,clean.length-2);
 		let icon = loadIcons()[title];
 		const img = document.createElement('IMG');
@@ -57,7 +57,7 @@
 		const proj = el.parentNode.querySelector('.entry-project');
 		proj.insertBefore(img, proj.firstChild); 
 		// don't reprocess
-		el.classList.add('hasImage');
+		el.classList.add('hasIcon');
 	}
 
 	function updateDom(){
@@ -68,7 +68,7 @@
 		decorateLocation('div.js-tasks button.pds-chosen-button div.pds-chosen-selection');
 
 		// js-project-selector
-		[...document.querySelectorAll('.entry-client:not(.hasImage)')].forEach(addEntryImage);
+		[...document.querySelectorAll('.entry-client:not(.hasIcon)')].forEach(addProjectIcon);
 	}
 	setInterval(updateDom,500);
 
