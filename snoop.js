@@ -1,17 +1,15 @@
-// -----------------------------------
-// ---- Snooping on HTTP Requests ----
-// -----------------------------------
-
+// === Snooping on HTTP Requests ===
 
 class SnoopRequest{
 	constructor({method,url,body,responseText,headers,func}){
-		const readonly = {url,responseText,body,method,func,headers,id:uuidv4()};
+		const readonly = {url,responseText,body,method,func,headers,timestamp:new Date().valueOf()};
 		for(let prop in readonly)
 			Object.defineProperty(this,prop,{value:readonly[prop]});
 	}
 	toJSON(){
-		const {url,responseText,body,method} = this;
-		const result = {method,url:url.toString(),responseText};
+		const {url,responseText,method,timestamp,headers,body} = this;
+		const result = {timestamp,method,url:url.toString(),responseText};
+		if(headers) result.headers=headers;
 		if(body) result.body=body;
 		return result;
 	}
@@ -26,16 +24,17 @@ function uuidv4() {
 }
 
 // Snooping on fetch
-function makeNewFetch(origFetch,loadHandlers){
+function makeNewFetch(origFetch,loadHandlers,interceptor){
 	return function(url,options){
+		const fakeResponse = interceptor(url,options);
+		if(fakeResponse!==undefined) return fakeResponse;
 		const promise = origFetch(url,options);
-		const {method,body,headers} = options || {};
-		const urlObj = new URL(url,unsafeWindow.location);
 		if(loadHandlers.length)
 			promise
 				.then( response => response.clone().text() )
 				.then( responseText => {
-					const record = new SnoopRequest({method,url:urlObj,body,responseText,headers,func:'fetch'})
+					const {method,body,headers} = options || {};
+					const record = new SnoopRequest({method,url:new URL(url,unsafeWindow.location),body,headers,responseText,func:'fetch'})
 					loadHandlers.forEach(function(callback){
 						try{ callback( record ); } catch( err ){ console.error(err); }
 					});
@@ -85,10 +84,33 @@ function makeNewXMLHttpRequest(origConstructor,loadHandlers){
 
 }
 
+// Snooping on Websocket
+function makeNewWebSocket(origConstructor,loadHandlers){
+	return function(){ // replacement constructor that captures results
+		let socket = new origConstructor(...arguments); // create the real/original one
+
+		// onopen onmessage send(body)
+		const handler = {
+			get(target, prop, receiver) {
+				return Reflect.get(...arguments);
+			},
+			set(obj, prop, value) {
+				return Reflect.set(...arguments);
+			}
+		};
+
+		// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy
+		return new Proxy(socket,handler);
+		
+	}
+}
+
+
 class RequestSnooper{
-	constructor(){
+	constructor(config){
+		const {fetchInterceptor} = config||{};
 		unsafeWindow.XMLHttpRequest = makeNewXMLHttpRequest(unsafeWindow.XMLHttpRequest,this._loadHandlers);
-		unsafeWindow.fetch = makeNewFetch(unsafeWindow.fetch,this._loadHandlers);
+		unsafeWindow.fetch = makeNewFetch(unsafeWindow.fetch,this._loadHandlers,fetchInterceptor || (()=>undefined) );
 	}
 	addHandler(method,runOld=true){
 		if(runOld)
@@ -96,12 +118,10 @@ class RequestSnooper{
 		this._loadHandlers.push(method);
 		return this;
 	}
-	enableLogging({ignoreUrls}){
-		ignoreUrls = ignoreUrls || [];
+	logRequests(predicate=()=>true){
 		this._loadHandlers.push((x)=>{
-			if(ignoreUrls.includes(x.url.toString()) ) return;
+			if(!predicate(x)) return;
 			Object.defineProperty(x,'idx',{value:this._loadLog.length});
-			Object.defineProperty(x,'timestamp',{value:new Date()});
 			this._loadLog.push(x);
 		});
 		return this; // chaining
