@@ -6,6 +6,7 @@
 // @author       Dean Rettig
 // @run-at       document-start
 // @require      file://C:/[folder]/observable.js
+// @require      file://C:/[folder]/dom.js
 // @require      file://C:/[folder]/snoop.js
 // @require      file://C:/[folder]/storage.js
 // @require      file://C:/[folder]/snl.user.js
@@ -16,6 +17,8 @@
 // ==/UserScript==
 
 // https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/choose (NBC / SNL)
+// dress: https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27688
+// live:  https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27689
 
 // Find test case by googling "https://bookings-us.qudini.com/booking-widget/events" with the quotes
 // https://bookings-us.qudini.com/booking-widget/events/Y283RE67JM8#/event/choose
@@ -23,10 +26,20 @@
 
 (function(){
 
+	// =======
+	// Globals
+	// =======
+
 	const SECONDS = 1000; // mS
 	const MINUTES = 60*SECONDS;
 	const HOURS = 60*MINUTES;	
 	const DAYS = 24*HOURS;
+
+	const liveShow = "LIVE SHOW"; // LIVE SHOW STANDBY - Saturday Night Live
+	const dressRehearsal = "DRESS REHEARSAL"; // DRESS REHEARSAL STANDBY - Saturday Night Live
+	const snlOrgId = "B9KIOO7ZIQF";
+	const [,orgId,eventId] = document.location.href.match(/events\/([^#]+)#\/event\/(.*)/);
+	const isSnl = orgId == snlOrgId;
 
 	console.print = function (...args) { queueMicrotask (console.log.bind (console, ...args)); }
 
@@ -36,7 +49,8 @@
 		status: {border:'thin solid black',padding:'2px 4px',"font-size":"12px"},
 		success: {color:"white", backgroundColor:'green'},
 		fail: {color:"white", backgroundColor:'red'},
-		input: {width:"100px"}
+		input: {width:"100px"},
+		configState: "background-color:#AAF;font-size:16px;"
 	}
 
 	const goTime = (function getNextThursday10Am(){
@@ -49,9 +63,41 @@
 	function goStamp(){ return new Date().valueOf()-goTime.valueOf(); }
 	function nowStamp(){ return new Date().valueOf()-nowMs;}
 
-	const snooper = new RequestSnooper().enableLogging({});
+	const fetchInterceptor = (url) => url.path.includes('ingest.sentry.io') ? new Promise(()=>{}) : undefined; // for ingest, never resolve
+	const snooper = new RequestSnooper({fetchInterceptor}).logRequests();
 	unsafeWindow.snooper = snooper;
 
+	function saveTextToFile(text,filename){
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(new Blob([text])); // old way that doesn't handle '#' a.href = "data:text,"+text;
+		a.download = filename;
+		a.click();
+	}
+
+	const perma={
+		log(msg){ 
+			this.entries.push({timestamp:new Date().valueOf(),msg});
+			console.print(msg);
+		},
+		entries:[]
+	};
+
+	window.addEventListener('beforeunload', ()=>{
+		function dateTimeStr(d=new Date()){ function pad(x){ return (x<10?'0':'')+x;} return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds()); }
+		const prefix = 'snl '+orgId;
+		const items = snooper._loadLog.map(x=>x.toJSON()).concat(perma.entries)
+			.sort((a,b)=>a.timestamp-b.timestamp)
+			.map(x => ({tsTxt:new Date(x.timestamp).toLocaleTimeString(),...x}));
+		saveTextToFile(JSON.stringify(items,null,'\t'), prefix+' '+dateTimeStr()+'.log');
+	}, false);
+
+	perma.log('test');
+
+	// =================
+	// Class Definitions
+	// =================
+
+	// Properties are the current configuration values.
 	class MyConfig{
 		constructor(repo){
 			this.repo = repo;
@@ -65,8 +111,8 @@
 			obs.define('configOptions',[]);
 			obs.define('showOptions',[]);
 			// config name
-			obs.define('name','')
-			this.listen('name',(x)=>this._nameChanged(x));
+			obs.define('configName','')
+			this.listen('configName',(x)=>this._onConfigNameChanged(x));
 			// default
 			obs.define('isDefault');
 		}
@@ -74,109 +120,85 @@
 			const newLabel = prompt('Enter name for new config');
 			if(!newLabel) return;
 			this.configOptions = [...this.configOptions,newLabel];
-			this.name = newLabel;
+			this.configName = newLabel;
 			this.saveUser();
 		}
 		removeName(){
-			const {name} = this;
-			if(!name) return;
-			if(prompt(`Please confirm deleting '${name}' by typing the word 'delete'`) != 'delete') return;
+			const {configName} = this;
+			if(!configName) return;
+			if(prompt(`Please confirm deleting '${configName}' by typing the word 'delete'`) != 'delete') return;
 			
-			const index = this.configOptions.indexOf(name);
+			const index = this.configOptions.indexOf(configName);
 			if (index !== -1)
 				this.configOptions = this.configOptions.filter((el,i)=>i != index);
-			this.repo.remove(name);
-			console.log('removed',name);
+			this.repo.remove(configName);
+			console.log('removed',configName);
 		}
 		saveUser(){
-			const {firstName,lastName,phone,email,groupSize,show} = this;
-			this.repo.update(this.name,x=>Object.assign(x,{firstName,lastName,phone,email,groupSize,show}));
-			if(this.isDefaut)
-				localStorage.curConfig = this.name;
+			const {firstName,lastName,phone,email,groupSize,show,isDefault} = this;
+			if(isDefault){
+				if(this._lastDefaultConfigName)
+					this.repo.update(this._lastDefaultConfigName,x=>x.isDefault=false);
+				this._lastDefaultConfigName = this.configName;
+			}
+			this.repo.update(this.configName,x=>Object.assign(x,{firstName,lastName,phone,email,groupSize,show,isDefault}));
 			console.log('user saved');
 		}
 		toJSON(){
 			const {firstName,lastName,phone,email,show} = this;
 			return {firstName,lastName,phone,email,show};
 		}
-		_nameChanged({newValue}){
+		_onConfigNameChanged({newValue}){
 			const x = this.repo.get(newValue);
 			Object.assign(this,x);
-			this.isDefault = (localStorage.curConfig == newValue);
 		}
 	}
 
-	class El {
-		constructor(x){ this.el = typeof x == "string" ? document.createElement(x) : x; }
-		css(style){ Object.assign(this.el.style,style); return this; }
-		text(text){ this.el.innerText = text; return this; }
-		appendTo(host){ host.appendChild(this.el); return this; }
-		attr(name,val){ this.el.setAttribute(name,val); return this; }
-		on(eventName,handler){ this.el.addEventListener(eventName,handler); return this;}
-	}
-	class OptionEl extends El { constructor(text){ super('option'); this.text(text); } }
-	class InputEl extends El { 
-		constructor(type='text'){ 
-			super('input'); 
-			this.attr('type',type);
-		}
-		bind(host,prop){
-			const input = this.el;
+	const bind = {
+		textInput: function(input,host,prop){ // builds an action that can be used in .chain()
 			input.value = host[prop];
-			this.on('input',()=> host[prop]=input.value );
+			input.on('input',()=> host[prop]=input.value );
 			host.listen(prop,({newValue})=>{ if(input.value != newValue) input.value = newValue; });
-			return this;
-		}
-	}
-	class CheckboxEl extends InputEl {
-		constructor(){super('checkbox');}
-		bind(host,prop){
-			const cb = this.el;
+		},
+		checkbox: function(cb,host,prop){
 			cb.checked = host[prop];
-			this.on('click',()=> host[prop]=cb.checked );
+			cb.on('click',()=> host[prop]=cb.checked );
 			host.listen(prop,({newValue})=>{ if(cb.checked != newValue) cb.checked = newValue; });
-			return this;
-		}
-	}
-	class SelectEl extends El { 
-		constructor(){ super('select'); this._options={};}
-		addTextOption(optText){ const o = new OptionEl(optText).el; this._options[optText]=o; this.el.add(o); return this; }
-		addTextOptions(optTextArr){ optTextArr.forEach( text=>this.addTextOption(text) ); return this; }
-		removeTextOption(optText){ const o = this._options[optText]; this.el.remove(o.index); delete this._options[optText]; return this; }
-		bind(host,prop){
-			const select = this.el;
+		},
+		optionsToStringArr: function(select,host,prop){
+			function setOptions(newOptions){
+				const valsToAdd = [ ...newOptions ];
+				[...select.children].forEach(o=>{
+					const text = o.innerText, idx = valsToAdd.indexOf(text);
+					if(idx==-1) select.remove(o); else valsToAdd. valsToAdd.splice(idx,1);
+				})
+				for(let n of valsToAdd) select.add(newOption(n));
+			}
+			setOptions(host[prop]);
+			host.listen(prop,({newValue})=> setOptions(newValue) );
+		},
+		selectValue: function(select,host,prop){
 			select.value = host[prop];
-			this.on('change',()=>host[prop]=select.value );
+			select.on('change',()=>host[prop]=select.value );
 			host.listen(prop,({newValue})=>{ 
 				if(select.value != newValue) select.value = newValue; 
 			});
-			return this;
 		}
-		bindOptions(host,prop){
-			// assuming it is empty, we don't have to pre-remove anything
-			this.addTextOptions(host[prop]);
-			host.listen(prop,({oldValue,newValue})=>{
-				console.log(111,oldValue,newValue);
-				for(let o of oldValue) if(!newValue.includes(o)) this.removeTextOption(o);
-				for(let n of newValue) if(!oldValue.includes(n)) this.addTextOption(n);
-			});
-			return this;
-		}
-	}
+	};
 
 	function showConfig(config,topBar){
-		const inputBar = new El('p').css(css.subBar).css({background:"#aaf"}).text('Config: ').appendTo(topBar).el;
-		new SelectEl().css({}).bindOptions(config,'configOptions').bind(config,'name').appendTo(inputBar);
-		new El('button').appendTo(inputBar).text('➕').on('click',()=>config.addUser());
-		new El('button').appendTo(inputBar).text('➖').on('click',()=>config.removeName());
-		new InputEl().css(css.input).attr('placeholder','first').bind(config,'firstName').appendTo(inputBar);
-		new InputEl().css(css.input).attr('placeholder','last').bind(config,'lastName').appendTo(inputBar);
-		new InputEl().css(css.input).attr('placeholder','phone').bind(config,'phone').appendTo(inputBar);
-		new InputEl().css({width:"200px"}).attr('placeholder','email').bind(config,'email').appendTo(inputBar);
-		new InputEl().css({width:"50px"}).attr('placeholder','1-4').bind(config,'groupSize').appendTo(inputBar);
-		new SelectEl().css({}).appendTo(inputBar).bindOptions(config,'showOptions').bind(config,'show');
-		new CheckboxEl('checkbox').css({height:"18px",width:"18px",'vertical-align':'top'}).bind(config,'isDefault').appendTo(inputBar).el;
-		new El('button').appendTo(inputBar).text('💾').on('click',()=>config.saveUser());
+		const inputBar = newEl('p').css(css.subBar).css({background:"#aaf"}).setText('Config: ').appendTo(topBar);
+		newSelect().chain(x=>bind.optionsToStringArr(x,config,'configOptions')).chain(x=>bind.selectValue(x,config,'configName')).appendTo(inputBar);
+		newEl('button').setText('➕').on('click',()=>config.addUser()).appendTo(inputBar);
+		newEl('button').setText('➖').on('click',()=>config.removeName()).appendTo(inputBar);
+		newInput().css(css.input).attr('placeholder','first').chain(x=>bind.textInput(x,config,'firstName')).appendTo(inputBar);
+		newInput().css(css.input).attr('placeholder','last').chain(x=>bind.textInput(x,config,'lastName')).appendTo(inputBar);
+		newInput().css(css.input).attr('placeholder','phone').chain(x=>bind.textInput(x,config,'phone')).appendTo(inputBar);
+		newInput().css({width:"200px"}).attr('placeholder','email').chain(x=>bind.textInput(x,config,'email')).appendTo(inputBar);
+		newInput().css({width:"50px"}).attr('placeholder','1-4').chain(x=>bind.textInput(x,config,'groupSize')).appendTo(inputBar);
+		newSelect().chain(x=>bind.optionsToStringArr(x,config,'showOptions')).chain(x=>bind.selectValue(x,config,'show')).appendTo(inputBar);
+		newInput('checkbox').css({height:"18px",width:"18px",'vertical-align':'top'}).chain(x=>bind.checkbox(x,config,'isDefault')).appendTo(inputBar);
+		newEl('button').setText('💾').on('click',()=>config.saveUser()).appendTo(inputBar);
 	}
 
 	class ShowDiv{
@@ -210,9 +232,6 @@
 		constructor(orgId){
 			this.orgId=orgId;
 			this.pre = [60*MINUTES,45*MINUTES,30*MINUTES,15*MINUTES,5*MINUTES,2*MINUTES,1*MINUTES,20*SECONDS,10*SECONDS,0];
-
-			new Observable(this).define('delay').define('phase');
-
 			this.postInterval = 2*SECONDS;
 			this.postRetryPeriod = 2*MINUTES;
 			if(this.pre[this.pre.length-1] != 0) this.pre.push(0);
@@ -220,19 +239,16 @@
 		}
 	
 		// == Phase 1 - waiting for target goTime ==
-		scheduleNext(target,showAppearTimeout=3*SECONDS){ // starts time for next reload / or monitor for shows
+		// 1) runs a timer that updates the time until Go-Time
+		// 2) schedules a Timeout to refresh
+		scheduleNext(target, showAppearTimeout=3*SECONDS){ // starts time for next reload / or monitor for shows
 			this.target = target;
 			console.print(`Go time: %c${this.target.toDateString()} ${this.target.toLocaleString()}`,'background-color:#AAF;')
 			const {delay,phase} = this.getDelay(); this.delay = delay; this.phase = phase;
 			if(delay === undefined) return;
 			const targetRefreshTime = new Date( new Date().valueOf() + delay );
 			console.print(`Scheduling page refresh for %c${targetRefreshTime.toLocaleTimeString()}`,'background-color:#dfd');
-			// update delay
-			const intervalId = setInterval( () => {
-				const {delay,phase} = this.getDelay();  this.delay = delay; this.phase = phase; // status is go, before, after, timeout
-				this.refreshSec = this.formatSeconds( delay );
-				this.targetSec = this.formatSeconds( -this.getOffsetFromTarget() );
-			}, 100 )
+			
 			setTimeout( ()=> {
 				switch(phase){
 					case 'before': this.reload(); break;
@@ -242,27 +258,44 @@
 				}
 				clearInterval( intervalId );
 			}, delay );
+
 			return this;
 		}
 
+		// Adds UI to status bar and updates it when .delay is changed.
 		displayRemainingTime(statusBar){
-			const timerStatus = new El('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar).el;
-			this.listen('delay',({delay})=> {
-				const refreshSec = this.formatSeconds( delay );
-				const targetSec = this.formatSeconds( -this.getOffsetFromTarget() );
-				timerStatus.innerHTML=`Time:${new Date().toLocaleTimeString()} Target: ${targetSec} Refresh: ${refreshSec} Phase: ${this.phase}`;
-			})
+			const timeEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'});//.appendTo(statusBar);
+			const tMinusEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar);
+			const refreshEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'});//.appendTo(statusBar);
+			const phaseEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'});//.appendTo(statusBar);
+			this.watchEl =newEl('span').css(css.status).css({color:'black',backgroundColor:'pink'}).setText('-----').appendTo(statusBar);
+			newEl('button').css(css.status).css({pointer:'cursor'}).setText('RELOAD').on('click',()=>this.reload()).appendTo(statusBar);
+
+			// update delay
+			const intervalId = setInterval( () => {
+				const {delay,phase} = this.getDelay();
+				const refreshSec = this.formatSeconds( -delay );
+				const targetSec = this.formatSeconds( this.getOffsetFromTarget() );
+				timeEl.innerText=`Time:${new Date().toLocaleTimeString()}`;
+				tMinusEl.innerText=`Target: ${targetSec}`;
+				tMinusEl.style.color = (delay>0) ? "green" : "red";
+				refreshEl.innerText=`Refresh: ${refreshSec}`;
+				phaseEl.innerText=`Phase: ${phase}`;
+			}, 100 )
+
 			return this;
 		}
 
 		formatSeconds(mS){
+			const prefix = mS<0 ?"-":"+";
+			if(mS<0) mS = -mS;
 			const allRemainingTenths = Math.floor(mS * 10 / SECONDS);
 			const tenths = allRemainingTenths % 10;
 			const totalSeconds = (allRemainingTenths-tenths) / 10;
 			let seconds = totalSeconds %60;
 			const minutes = (totalSeconds-seconds)/60;
 			if(seconds < 10) seconds = '0'+seconds;
-			return `${minutes}:${seconds}.${tenths}`;
+			return `${prefix}${minutes}:${seconds}.${tenths}`;
 		}
 
 		getDelay(){
@@ -292,9 +325,15 @@
 			this.watchingForShowsStart = new Date().valueOf();
 			const waiter = this;
 			console.print(`Waiting ${timeout}ms for shows to appear`);
-			const intervalId = setInterval(async function() {
+			let attempt = 0;
+
+			if(this.watchEl) this.watchEl.style.backgroundColor='#FF8';
+			const intervalId = setInterval(async () => {
 				try{
+					++attempt;
+					this.watchText(`Attempt ${attempt}`)
 					const shows = await waiter.fetchShowsAsync();
+					this.watchText(`Attempt ${attempt} - ${shows.length}`);
 					console.log(`${shows.length} shows`);
 					if(shows.length) done();
 				} catch (err){ }
@@ -302,7 +341,8 @@
 			const timeoutId = setTimeout(done, timeout);
 			function done(){ clearTimeout(timeoutId); clearInterval(intervalId); waiter.reload(); }
 		}
-
+		watchText(text){ if(this.watchEl) this.watchEl.innerText=text; }
+	
 		async fetchShowsAsync(){
 			const response = await fetch(`https://bookings-us.qudini.com/booking-widget/event/events/${this.orgId}`);
 			if(!response.ok) throw "bad response";
@@ -374,7 +414,7 @@
 			const {status} = this;
 
 			function create(prop){
-				const span = new El('span').css(css.status).appendTo(statusBar).el;
+				const span = newEl('span').css(css.status).appendTo(statusBar);
 				if(prop)
 					status.listen(prop,({newValue})=>{ 
 						span.innerHTML=newValue.text;
@@ -596,6 +636,7 @@
 			const now = new Date().toLocaleString();
 			this.status.submit = Status.pass(`submitting &#x2714;`);
 			console.print(`submitting at ${now}`,nowStamp(),goStamp());
+			perma.log(`submitting at ${now} ${nowStamp()} ${goStamp()}`);
 			submitButton.click();
 			return true;
 		}
@@ -619,6 +660,7 @@
 	function showCountAsync(timeout = 2*SECONDS){
 		// wait for either:
 		return new Promise((resolve,reject)=>{
+
 			// the shows to appear on the snooper
 			snooper.addHandler(x => {
 				const {url:{pathname},responseText} = x;
@@ -627,15 +669,16 @@
 					x.handled = "events";
 				}
 			} );
+
 			// the DIVs to appear
 			const timerId = setInterval(()=>{ const count = ShowDiv.findCurrent().length; if(count) stop('div',count); },100);
 			// or the timeout
 			const timeoutId = setTimeout(()=>stop('timeout',0), timeout);
-			function stop(reason,val){ 
-				resolve(val); 
+			function stop(reason,showCount){ 
+				resolve(showCount); 
 				clearInterval(timerId); 
 				clearTimeout(timeoutId);
-				console.print('Initial show counts:',val,reason,nowStamp(),goStamp());
+				console.print('Initial show counts:',showCount,reason,nowStamp(),goStamp());
 			}
 		})
 	}
@@ -645,40 +688,35 @@
 	// ===============
 	async function initPageAsync(){
 
-		const liveShow = "LIVE SHOW"; // LIVE SHOW STANDBY - Saturday Night Live
-		const dressRehearsal = "DRESS REHEARSAL"; // DRESS REHEARSAL STANDBY - Saturday Night Live
-		const snlOrgId = "B9KIOO7ZIQF";
-		const [,orgId,eventId] = document.location.href.match(/events\/([^#]+)#\/event\/(.*)/);
-		const isSnl = orgId == snlOrgId;
 		const configRepo = new SyncedPersistentDict(orgId);
 		const myConfig = new MyConfig( configRepo );
 		const waiter = new Waiter( orgId )
 	
 		myConfig.showOptions = ["[none]",liveShow,dressRehearsal];
 		myConfig.configOptions = configRepo.keys();
-		myConfig.name = localStorage.curConfig;
+		myConfig.configName = configRepo.entries().filter(([,values])=>values.isDefault).map(([name,])=>name)[0];
 	
-		console.print(`Using Config: %c[${myConfig.name}] for [${myConfig.show}]`,'background-color:#AAF;font-size:16px;')
+		console.print(`${orgId}: Using Config: %c[${myConfig.configName}] for [${myConfig.show}]` + (isSnl?" SNL":""),css.configState)
 		console.print(JSON.stringify(myConfig,null,'\t'))
-		console.print(`Is SNL: ${isSnl}`);
 
 		// wait for shows to load
 		const hasShows = await showCountAsync();
-
+	
 		// UI
-		const topBar = new El('div').css(css.topBar).appendTo( document.body ).el;
-		const statusBar = new El('p').css(css.subBar).appendTo(topBar).el;
+		const topBar = newEl('div').css(css.topBar).appendTo( document.body );
+		const statusBar = newEl('p').css(css.subBar).appendTo( topBar );
 		showConfig(myConfig,topBar);
 
 		if(hasShows){
 			const submitter = new Submitter(myConfig).showInStatusBar(statusBar);
 			if(!isSnl) submitter.stubSubmit();
 			submitter.monitor();
-		} else if( new Date().valueOf() < goTime.valueOf() )
-			waiter.scheduleNext(goTime).displayRemainingTime(statusBar);
+		} else if( new Date().valueOf() < goTime.valueOf() ){
+			waiter.scheduleNext(goTime,5*SECONDS).displayRemainingTime(statusBar);
 			// waiter.stubReload().scheduleNext(new Date(new Date().valueOf()+10*SECONDS),5*SECONDS).displayRemainingTime(statusBar);
-		else
-			waiter.reloadWhenShowsAppear(3*SECONDS);
+		} else {
+			waiter.reloadWhenShowsAppear(5*SECONDS);
+		}
 
 		unsafeWindow.test = {
 			waiter : {
