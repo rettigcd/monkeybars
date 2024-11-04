@@ -33,16 +33,21 @@
 			.forEach(({el,isMatch}) => Object.assign(el.style,isMatch ? css.correctLocation : css.wrongLocation) );
 	}
 
-	function loadIcons(){ return JSON.parse(localStorage.icons||'{}'); }
-	function setIcon(title,icon){ 
-		const icons = loadIcons(); 
-		if(icon) icons[title] = icon; else delete icons[title];
-		localStorage.icons = JSON.stringify(icons,null,'\t');
+	class KeyValuePersistentRepo{
+		constructor(key){this.key=key;}
+		get(key){ return this.#load()[key]; }
+		set(prop,value){ const obj=this.#load(); if(value) obj[prop]=value; else delete obj[prop]; localStorage[this.key] = JSON.stringify(obj,null,'\t'); }
+		#load(){ return JSON.parse(localStorage[this.key]||'{}'); }
 	}
+	// wrap the repo and make it look like a simple object. (I'm going to hell for this.)
+	const iconMap = new Proxy(new KeyValuePersistentRepo('icons'), { 
+		get(target, prop){ return target.get(prop); },
+		set(target, prop, newVal) { target.set(prop,newVal); return true; },
+	});
 
 	function addProjectIcon(el){
 		const clean = el.innerText.replace("\n", ""), title = clean.substring(1,clean.length-2);
-		let icon = loadIcons()[title];
+		let icon = iconMap[title];
 		const img = document.createElement('IMG');
 		img.src=icon || standInIcon;
 		Object.assign(img.style, css.projectIcon);
@@ -50,7 +55,7 @@
 			const newIcon = prompt(`Enter new icon URL for [${title}]`, icon);
 			if(newIcon==null) return;
 			icon = newIcon;
-			setIcon(title,icon);
+			iconMap[title] = icon;
 			img.src=icon || standInIcon;
 		});
 		// insert
