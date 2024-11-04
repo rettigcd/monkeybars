@@ -58,12 +58,14 @@
 		const daysFromNow = ((7+4)-date.getDay())%7;
 		const targetDate = new Date(date.valueOf() + daysFromNow * DAYS);
 		const yyyy = targetDate.getFullYear(), mm = targetDate.getMonth(), dd = targetDate.getDate();
-		return new Date(yyyy,mm,dd,10,0,0,0); // (my clock is ahead by 582ms per https://time.gov)
+		return new Date(yyyy,mm,dd,10,0,0,0);
 	})(), nowMs = new Date().valueOf();
-	function goStamp(){ return new Date().valueOf()-goTime.valueOf(); }
-	function nowStamp(){ return new Date().valueOf()-nowMs;}
 
-	const fetchInterceptor = (url) => url.path.includes('ingest.sentry.io') ? new Promise(()=>{}) : undefined; // for ingest, never resolve
+	const fetchInterceptor = (url) => { // url might be string, URL, or Request
+		// prevent ingest-sentry from going apeshit when something throws an excepton
+		if(url.toString().includes('ingest.sentry.io') ) return new Promise(()=>{});
+		return undefined;
+	}
 	const snooper = new RequestSnooper({fetchInterceptor}).logRequests();
 	unsafeWindow.snooper = snooper;
 
@@ -75,9 +77,10 @@
 	}
 
 	const perma={
-		log(msg){ 
+		log(msg){
+			const consoleMsg = (typeof msg == "object") ? JSON.stringify(msg,null,'\t') : msg;
+			console.print('%c'+consoleMsg,'font-style:italic;color:blue;font-size:14px;');
 			this.entries.push({timestamp:new Date().valueOf(),msg});
-			console.print(msg);
 		},
 		entries:[]
 	};
@@ -87,11 +90,22 @@
 		const prefix = 'snl '+orgId;
 		const items = snooper._loadLog.map(x=>x.toJSON()).concat(perma.entries)
 			.sort((a,b)=>a.timestamp-b.timestamp)
-			.map(x => ({tsTxt:new Date(x.timestamp).toLocaleTimeString(),...x}));
+			.map(x => ({time:new Date(x.timestamp).toLocaleTimeString(),...x}));
 		saveTextToFile(JSON.stringify(items,null,'\t'), prefix+' '+dateTimeStr()+'.log');
 	}, false);
 
-	perma.log('test');
+	perma.log('start');
+
+	function formatSeconds(mS){
+		if(mS===undefined) return '';
+		const prefix = mS<0 ?"-":"+";
+		if(mS<0) mS = -mS;
+
+		let x = Math.floor(mS * 10 / SECONDS);
+		function rem(d){ const r=x%d;x=Math.floor(x/d+0.5); return r<10 ? ('0'+r):r; }
+		const t=rem(10), s=rem(60), m=rem(60), h=rem(24);
+		return x!=0 ? `${prefix}${x} ${h}:${m}:${s}.${t}` : `${prefix}${h}:${m}:${s}.${t}`;
+	}
 
 	// =================
 	// Class Definitions
@@ -170,7 +184,10 @@
 				const valsToAdd = [ ...newOptions ];
 				[...select.children].forEach(o=>{
 					const text = o.innerText, idx = valsToAdd.indexOf(text);
-					if(idx==-1) select.remove(o); else valsToAdd. valsToAdd.splice(idx,1);
+					if(idx==-1) // not found in vals-to-add
+						select.remove(o); // remove option
+					else  // found in vals-to-add
+						valsToAdd.splice(idx,1); // remove from vals-to-add because it is already theer
 				})
 				for(let n of valsToAdd) select.add(newOption(n));
 			}
@@ -185,6 +202,34 @@
 			});
 		}
 	};
+
+	// Adds UI to status bar and updates it when .delay is changed.
+	function displayRemainingTime(waiter,topBar){
+		const statusBar = newEl('p').css(css.subBar).appendTo( topBar );
+		const timeEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar);
+		const tMinusEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar);
+		const refreshEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar);
+		const watchEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'pink'}).setText('Shows: ?').appendTo(statusBar);
+		newEl('button').css(css.status).css({pointer:'cursor'}).setText('RELOAD').on('click',()=>waiter.reload('button click')).appendTo(statusBar);
+
+		waiter.listen('waitStatus',({newValue,oldValue})=>{
+			if(oldValue===undefined) watchEl.style.backgroundColor='#FF8';
+			watchEl.innerText=newValue;
+		});
+
+		// update delay
+		const intervalId = setInterval( () => {
+			// Current Time
+			timeEl.innerText=`Time:${new Date().toLocaleTimeString()}`;
+			// T-(Time remaining) until Target
+			const offsetFromTarget = waiter.getOffsetFromTarget();
+			tMinusEl.innerText =`Target: ${formatSeconds( offsetFromTarget )}`; tMinusEl.style.color = (offsetFromTarget<0) ? "green" : "red";
+			// Refresh
+			const {delay} = waiter.getDelay();
+			refreshEl.innerText =`Refresh: ${formatSeconds( -delay )}`;
+		}, 100 )
+	}
+
 
 	function showConfig(config,topBar){
 		const inputBar = newEl('p').css(css.subBar).css({background:"#aaf"}).setText('Config: ').appendTo(topBar);
@@ -201,101 +246,84 @@
 		newEl('button').setText('💾').on('click',()=>config.saveUser()).appendTo(inputBar);
 	}
 
-	class ShowDiv{
-		div; label;
-		constructor(div){
-			this.div=div;
-			this.label=div.getAttribute('aria-label');
-		}
-		static findCurrentAsync(timeout=1*SECONDS){
-			return new Promise((resolve,reject)=>{
-				const timeoutTime = new Date().valueOf() + timeout;
-				const timerId = setInterval(()=>{
-					const shows = ShowDiv.findCurrent();
-					if(shows.length || timeoutTime < new Date().valueOf()){
-						resolve(shows);
-						clearInterval(timerId);
-					}
-				},100)
-			})
-		}
-		static findCurrent(){
-			return [...document.querySelectorAll('div[aria-label]')]
-				.map(div=>new ShowDiv(div))
-				.filter(({label})=>label);
-		}
-	}
 	//==================
 	// ::Waiter
 	//==================
 	class Waiter {
-		constructor(orgId){
-			this.orgId=orgId;
+		constructor(showService,logger){
+			this._showService = showService;
+			this._logger = logger||perma;
 			this.pre = [60*MINUTES,45*MINUTES,30*MINUTES,15*MINUTES,5*MINUTES,2*MINUTES,1*MINUTES,20*SECONDS,10*SECONDS,0];
 			this.postInterval = 2*SECONDS;
 			this.postRetryPeriod = 2*MINUTES;
 			if(this.pre[this.pre.length-1] != 0) this.pre.push(0);
 			// pre must be in descending order, and should end with 0
+			new Observable(this).define('waitStatus');
 		}
 	
 		// == Phase 1 - waiting for target goTime ==
 		// 1) runs a timer that updates the time until Go-Time
 		// 2) schedules a Timeout to refresh
-		scheduleNext(target, showAppearTimeout=3*SECONDS){ // starts time for next reload / or monitor for shows
-			this.target = target;
-			console.print(`Go time: %c${this.target.toDateString()} ${this.target.toLocaleString()}`,'background-color:#AAF;')
+		scheduleNext(targetTime, showAppearTimeout=3*SECONDS){ // starts time for next reload / or monitor for shows
+			this.target = targetTime;
 			const {delay,phase} = this.getDelay(); this.delay = delay; this.phase = phase;
-			if(delay === undefined) return;
-			const targetRefreshTime = new Date( new Date().valueOf() + delay );
-			console.print(`Scheduling page refresh for %c${targetRefreshTime.toLocaleTimeString()}`,'background-color:#dfd');
+
+			this._logger.log({
+				action:'scheduleNext()',
+				goTime:this.target.toDateString()+' '+this.target.toLocaleString(), 
+				delay, phase, 
+				refreshTime:new Date( new Date().valueOf() + delay ).toLocaleTimeString()
+			});
 			
 			setTimeout( ()=> {
 				switch(phase){
-					case 'before': this.reload(); break;
-					case 'go': this.reloadWhenShowsAppear(showAppearTimeout); break;
-					case 'after': this.reloadWhenShowsAppear(showAppearTimeout); break;
-					default: break;
+					case 'timeout':
+					case 'before':
+						this.reload(phase); 
+						break;
+					case 'go':
+					case 'after':
+						this.reloadWhenShowsAppear(showAppearTimeout); 
+						break;
 				}
-				clearInterval( intervalId );
 			}, delay );
 
 			return this;
 		}
 
-		// Adds UI to status bar and updates it when .delay is changed.
-		displayRemainingTime(statusBar){
-			const timeEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'});//.appendTo(statusBar);
-			const tMinusEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar);
-			const refreshEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'});//.appendTo(statusBar);
-			const phaseEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'});//.appendTo(statusBar);
-			this.watchEl =newEl('span').css(css.status).css({color:'black',backgroundColor:'pink'}).setText('-----').appendTo(statusBar);
-			newEl('button').css(css.status).css({pointer:'cursor'}).setText('RELOAD').on('click',()=>this.reload()).appendTo(statusBar);
+		reload(reason=''){ this._logger.log({action:"reload()",reason}); location.reload(); }
 
-			// update delay
-			const intervalId = setInterval( () => {
-				const {delay,phase} = this.getDelay();
-				const refreshSec = this.formatSeconds( -delay );
-				const targetSec = this.formatSeconds( this.getOffsetFromTarget() );
-				timeEl.innerText=`Time:${new Date().toLocaleTimeString()}`;
-				tMinusEl.innerText=`Target: ${targetSec}`;
-				tMinusEl.style.color = (delay>0) ? "green" : "red";
-				refreshEl.innerText=`Refresh: ${refreshSec}`;
-				phaseEl.innerText=`Phase: ${phase}`;
-			}, 100 )
+		// == Phase 2 - waiting for shows ==
+		reloadWhenShowsAppear(timeout=3*SECONDS){
+			this._logger.log({action:'reloadWhenShowsAppear()',timeout});
+			const watchingForShowsStart = new Date().valueOf();
+			const {_logger:logger,_showService:showService,reload} = this;
+			let attempt = 0;
 
-			return this;
-		}
-
-		formatSeconds(mS){
-			const prefix = mS<0 ?"-":"+";
-			if(mS<0) mS = -mS;
-			const allRemainingTenths = Math.floor(mS * 10 / SECONDS);
-			const tenths = allRemainingTenths % 10;
-			const totalSeconds = (allRemainingTenths-tenths) / 10;
-			let seconds = totalSeconds %60;
-			const minutes = (totalSeconds-seconds)/60;
-			if(seconds < 10) seconds = '0'+seconds;
-			return `${prefix}${minutes}:${seconds}.${tenths}`;
+			const intervalId = setInterval(async () => {
+				try{
+					++attempt;
+					this.waitStatus = `Attempt ${attempt}`;
+					const shows = await showService.fetchShowsAsync();
+					this.waitStatus = `Attempt ${attempt} - ${shows.length}`;
+					if(shows.length) done('showService found shows');
+				} catch (err){
+					logger.log(err);
+				}
+			},250);
+			const timeoutId = setTimeout(function(){ 
+				done('timed out waiting for show to appear'); 
+			}, timeout);
+			function done(reason){ 
+				clearTimeout(timeoutId); 
+				clearInterval(intervalId); 
+				logger.log({
+					action:'reloadWhenShowsAppear()-done',
+					reason,
+					duration:new Date().valueOf()-watchingForShowsStart
+				});
+				reload(reason);
+			}
 		}
 
 		getDelay(){
@@ -314,49 +342,15 @@
 			}
 
 			// Exceeded try period
-			return {delay:undefined,phase:'timeout'};
+			return {delay:0,phase:'timeout'};
 		}
 
 		// + is after, - is before
-		getOffsetFromTarget(){ return new Date().valueOf() - this.target.valueOf(); }
-
-		// == Phase 2 - waiting for shows ==
-		reloadWhenShowsAppear(timeout=3*SECONDS){
-			this.watchingForShowsStart = new Date().valueOf();
-			const waiter = this;
-			console.print(`Waiting ${timeout}ms for shows to appear`);
-			let attempt = 0;
-
-			if(this.watchEl) this.watchEl.style.backgroundColor='#FF8';
-			const intervalId = setInterval(async () => {
-				try{
-					++attempt;
-					this.watchText(`Attempt ${attempt}`)
-					const shows = await waiter.fetchShowsAsync();
-					this.watchText(`Attempt ${attempt} - ${shows.length}`);
-					console.log(`${shows.length} shows`);
-					if(shows.length) done();
-				} catch (err){ }
-			},250);
-			const timeoutId = setTimeout(done, timeout);
-			function done(){ clearTimeout(timeoutId); clearInterval(intervalId); waiter.reload(); }
-		}
-		watchText(text){ if(this.watchEl) this.watchEl.innerText=text; }
-	
-		async fetchShowsAsync(){
-			const response = await fetch(`https://bookings-us.qudini.com/booking-widget/event/events/${this.orgId}`);
-			if(!response.ok) throw "bad response";
-			return await response.json();
-		}
-
-		reload(){ location.reload(); }
+		getOffsetFromTarget(){ return this.target ? new Date().valueOf() - this.target.valueOf() : undefined; }
 
 		// for testing
 		stubReload(){
 			this.reload = function(){
-				this.done=new Date();
-				if(this.watchingForShowsStart)
-					console.log(`Show-watch duration: ${this.done.valueOf()-this.watchingForShowsStart}`);
 				console.log("%cRELOAD",'background:red;color:white;border:2px solid black;');
 			};
 			return this;
@@ -378,12 +372,15 @@
 
 	class Submitter {
 
-		constructor(config){
+		constructor(config,showService,logger){
 
 			this.config = config;
+			this._showService = showService;
+			this._logger = logger||perma;
 
 			this.startMonitorTime = new Date().valueOf(); // record when start monitoring
 
+			// make status observable
 			this.status = {}
 			new Observable(this.status).define('attempt').define('show')
 				.define('groupSize').define('bookEvent')
@@ -409,7 +406,8 @@
 
 		}
 
-		showInStatusBar(statusBar){
+		showInStatusBar(topBar){
+			const statusBar = newEl('p').css(css.subBar).appendTo( topBar );
 			statusBar.innerHTML = '';
 			const {status} = this;
 
@@ -417,7 +415,7 @@
 				const span = newEl('span').css(css.status).appendTo(statusBar);
 				if(prop)
 					status.listen(prop,({newValue})=>{ 
-						span.innerHTML=newValue.text;
+						span.innerText=newValue.text;
 						Object.assign(span.style,newValue.success?css.success:css.fail);
 					});
 				return span;
@@ -425,8 +423,8 @@
 
 			const attemptStatus = create();
 			Object.assign(attemptStatus.style,{cursor:'pointer'});
-			attemptStatus.addEventListener("click", this.stop.bind(this))
-			this.status.listen('attempt',({attempt})=>{
+			attemptStatus.addEventListener("click", ()=>this.stop())
+			status.listen('attempt',({attempt})=>{
 				if(attempt == "stopped"){
 					attemptStatus.innerHTML = 'Stopped';
 					attemptStatus.style.color='red';
@@ -436,19 +434,20 @@
 					attemptStatus.innerHTML = attempt;
 				}
 			});
-			"show,groupSize,bookEvent,firstName,lastName,mobileNumber,email,cb,submit".split(',').forEach(create);
+			"show,groupSize,bookEvent,firstName,lastName,mobileNumber,email,cb,submit".split(',')
+				.forEach(create);
 			return this;
 		}
 
 		monitor(){
-			console.print('%cattempting to submit page...','color:green;');
+			this._logger.log('attempting to submit page...');
 
 			this.attempt = 0;
-			this.intervalId = setInterval(this.onTick.bind(this),200);
+			this.intervalId = setInterval(()=>this.onTick(),200);
 
 			// set focus on first element
-			const fn=[...document.getElementsByName('firstName')];
-			if(fn.length>0 && fn[0].focus) fn[0].focus();
+			// const fn=[...document.getElementsByName('firstName')];
+			// if(fn.length>0 && fn[0].focus) fn[0].focus();
 		}
 
 		onTick(){
@@ -483,10 +482,11 @@
 
 		selectShow(){ // return null if unsuccessful
 			if(this.config.show){
-				const show = ShowDiv.findCurrent()
+				const show = this._showService.findCurrentDivs()
 					.find( ({label})=>label.includes(this.config.show) );
 				if(show){
 					try{ show.div.click(); }catch(err){}
+					this._logger.log({action:'selectShow()',show});
 					this.status.show = Status.pass('`Show selected.');
 					return true;
 				}
@@ -510,7 +510,8 @@
 				match.dispatchEvent(new Event('change'));
 				match.dispatchEvent(new Event('blur'));
 
-				this.status[sub] = Status.pass(`${sub} &#x2714;`)
+				this._logger.log({action:'setText',sub,value});
+				this.status[sub] = Status.pass(`${sub} ✔`)
 				return true;
 			}
 			catch(ex){
@@ -542,12 +543,12 @@
 				const index = Math.max(+size,1)-1; // assuming size=1 is in index=0 // missing or negative size, use 1
 				if(!(index < options.length)){
 					this.status.groupSize = Status.fail(`Too few Grp-Size Options: ${options.length}`);
-					// status.fail(`Too few Grp-Size Options: ${options.length}`);
 					return false;
 				}
 				options[index].click();
 
-				return true; // This should disable the auto-clicking.
+				this._logger.log({action:'setGroupSize()',size});
+				return true;
 			}
 			catch(er){
 				console.error('setGroupSize',er);
@@ -570,15 +571,13 @@
 				// check if it was set
 				const btns = [...groupSizeDiv.querySelectorAll('button')];
 				const changed = btns.length==2 && btns[0].innerHTML == size;
-				if(changed){
-					this.status.groupSize = Status.pass("Grp-Size &#x2714;")
-				} else {
-					this.status.groupSize = Status.fail("Grp-Size NOT Set")
-				}
+				this.status.groupSize = changed
+					? Status.pass("Grp-Size ✔")
+					: Status.fail("Grp-Size NOT Set");
 				return changed;
 			}
 			catch(er){
-				console.error('setGroupSize',er);
+				console.error('validateGroupSize',er);
 			}
 
 		}
@@ -596,7 +595,8 @@
 			}
 			if(btn.click) btn.click();
 			if(btn.triggerHandler) btn.triggerHandler('click');
-			this.status.bookEvent = Status.pass('Book-Event &#x2714;');
+			this.status.bookEvent = Status.pass('Book-Event ✔');
+			this._logger.log({action:"bookEvent()"});
 			return true;
 		}
 
@@ -611,6 +611,7 @@
 				checkBox.dispatchEvent(new Event('change'));
 				checkBox.dispatchEvent(new Event('click'));
 				this.status.cb = Status.pass('checked privacy-agreement');
+				this._logger.log({action:"checkPRivacyAgreement()"});
 				return true;
 			}
 			catch(ex){
@@ -633,10 +634,8 @@
 				return false;
 			}
 
-			const now = new Date().toLocaleString();
-			this.status.submit = Status.pass(`submitting &#x2714;`);
-			console.print(`submitting at ${now}`,nowStamp(),goStamp());
-			perma.log(`submitting at ${now} ${nowStamp()} ${goStamp()}`);
+			this.status.submit = Status.pass(`submitting ✔`);
+			this._logger.log("submitting form...");
 			submitButton.click();
 			return true;
 		}
@@ -644,7 +643,7 @@
 
 		// for testing:
 		stubSubmit(){
-			console.print('%cstubbing out the submit button.','color:red;');
+			console.print('%cstubbing out the form submit button.','color:red;');
 			const oldFinder = this._findSubmitButton;
 			this._findSubmitButton = function(){
 				return { 
@@ -656,31 +655,52 @@
 
 	}
 
-	// Run on Page-Load to know what state we are in.
-	function showCountAsync(timeout = 2*SECONDS){
-		// wait for either:
-		return new Promise((resolve,reject)=>{
+	class ShowService{
+		constructor(orgId,logger){ this.orgId = orgId; this._logger=logger||perma; }
+		// Called at start-up. Watches the page and the Snooper to determine how many shows there are.
+		waitForShowCountAsync(timeout = 2*SECONDS){
+			// wait for either:
+			return new Promise((resolve,reject)=>{
 
-			// the shows to appear on the snooper
-			snooper.addHandler(x => {
-				const {url:{pathname},responseText} = x;
-				if(pathname.includes('/booking-widget/event/events/')){
-					stop('snoop',JSON.parse(responseText).length);
-					x.handled = "events";
+				// 1) the DIVs to appear
+				const timerId = setInterval(()=>{ const count = this.findCurrentDivs().length; if(count) stop('div',count); },100);
+
+				// 2) or the timeout
+				const timeoutId = setTimeout(()=>stop('timeout',0), timeout);
+
+				// 3) the shows to appear on the snooper (do this LAST to ensure timers/intervals are started before we try to clear them.)
+				snooper.addHandler(x => {
+					const {url:{pathname},responseText} = x;
+					if(this.isSnoopPath(pathname)){
+						stop('snoop',JSON.parse(responseText).length);
+						x.handled = "events";
+					}
+				} );
+
+				function stop(reason,showCount){ 
+					clearInterval(timerId); 
+					clearTimeout(timeoutId);
+					resolve({showCount,reason}); 
 				}
-			} );
-
-			// the DIVs to appear
-			const timerId = setInterval(()=>{ const count = ShowDiv.findCurrent().length; if(count) stop('div',count); },100);
-			// or the timeout
-			const timeoutId = setTimeout(()=>stop('timeout',0), timeout);
-			function stop(reason,showCount){ 
-				resolve(showCount); 
-				clearInterval(timerId); 
-				clearTimeout(timeoutId);
-				console.print('Initial show counts:',showCount,reason,nowStamp(),goStamp());
-			}
-		})
+			})
+		}
+		// called periodically to detect noshow-to-hasshows transition
+		async fetchShowsAsync(){
+			this._logger.log('querying: shows');
+			const response = await unsafeWindow.fetch(`https://bookings-us.qudini.com/booking-widget/event/events/${this.orgId}`);
+			if(!response.ok) throw "bad response";
+			const shows = await response.json();
+			this._logger.log(`found: ${shows.length} shows.`);
+			return shows;
+		}
+		// override to disable snoop - for testing
+		isSnoopPath(pathname){ return pathname.includes('/booking-widget/event/events/'); }
+		// override to disable div - for testing
+		findCurrentDivs(){
+			return [...document.querySelectorAll('div[aria-label]')]
+				.map(div=>({div,label:div.getAttribute('aria-label')}))
+				.filter(({label})=>label);
+		}
 	}
 
 	// ===============
@@ -690,7 +710,8 @@
 
 		const configRepo = new SyncedPersistentDict(orgId);
 		const myConfig = new MyConfig( configRepo );
-		const waiter = new Waiter( orgId )
+		const showService = new ShowService( orgId, perma );
+		const waiter = new Waiter( showService, perma )
 	
 		myConfig.showOptions = ["[none]",liveShow,dressRehearsal];
 		myConfig.configOptions = configRepo.keys();
@@ -700,61 +721,26 @@
 		console.print(JSON.stringify(myConfig,null,'\t'))
 
 		// wait for shows to load
-		const hasShows = await showCountAsync();
+		const initial = await showService.waitForShowCountAsync(); 
+		perma.log(`Initial show counts: ${initial.showCount} from ${initial.reason}`);
+
 	
 		// UI
 		const topBar = newEl('div').css(css.topBar).appendTo( document.body );
-		const statusBar = newEl('p').css(css.subBar).appendTo( topBar );
 		showConfig(myConfig,topBar);
+		displayRemainingTime(waiter,topBar)
 
-		if(hasShows){
-			const submitter = new Submitter(myConfig).showInStatusBar(statusBar);
+		if(initial.showCount){
+			const submitter = new Submitter(myConfig,showService,perma).showInStatusBar(topBar);
 			if(!isSnl) submitter.stubSubmit();
 			submitter.monitor();
 		} else if( new Date().valueOf() < goTime.valueOf() ){
-			waiter.scheduleNext(goTime,5*SECONDS).displayRemainingTime(statusBar);
-			// waiter.stubReload().scheduleNext(new Date(new Date().valueOf()+10*SECONDS),5*SECONDS).displayRemainingTime(statusBar);
+			waiter.scheduleNext(goTime,5*SECONDS);
 		} else {
 			waiter.reloadWhenShowsAppear(5*SECONDS);
 		}
 
-		unsafeWindow.test = {
-			waiter : {
-				fetch: async function(){
-					try{
-						const shows = await waiter.fetchShowsAsync();
-						console.log(`%cFound ${shows.length} Shows`,'color:green');
-					} catch(err){
-						console.error(err);
-					}
-				},
-				reload: function(){ waiter.reload(); },
-				timesOut: function(){
-					let fetchCounts = 0;
-					const waiter = new Waiter(orgId);
-					waiter.fetchShowsAsync = () => { fetchCounts++; return Promise.resolve([]) };
-					waiter.stubReload();
-					waiter.reloadWhenShowsAppear(3*SECONDS);
-				},
-				findsShows: function(){ // after 1.5 seconds
-					const findShowsAfter = new Date().valueOf() + 1500;
-					let fetchCounts = 0;
-					const waiter = new Waiter(orgId);
-					waiter.fetchShowsAsync = () => { 
-						fetchCounts++;
-						const delta = new Date().valueOf() - findShowsAfter, shows = 0<delta ? ["show"] : [];
-						return Promise.resolve( shows );
-					};
-					waiter.stubReload();
-					waiter.reloadWhenShowsAppear(3*SECONDS);
-				},
-				hitsTargetAndFinds: function(){
-					const start = new Date().valueOf();
-					waiter.stubReload();
-					waiter.scheduleNext(new Date(start + 3*SECONDS));
-				}
-			},
-		}
+		unsafeWindow.cmd = {waiter,showService,myConfig,initial};
 
 	};
 	initPageAsync();
@@ -762,22 +748,3 @@
 	queueMicrotask (console.debug.bind (console, '%cSNL Standby - loaded','background-color:#DFD;')); // Last line of file
 
 })();
-/*
-TODO: 
-	Test Target Time
-	Test checkbox
-	Consider not reloading at target time but just enable Waiter
-
-Given: soon target time
-When: cross target
-Then: engaves waiter, which reloads
-
-Currently: If Shows, submit them.     
-	CON: can't test reload while there is a show
-
-Switch To: If before target, Reload.  
-	CON: could possibly be show and not see it.
-	CON: can't test form selection
-
-
-*/
