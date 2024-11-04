@@ -26,6 +26,7 @@ function uuidv4() {
 // Snooping on fetch
 function makeNewFetch(origFetch,loadHandlers,interceptor){
 	return function(url,options){
+		// !!! 1st parameter can be any of these: string, URL, Request
 		const fakeResponse = interceptor(url,options);
 		if(fakeResponse!==undefined) return fakeResponse;
 		const promise = origFetch(url,options);
