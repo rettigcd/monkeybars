@@ -56,7 +56,7 @@
 	const monthNames = "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec".split(',');
 
 	const css = {
-		spinner: { border:"2px solid", "border-color":"#ddf #ddf #44f #00f", 'border-radius':'50%', width:'16px',height:'16px', animation:'spin 2s linear infinite' },
+		spinner: { border:"8px solid", "border-color":"blue lightgray", 'border-radius':'50%', width:'16px',height:'16px', animation:'spin 2s linear infinite' },
 	};
 
 	// ===== LINQ =====
@@ -844,9 +844,9 @@
 			.on('click', function(){ userCtx.status = this.value; } )
 			.chain(x=>{
 				Object.entries(UserStatus)
-					.filter(([text,value])=>value!=UserStatus.failed)
+					.filter(([,value])=>value!=UserStatus.failed)
 					.forEach(([text,value])=>x.addOption(newOption(text,value)));
-				x=>x.value=userCtx.status;
+				x.value = userCtx.status;
 			});
 	}
 
@@ -1303,10 +1303,11 @@
 		async * fetchGalleryImagesAsync(){
 			const startingHtml = await this._fetchGalleryPageHtml();
 			const preloadedState = Fetcher.extractPreloadedStateFromHtml(startingHtml);
+			const { users:{currentUser:{tkn:token}}, medias:{bySiteId:siteMedias} } = preloadedState;
+			const [firstSitePair] = Object.entries(siteMedias);
+			if(!firstSitePair) return;
 
-			const token = preloadedState.users.currentUser.tkn;
-
-			const [siteId,siteMedia] = Object.entries(preloadedState.medias.bySiteId)[0];
+			const [siteId,siteMedia] = firstSitePair;
 			const result = Fetcher.extractImagesFromPreloadedState(preloadedState).sort(byDesc(x=>x.uploadDate));
 			for(let img of result)
 				yield img;
@@ -1454,9 +1455,9 @@
 			setTimeout(()=>window.location.href=`/${users[0].username}/gallery`,2000);
 	}
 
-	function saveTextToFile({text,filename}){
-		var a = document.createElement("a");
-		a.href = "data:text,"+text;
+	function saveTextToFile(text,filename){
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(new Blob([text])); // old way that doesn't handle '#' a.href = "data:text,"+text;
 		a.download = filename;
 		a.click();
 	}

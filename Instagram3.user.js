@@ -21,16 +21,23 @@
 (function() {
 	'use strict';
 
+	unsafeWindow.WebSocket = function(url,protocol){ 
+		console.print('opening socket',url,protocol);
+		return { 
+			send(body){ console.print('socket.send()',body); },
+			close(){ console.print('socket.close()'); }
+	 	};
+	}
+
 	const storageTime = EpochTime.JavascriptTime;
 
 	function buildRequestSnooper(){
 		return new RequestSnooper()
-			.enableLogging({
-				ignoreUrls:[
+			.logRequests(({url})=> [
 					'https://www.instagram.com/logging/falco',
 					'https://graph.instagram.com/logging_client_events'
-				]
-			});
+				].includes(url.toString()) == false
+			);
 	}
 
 	// return YYYYMMYYHHMMSS
@@ -617,7 +624,7 @@
 		const stub = {
 			owner:'-none-',
 			taggedUsers: [],
-			downloadAsync: function(){
+			downloadAsync(){
 				console.debug('No image found to download.');
 				return Promise.reject();
 			}
@@ -993,8 +1000,8 @@
 	}
 
 	function saveTextToFile(text,filename){
-		var a = document.createElement("a");
-		a.href = "data:text,"+text;
+		const a = document.createElement("a");
+		a.href = URL.createObjectURL(new Blob([text])); // old way that doesn't handle '#' a.href = "data:text,"+text;
 		a.download = filename;
 		a.click();
 	}
