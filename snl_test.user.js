@@ -41,7 +41,9 @@
 			}
 		}
 
-		const showCount = 38;
+		const showCountStr = prompt('How many shows are there?');
+		if(showCountStr===null) return;
+		const showCount = Number(showCountStr);
 
 		// =============
 		// ShowService

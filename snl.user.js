@@ -17,12 +17,14 @@
 // ==/UserScript==
 
 // https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/choose (NBC / SNL)
-// dress: https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27688
-// live:  https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27689
+// https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27688 - dress
+// https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27689 - live
 
 // Find test case by googling "https://bookings-us.qudini.com/booking-widget/events" with the quotes
-// https://bookings-us.qudini.com/booking-widget/events/Y283RE67JM8#/event/choose
-// https://bookings-us.qudini.com/booking-widget/events/DBY5E5JLLXG#/event/choose
+// https://bookings-us.qudini.com/booking-widget/events/DBY5E5JLLXG#/event/choose  - Hotwheels
+// https://bookings-us.qudini.com/booking-widget/events/6CO60SDFVYO#/event/choose  - Thanksgiving Apps and sides
+// https://bookings-us.qudini.com/booking-widget/events/UZJLSRJUNZC/event/choose   - cafe classic
+// https://bookings-us.qudini.com/booking-widget/events/2HYM77D8NYO/event/choose   - how to design cozy holiday bed
 
 (function(){
 
@@ -254,13 +256,8 @@
 		configView(myConfig,topBar);
 		waiterView(waiter,topBar);
 		submitter.showInStatusBar(topBar);
-		function addToDoc(){ topBar.appendTo( document.body ) }
-		if(document.body != null)
-			addToDoc();
-		else {
-			console.log(`%cdocument.body==[${document.body}]`,'font-size:18px;color:red;font-weight:bold;'); 
-			document.addEventListener('DOMContentLoaded', addToDoc );
-		}
+		// wait for body to appear
+		const id = setInterval(function(){if(document.body){topBar.appendTo(document.body);clearInterval(id);}else console.log('nobody');}, 200);
 	}
 
 	//==================
@@ -707,6 +704,7 @@
 		// called periodically to detect noshow-to-hasshows transition
 		async fetchShowsAsync(){
 			this._logger.log('querying: shows');
+			                                        // https://bookings-us.qudini.com/booking-widget/event/events/2HYM77D8NYO/event/choose
 			const response = await unsafeWindow.fetch(`https://bookings-us.qudini.com/booking-widget/event/events/${this.orgId}`);
 			if(!response.ok) throw "bad response";
 			const shows = await response.json();
@@ -728,16 +726,14 @@
 	// ===============
 	async function initPageAsync(){
 
-		const [,orgId,eventId] = document.location.href.match(/events\/([^#]+)#\/event\/(.*)/);
-		const isSnl = orgId == snlOrgId;
 		let goTime = getNextThursday10Am();
 		let waitForShowsTimeout = 5*SECONDS;
-
+		const [,orgId,eventId] = document.location.href.match(/events\/([^#\/]+).*\/event\/([^#\/]+)/);
+		const isSnl = orgId == snlOrgId;
 
 		const logger = new TimeStampConsoleLogger();
 		const snooper = buildSnooper();
 		const showService = new ShowService( orgId, snooper, logger );
-
 		const waiter = new Waiter( showService, logger )
 		const configRepo = new SyncedPersistentDict(orgId);
 		const myConfig = new MyConfig( configRepo );
@@ -765,7 +761,7 @@
 		}
 
 		// Start...
-		logger.log({action:"start",orgId,configName:myConfig.configName,show:myConfig.show,isSnl});
+		logger.log({action:"start",orgId,configName:myConfig.configName,show:myConfig.show,isSnl,eventId});
 
 		// wait for shows to load
 		const initial = await showService.waitForShowCountAsync(); 
