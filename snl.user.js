@@ -38,36 +38,35 @@
 	const liveShow = "LIVE SHOW"; // LIVE SHOW STANDBY - Saturday Night Live
 	const dressRehearsal = "DRESS REHEARSAL"; // DRESS REHEARSAL STANDBY - Saturday Night Live
 	const snlOrgId = "B9KIOO7ZIQF";
-	const [,orgId,eventId] = document.location.href.match(/events\/([^#]+)#\/event\/(.*)/);
-	const isSnl = orgId == snlOrgId;
-
+	
 	console.print = function (...args) { queueMicrotask (console.log.bind (console, ...args)); }
 
 	const css = {
 		topBar: {position:'fixed',top:'0px',right:'0px',backgroundColor:'#ddf',zIndex:1000},
 		subBar: {margin:0},
-		status: {border:'thin solid black',padding:'2px 4px',"font-size":"12px"},
+		status: {border:'thin solid black',padding:'2px 4px',"font-size":"14px",backgroundColor:'white',color:'black'},
 		success: {color:"white", backgroundColor:'green'},
 		fail: {color:"white", backgroundColor:'red'},
 		input: {width:"100px"},
-		configState: "background-color:#AAF;font-size:16px;"
-	}
+		log: 'font-style:italic; color:black; font-size:14px; font-weight:bold;text-shadow: 1px 1px 2px #55f;'
+	};
 
-	const goTime = (function getNextThursday10Am(){
+	function getNextThursday10Am(){
 		const date = new Date();
 		const daysFromNow = ((7+4)-date.getDay())%7;
 		const targetDate = new Date(date.valueOf() + daysFromNow * DAYS);
 		const yyyy = targetDate.getFullYear(), mm = targetDate.getMonth(), dd = targetDate.getDate();
 		return new Date(yyyy,mm,dd,10,0,0,0);
-	})(), nowMs = new Date().valueOf();
-
-	const fetchInterceptor = (url) => { // url might be string, URL, or Request
-		// prevent ingest-sentry from going apeshit when something throws an excepton
-		if(url.toString().includes('ingest.sentry.io') ) return new Promise(()=>{});
-		return undefined;
 	}
-	const snooper = new RequestSnooper({fetchInterceptor}).logRequests();
-	unsafeWindow.snooper = snooper;
+
+	function buildSnooper(){
+		const fetchInterceptor = (url) => { // url might be string, URL, or Request
+			// prevent ingest-sentry from going apeshit when something throws an excepton
+			if(url.toString().includes('ingest.sentry.io') ) return new Promise(()=>{});
+			return undefined;
+		}
+		return new RequestSnooper({fetchInterceptor}).logRequests();
+	}
 
 	function saveTextToFile(text,filename){
 		const a = document.createElement("a");
@@ -76,25 +75,24 @@
 		a.click();
 	}
 
-	const perma={
+	class TimeStampConsoleLogger{
 		log(msg){
 			const consoleMsg = (typeof msg == "object") ? JSON.stringify(msg,null,'\t') : msg;
-			console.print('%c'+consoleMsg,'font-style:italic;color:blue;font-size:14px;');
+			console.print('%c'+consoleMsg,css.log);
 			this.entries.push({timestamp:new Date().valueOf(),msg});
-		},
-		entries:[]
-	};
+		}
+		entries=[]
+	}
 
-	window.addEventListener('beforeunload', ()=>{
-		function dateTimeStr(d=new Date()){ function pad(x){ return (x<10?'0':'')+x;} return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds()); }
-		const prefix = 'snl '+orgId;
-		const items = snooper._loadLog.map(x=>x.toJSON()).concat(perma.entries)
-			.sort((a,b)=>a.timestamp-b.timestamp)
-			.map(x => ({time:new Date(x.timestamp).toLocaleTimeString(),...x}));
-		saveTextToFile(JSON.stringify(items,null,'\t'), prefix+' '+dateTimeStr()+'.log');
-	}, false);
-
-	perma.log('start');
+	function downloadLogsOnUnload(prefix,snooper,logger){
+		window.addEventListener('beforeunload', ()=>{
+			function dateTimeStr(d=new Date()){ function pad(x){ return (x<10?'0':'')+x;} return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds()); }
+			const items = snooper._loadLog.map(x=>x.toJSON()).concat(logger.entries)
+				.sort((a,b)=>a.timestamp-b.timestamp)
+				.map(x => ({time:new Date(x.timestamp).toLocaleTimeString(),...x}));
+			saveTextToFile(JSON.stringify(items,null,'\t'), prefix+' '+dateTimeStr()+'.log');
+		}, false);
+	}
 
 	function formatSeconds(mS){
 		if(mS===undefined) return '';
@@ -102,9 +100,12 @@
 		if(mS<0) mS = -mS;
 
 		let x = Math.floor(mS * 10 / SECONDS);
-		function rem(d){ const r=x%d;x=Math.floor(x/d+0.5); return r<10 ? ('0'+r):r; }
-		const t=rem(10), s=rem(60), m=rem(60), h=rem(24);
-		return x!=0 ? `${prefix}${x} ${h}:${m}:${s}.${t}` : `${prefix}${h}:${m}:${s}.${t}`;
+		function rem(d,pad=true){ const r=x%d; x=(x-r)/d; return (r<10&&pad) ? ('0'+r):r; }
+		const t=rem(10,false), s=rem(60), m=rem(60), h=rem(24);
+		return x!=0 ? `${prefix}${x} ${h}:${m}:${s}.${t}` 
+			: h!='00' ? `${prefix}${h}:${m}:${s}.${t}`
+			: m!='00' ? `${prefix}${m}:${s}.${t}`
+			: `${prefix}${s}.${t}`;
 	}
 
 	// =================
@@ -204,17 +205,19 @@
 	};
 
 	// Adds UI to status bar and updates it when .delay is changed.
-	function displayRemainingTime(waiter,topBar){
+	function waiterView(waiter,topBar){
 		const statusBar = newEl('p').css(css.subBar).appendTo( topBar );
-		const timeEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar);
-		const tMinusEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar);
-		const refreshEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'white'}).appendTo(statusBar);
-		const watchEl = newEl('span').css(css.status).css({color:'black',backgroundColor:'pink'}).setText('Shows: ?').appendTo(statusBar);
+		const timeEl = newEl('span').css(css.status).appendTo(statusBar);
+		const tMinusEl = newEl('span').css(css.status).appendTo(statusBar);
+		const watchEl = newEl('span').css(css.status).setText('Shows: ?').appendTo(statusBar);
+		const refreshEl = newEl('span').css(css.status).appendTo(statusBar);
 		newEl('button').css(css.status).css({pointer:'cursor'}).setText('RELOAD').on('click',()=>waiter.reload('button click')).appendTo(statusBar);
 
 		waiter.listen('waitStatus',({newValue,oldValue})=>{
-			if(oldValue===undefined) watchEl.style.backgroundColor='#FF8';
-			watchEl.innerText=newValue;
+			if(oldValue===undefined) watchEl.style.backgroundColor='#8F8';
+			const {attempt,count} = newValue;
+			watchEl.innerText=`Shows: ${count} (${attempt})`;
+			watchEl.style.backgroundColor = count == '0' ? '#F88' : '#8F8';
 		});
 
 		// update delay
@@ -223,15 +226,15 @@
 			timeEl.innerText=`Time:${new Date().toLocaleTimeString()}`;
 			// T-(Time remaining) until Target
 			const offsetFromTarget = waiter.getOffsetFromTarget();
-			tMinusEl.innerText =`Target: ${formatSeconds( offsetFromTarget )}`; tMinusEl.style.color = (offsetFromTarget<0) ? "green" : "red";
+			const targetStr = formatSeconds( offsetFromTarget );
+			tMinusEl.innerText =`Target: ${targetStr}`; tMinusEl.style.color = (offsetFromTarget<0) ? "green" : "red";
 			// Refresh
 			const {delay} = waiter.getDelay();
 			refreshEl.innerText =`Refresh: ${formatSeconds( -delay )}`;
 		}, 100 )
 	}
 
-
-	function showConfig(config,topBar){
+	function configView(config,topBar){
 		const inputBar = newEl('p').css(css.subBar).css({background:"#aaf"}).setText('Config: ').appendTo(topBar);
 		newSelect().chain(x=>bind.optionsToStringArr(x,config,'configOptions')).chain(x=>bind.selectValue(x,config,'configName')).appendTo(inputBar);
 		newEl('button').setText('➕').on('click',()=>config.addUser()).appendTo(inputBar);
@@ -246,13 +249,27 @@
 		newEl('button').setText('💾').on('click',()=>config.saveUser()).appendTo(inputBar);
 	}
 
+	function generateView({myConfig,waiter,submitter}){
+		const topBar = newEl('div').css(css.topBar);
+		configView(myConfig,topBar);
+		waiterView(waiter,topBar);
+		submitter.showInStatusBar(topBar);
+		function addToDoc(){ topBar.appendTo( document.body ) }
+		if(document.body != null)
+			addToDoc();
+		else {
+			console.log(`%cdocument.body==[${document.body}]`,'font-size:18px;color:red;font-weight:bold;'); 
+			document.addEventListener('DOMContentLoaded', addToDoc );
+		}
+	}
+
 	//==================
 	// ::Waiter
 	//==================
 	class Waiter {
 		constructor(showService,logger){
 			this._showService = showService;
-			this._logger = logger||perma;
+			this._logger = logger;
 			this.pre = [60*MINUTES,45*MINUTES,30*MINUTES,15*MINUTES,5*MINUTES,2*MINUTES,1*MINUTES,20*SECONDS,10*SECONDS,0];
 			this.postInterval = 2*SECONDS;
 			this.postRetryPeriod = 2*MINUTES;
@@ -291,21 +308,24 @@
 			return this;
 		}
 
-		reload(reason=''){ this._logger.log({action:"reload()",reason}); location.reload(); }
+		reload(reason=''){
+			this._logger.log({action:"reload()",reason}); location.reload();
+		}
 
 		// == Phase 2 - waiting for shows ==
 		reloadWhenShowsAppear(timeout=3*SECONDS){
 			this._logger.log({action:'reloadWhenShowsAppear()',timeout});
 			const watchingForShowsStart = new Date().valueOf();
-			const {_logger:logger,_showService:showService,reload} = this;
+			const {_logger:logger,_showService:showService} = this;
+			const reload = (x) => this.reload(x);
 			let attempt = 0;
 
 			const intervalId = setInterval(async () => {
 				try{
 					++attempt;
-					this.waitStatus = `Attempt ${attempt}`;
+					this.waitStatus = {attempt,count:"?"}; // `Shows: ? (${attempt})`;
 					const shows = await showService.fetchShowsAsync();
-					this.waitStatus = `Attempt ${attempt} - ${shows.length}`;
+					this.waitStatus = {attempt,count:shows.length}; // `Shows: ${shows.length} (${attempt})`;
 					if(shows.length) done('showService found shows');
 				} catch (err){
 					logger.log(err);
@@ -376,7 +396,7 @@
 
 			this.config = config;
 			this._showService = showService;
-			this._logger = logger||perma;
+			this._logger = logger;
 
 			this.startMonitorTime = new Date().valueOf(); // record when start monitoring
 
@@ -656,7 +676,7 @@
 	}
 
 	class ShowService{
-		constructor(orgId,logger){ this.orgId = orgId; this._logger=logger||perma; }
+		constructor(orgId,snooper,logger){ this.orgId = orgId; this._snooper=snooper; this._logger=logger; }
 		// Called at start-up. Watches the page and the Snooper to determine how many shows there are.
 		waitForShowCountAsync(timeout = 2*SECONDS){
 			// wait for either:
@@ -669,7 +689,7 @@
 				const timeoutId = setTimeout(()=>stop('timeout',0), timeout);
 
 				// 3) the shows to appear on the snooper (do this LAST to ensure timers/intervals are started before we try to clear them.)
-				snooper.addHandler(x => {
+				this._snooper.addHandler(x => {
 					const {url:{pathname},responseText} = x;
 					if(this.isSnoopPath(pathname)){
 						stop('snoop',JSON.parse(responseText).length);
@@ -708,39 +728,65 @@
 	// ===============
 	async function initPageAsync(){
 
+		const [,orgId,eventId] = document.location.href.match(/events\/([^#]+)#\/event\/(.*)/);
+		const isSnl = orgId == snlOrgId;
+		let goTime = getNextThursday10Am();
+		let waitForShowsTimeout = 5*SECONDS;
+
+
+		const logger = new TimeStampConsoleLogger();
+		const snooper = buildSnooper();
+		const showService = new ShowService( orgId, snooper, logger );
+
+		const waiter = new Waiter( showService, logger )
 		const configRepo = new SyncedPersistentDict(orgId);
 		const myConfig = new MyConfig( configRepo );
-		const showService = new ShowService( orgId, perma );
-		const waiter = new Waiter( showService, perma )
+		const submitter = new Submitter(myConfig,showService,logger);
 	
 		myConfig.showOptions = ["[none]",liveShow,dressRehearsal];
 		myConfig.configOptions = configRepo.keys();
 		myConfig.configName = configRepo.entries().filter(([,values])=>values.isDefault).map(([name,])=>name)[0];
-	
-		console.print(`${orgId}: Using Config: %c[${myConfig.configName}] for [${myConfig.show}]` + (isSnl?" SNL":""),css.configState)
-		console.print(JSON.stringify(myConfig,null,'\t'))
+		downloadLogsOnUnload('snl '+orgId, snooper, logger);
+
+		if(localStorage.testUi){
+			delete localStorage.testUi;
+			goTime = new Date(new Date().valueOf()+5*SECONDS);
+			waitForShowsTimeout = 10*SECONDS
+			const showShowsAfter = 5*SECONDS;
+			Object.assign(showService,{ 
+				showTime: goTime.valueOf() + showShowsAfter, 
+				waitForShowCountAsync(){ return Promise.resolve({showCounts:0,reason:'timeout'}); }, 
+				fetchShowsAsync(){ const hasShows = new Date() >= this.showTime; return Promise.resolve( hasShows ? ["show1","show2"] : [] ); } 
+			});
+			Object.assign(waiter,{
+				reload(){ logger.log('RELOAD-STUB called!'); }
+			});
+			console.log('DUDE - TESTING');
+		}
+
+		// Start...
+		logger.log({action:"start",orgId,configName:myConfig.configName,show:myConfig.show,isSnl});
 
 		// wait for shows to load
 		const initial = await showService.waitForShowCountAsync(); 
-		perma.log(`Initial show counts: ${initial.showCount} from ${initial.reason}`);
+		logger.log(`Initial show counts: ${initial.showCount} from ${initial.reason}`);
 
-	
-		// UI
-		const topBar = newEl('div').css(css.topBar).appendTo( document.body );
-		showConfig(myConfig,topBar);
-		displayRemainingTime(waiter,topBar)
+		// View
+		generateView({myConfig,waiter,submitter});
 
 		if(initial.showCount){
-			const submitter = new Submitter(myConfig,showService,perma).showInStatusBar(topBar);
 			if(!isSnl) submitter.stubSubmit();
 			submitter.monitor();
-		} else if( new Date().valueOf() < goTime.valueOf() ){
-			waiter.scheduleNext(goTime,5*SECONDS);
-		} else {
-			waiter.reloadWhenShowsAppear(5*SECONDS);
+		} else{
+			if( new Date().valueOf() < goTime.valueOf() ){
+				waiter.scheduleNext(goTime,waitForShowsTimeout);
+			} else {
+				waiter.reloadWhenShowsAppear(waitForShowsTimeout);
+			}
 		}
 
-		unsafeWindow.cmd = {waiter,showService,myConfig,initial};
+		unsafeWindow.cmd = {waiter,showService,myConfig,snooper,logger,initial,formatSeconds};
+		unsafeWindow.snooper = snooper;
 
 	};
 	initPageAsync();

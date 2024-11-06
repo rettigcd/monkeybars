@@ -16,11 +16,11 @@
 	unsafeWindow.runTests = async function(){
 
 		const SECONDS = 1000;
-		const {waiter,showService,myConfig,initial} = unsafeWindow.cmd;
+		const {waiter,showService,snooper,myConfig,initial} = unsafeWindow.cmd;
 		const old_isSnoopPath = showService.isSnoopPath;
 		const old_findCurrentDivs = showService.findCurrentDivs;
 		const dontLog = {log(){}}
-		const noLogShowService = new showService.constructor(showService.orgId,dontLog);
+		const noLogShowService = new showService.constructor(showService.orgId,snooper,dontLog);
 
 		function assert(actual){
 			const a=JSON.stringify(actual);
@@ -110,5 +110,9 @@
 
 	}
 
+	unsafeWindow.testUi = function(){
+		localStorage.testUi = "true";
+		document.location.reload();
+	}
 
 })();
