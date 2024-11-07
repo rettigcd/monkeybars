@@ -16,7 +16,7 @@
 // @grant        unsafeWindow
 // ==/UserScript==
 
-// https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/choose (NBC / SNL)
+// https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/choose - SNL
 // https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27688 - dress
 // https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27689 - live
 
@@ -46,7 +46,8 @@
 	const css = {
 		topBar: {position:'fixed',top:'0px',right:'0px',backgroundColor:'#ddf',zIndex:1000},
 		subBar: {margin:0},
-		status: {border:'thin solid black',padding:'2px 4px',"font-size":"14px",backgroundColor:'white',color:'black'},
+		status: {border:'thin solid black',padding:'2px 4px',"font-size":"12px",backgroundColor:'white',color:'black'},
+		reloadButton: {border:'3px outset black',"border-radius":"8px", padding:'0px 4px', margin:"1px 4px","font-size":"13px",backgroundColor:'#0F0',color:'black', cursor:"pointer"},
 		success: {color:"white", backgroundColor:'green'},
 		fail: {color:"white", backgroundColor:'red'},
 		input: {width:"100px"},
@@ -87,13 +88,25 @@
 	}
 
 	function downloadLogsOnUnload(prefix,snooper,logger){
-		window.addEventListener('beforeunload', ()=>{
+		function flushLog(){
+			// Get current log items
 			function dateTimeStr(d=new Date()){ function pad(x){ return (x<10?'0':'')+x;} return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds()); }
 			const items = snooper._loadLog.map(x=>x.toJSON()).concat(logger.entries)
 				.sort((a,b)=>a.timestamp-b.timestamp)
 				.map(x => ({time:new Date(x.timestamp).toLocaleTimeString(),...x}));
-			saveTextToFile(JSON.stringify(items,null,'\t'), prefix+' '+dateTimeStr()+'.log');
-		}, false);
+			if(!items.length){ console.print('No log items to flush.'); return;}
+			const logAsString = JSON.stringify(items,null,'\t');
+			// Save to localStorage, file, clear localstorage
+			localStorage.savedLog = logAsString;
+			saveTextToFile(logAsString, prefix+' '+dateTimeStr()+'.txt');
+			snooper._loadLog.length=0;
+			logger.entries.length=0;
+			delete localStorage.savedLog;
+		}
+		if(localStorage.savedLog!==undefined) {console.log("flushing previously savedLog"); flushLog(); }
+
+		document.addEventListener('visibilitychange', ()=>{if(document.visibilityState=="hidden") flushLog(); });
+		unsafeWindow.flushLog = flushLog;
 	}
 
 	function formatSeconds(mS){
@@ -212,8 +225,8 @@
 		const timeEl = newEl('span').css(css.status).appendTo(statusBar);
 		const tMinusEl = newEl('span').css(css.status).appendTo(statusBar);
 		const watchEl = newEl('span').css(css.status).setText('Shows: ?').appendTo(statusBar);
+		newEl('button').css(css.reloadButton).setText('RELOAD').on('click',()=>waiter.reload('button click')).appendTo(statusBar);
 		const refreshEl = newEl('span').css(css.status).appendTo(statusBar);
-		newEl('button').css(css.status).css({pointer:'cursor'}).setText('RELOAD').on('click',()=>waiter.reload('button click')).appendTo(statusBar);
 
 		waiter.listen('waitStatus',({newValue,oldValue})=>{
 			if(oldValue===undefined) watchEl.style.backgroundColor='#8F8';
@@ -225,7 +238,7 @@
 		// update delay
 		const intervalId = setInterval( () => {
 			// Current Time
-			timeEl.innerText=`Time:${new Date().toLocaleTimeString()}`;
+			timeEl.innerText=`Time: ${new Date().toLocaleTimeString()}`;
 			// T-(Time remaining) until Target
 			const offsetFromTarget = waiter.getOffsetFromTarget();
 			const targetStr = formatSeconds( offsetFromTarget );
@@ -267,7 +280,7 @@
 		constructor(showService,logger){
 			this._showService = showService;
 			this._logger = logger;
-			this.pre = [60*MINUTES,45*MINUTES,30*MINUTES,15*MINUTES,5*MINUTES,2*MINUTES,1*MINUTES,20*SECONDS,10*SECONDS,0];
+			this.pre = [60*MINUTES,15*MINUTES,2*MINUTES,20*SECONDS,0];
 			this.postInterval = 2*SECONDS;
 			this.postRetryPeriod = 2*MINUTES;
 			if(this.pre[this.pre.length-1] != 0) this.pre.push(0);
@@ -457,7 +470,7 @@
 		}
 
 		monitor(){
-			this._logger.log('attempting to submit page...');
+			this._logger.log('attempting to submit form...');
 
 			this.attempt = 0;
 			this.intervalId = setInterval(()=>this.onTick(),200);
@@ -689,7 +702,7 @@
 				this._snooper.addHandler(x => {
 					const {url:{pathname},responseText} = x;
 					if(this.isSnoopPath(pathname)){
-						stop('snoop',JSON.parse(responseText).length);
+						stop('snooper',JSON.parse(responseText).length);
 						x.handled = "events";
 					}
 				} );
@@ -727,8 +740,8 @@
 	async function initPageAsync(){
 
 		let goTime = getNextThursday10Am();
-		let waitForShowsTimeout = 5*SECONDS;
-		const [,orgId,eventId] = document.location.href.match(/events\/([^#\/]+).*\/event\/([^#\/]+)/);
+		let waitForShowsTimeout = 4*SECONDS;
+		const [,orgId,,eventId] = document.location.href.match(/events\/([^#\/]+)(.*\/event\/([^#\/]+))?/);
 		const isSnl = orgId == snlOrgId;
 
 		const logger = new TimeStampConsoleLogger();

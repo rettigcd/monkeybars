@@ -52,7 +52,7 @@
 		assert(showService.findCurrentDivs().map(x=>x.tagName).length).equals(showCount,'showService.findCurrentDivs()');
 
 		// SUT: showService - When waiting for shows to appear => finds them via the snooper
-		assert(await showService.waitForShowCountAsync()).equals({showCount,reason:"snoop"},'showService.waitForShowCount-1');
+		assert(await showService.waitForShowCountAsync()).equals({showCount,reason:"snooper"},'showService.waitForShowCount-1');
 
 		// SUT: showService - Given: no shows via api > when wait For Shows to appear => finds via DIVs
 		showService.isSnoopPath = ()=>false;
@@ -68,7 +68,7 @@
 		showService.isSnoopPath = old_isSnoopPath;
 
 		// SUT: showService - When calling show API > finds shows
-		assert(await showService.waitForShowCountAsync()).equals({showCount,"reason":"snoop"},'showService.waitForShowCount-4');
+		assert(await showService.waitForShowCountAsync()).equals({showCount,"reason":"snooper"},'showService.waitForShowCount-4');
 
 		// =============
 		// Waiter
