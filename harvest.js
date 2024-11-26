@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Harvest Locations
 // @namespace    http://tampermonkey.net/
-// @version      2024-10-09
+// @version      2024-11-26
 // @description  Highlight Users location and adds icons to help select correct location/billing codes.
 // @author       Dean Rettig
 // @match        https://infernored.harvestapp.com/time/day/*/*/*/*
@@ -46,20 +46,22 @@
 	});
 
 	function addProjectIcon(el){
-		const clean = el.innerText.replace("\n", ""), title = clean.substring(1,clean.length-2);
-		let icon = iconMap[title];
+		const clean = el.innerText.replace("\n", ""), clientName = clean.substring(1,clean.length-2);
+		const proj = el.parentNode.querySelector('.entry-project'), projName = proj.innerText;
+		const key = `${clientName}-${projName}`; // make project-specific key
+
+		let icon = iconMap[key] || iconMap[clientName]; // try key first, fallback to just client.
 		const img = document.createElement('IMG');
 		img.src=icon || standInIcon;
 		Object.assign(img.style, css.projectIcon);
 		img.addEventListener('click',()=>{
-			const newIcon = prompt(`Enter new icon URL for [${title}]`, icon);
+			const newIcon = prompt(`Enter new icon URL for [${key}]`, icon);
 			if(newIcon==null) return;
 			icon = newIcon;
-			iconMap[title] = icon;
+			iconMap[key] = icon;
 			img.src=icon || standInIcon;
 		});
 		// insert
-		const proj = el.parentNode.querySelector('.entry-project');
 		proj.insertBefore(img, proj.firstChild); 
 		// don't reprocess
 		el.classList.add('hasIcon');
