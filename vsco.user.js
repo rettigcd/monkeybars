@@ -10,9 +10,10 @@
 // @require      file://C:/[monkeyBarsFolder]/observable.js
 // @require      file://C:/[monkeyBarsFolder]/storage.js
 // @require      file://C:/[monkeyBarsFolder]/vsco.user.js
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=vsco.co
+// @icon64       https://www.google.com/s2/favicons?sz=64&domain=vsco.co
 // @grant        GM_download
 // @grant        GM_setClipboard
+// @grant        GM_log
 // @grant        unsafeWindow
 // ==/UserScript==
 
@@ -373,7 +374,7 @@
 		gallery;
 		constructor(userAccess,galleryModel){
 			const css = {
-				top			: {position:"fixed",top:"0px",left:'0px',width:'100%',height:"40px",'z-index':'3000',background:'rgba(255,255,255,0.9)',overflow:"auto"},
+				top			: {position:"fixed",top:"0px",left:'0px',width:'100%',height:"50px",'z-index':'3000',background:'rgba(255,255,255,0.9)',overflow:"auto"},
 				leftPanel	: {margin:0,padding:0,display:'inline-block'},
 				star		: {display:'inline-block'},
 				userLink	: {display:'inline-block'},
@@ -395,7 +396,7 @@
 			const visibleRowProgress = newEl('div').css(css.progress).appendTo(leftPanel);
 
 			this.calendarEl = newEl('div').css(css.calendar).appendTo(top);
-			const scanNextEl = newEl('div').css(css.next).appendTo(top);
+			this.scanNextEl = newEl('div').css(css.next).appendTo(top);
 			const thumbDiv = newEl('div');
 
 			const spacerEl = newEl('div').css({"height":css.top.height});
@@ -408,14 +409,19 @@
 			new ScanNewImagesMenu( scanNewImagesDiv, userAccess );
 			this.gallery = new GalleryView( thumbDiv, visibleRowProgress, galleryModel );
 			new Importer( fileImport );
+
 			// next links
 			for(let link of [userAccess.needsReview(), userAccess.missingViewDate(), userAccess.toPrune()])
-				link.appendTo(scanNextEl);
+				link.appendTo(this.scanNextEl);
 		}
+		// If page is a user-page, this binds to their models.
 		showCurrentUser(userCtx, calendar){
 			this.userStatusDiv.append( makeUserStatusControl( userCtx ) );
 			this.userDownloadCountsDiv.append( makeDownloadCountsControl(userCtx) );
 			this.calendarEl.appendChild( new CalendarView( calendar ) );
+		}
+		appendButton(button){
+			this.scanNextEl.appendChild(button);
 		}
 	}
 
@@ -765,16 +771,10 @@
 			const dayWaitMap = [,,7,2,1,0];
 			const now = storageTime.now();
 
-			function waitToDisplayNewImages(data){ // predicate, not inherant property of UserData
-				return 0; // don't wait for anyone
-				// const dily = data.downloadsInLastYear;
-				// const days = dily > 30 ? 0 : dily > 20 ? 1 : dily > 5 ? 2 : 7;
-				// return days*storageTime.DAYS;
-			}
 			function displayNewImages(user){
 				const imgs = user.newImages;
 				return imgs.length>=4
-					|| Math.min(...imgs.map(x=>x.uploadDate)) + waitToDisplayNewImages( user.data ) < now;
+					|| Math.min(...imgs.map(x=>x.uploadDate)) < now;
 			}
 			this._newImageUsers = this._userAccess.newImageUsers
 				.filter( displayNewImages );
@@ -998,6 +998,7 @@
 			return new NextLink({
 				label:'for review',
 				count: users.length,
+				tooltip: 'These pages have not yet been evaluated to keep or ignore.',
 				nextUrl: users.length ? users[rnd(users.length)].fetch.galleryUrl : undefined
 			})
 		}
@@ -1017,12 +1018,12 @@
 			return new NextLink({
 				label: 'missing view-date',
 				count: users.length,
+				tooltip: 'No view-date recorded.',
 				nextUrl: users.length ? `/${users[0].username}/gallery` : undefined,
 			});
 		}
 		toPrune(yearsWithoutDownload=4){
 			const pageOwner = this.pageOwner;
-			// userAccess.repo.sync(); // save viewDate before we scan
 			const earliestEmptyYear = new Date().getFullYear() - yearsWithoutDownload;
 			const toPrune = Object.entries(JSON.parse(localStorage.users))
 				.filter(([u,v])=>2<=v.stars&&v.stars<=5 // 1 is 'ignored'
@@ -1033,8 +1034,9 @@
 				.filter( ({lastYear}) => lastYear<earliestEmptyYear )
 				.sort(by(x=>x.lastYear).thenBy(x=>x.lastCount).thenBy(x=>x.username));
 			return new NextLink({
-				label:'prune',
+				label:'to prune',
 				count:toPrune.length,
+				tooltip:`No downloads in last ${yearsWithoutDownload} years.`,
 				nextUrl:toPrune.length ? `/${toPrune[0].username}/gallery` : undefined
 			});
 		}
@@ -1043,7 +1045,7 @@
 	class UserCtx {
 		constructor(username,userAccess){
 			this.username = username;
-			this._access = userAccess;
+			this._access = userAccess; // class: UserAccess
 			new HasEvents(this);
 		}
 
@@ -1057,7 +1059,11 @@
 		clearNewImages(){ this._access.newImageRepo.remove(this.username); }
 
 		save(){ if(this.status != UserStatus.following) this.status = UserStatus.shouldReview;}
-		open(){ this.save(); window.open(this.fetch.galleryUrl, '_blank'); }
+		open(){ 
+			this.save();
+			this._access.repo.sync(); // flush 'save' before we open the next page.
+			window.open(this.fetch.galleryUrl, '_blank');
+		}
 		mask(){ this._access.commonRepo.add(this.username); console.log(`${this.username} masked!`); }
 
 		// status
@@ -1404,8 +1410,8 @@
 
 	class NextLink{ 
 		label; nextUrl; count;
-		constructor({label,nextUrl,count}){
-			Object.assign(this,{label,nextUrl,count});
+		constructor({label,nextUrl,count,tooltip}){
+			Object.assign(this,{label,nextUrl,count,tooltip});
 		}
 		goto(){
 			const {label,count,nextUrl} = this, msg = `${label}: ${count}`;
@@ -1416,10 +1422,11 @@
 		}
 		// UI stuff
 		appendTo(host){
-			const {label,nextUrl,count} = this;
+			const {label,nextUrl,count,tooltip} = this;
 			if(!nextUrl) return;
 			newEl('div')
 				.setText(`${label}: ${count}`)
+				.attr('title',tooltip)
 				.css({'text-decoration':'underline','cursor':'pointer','font-size':'12px'})
 				.on('click',() => document.location.href = nextUrl )
 				.appendTo(host)
@@ -1438,11 +1445,11 @@
 	sessionStorage.msgs = '';
 
 	class LastYear{
-		constructor([u,v]){
-			this.username = u;
-			this.lastYear = LastYear.calcLastYear(v,1980);
-			this.lastCount = this.lastYear==1980 ? 0 : v.dl[this.lastYear];
-			this.viewDate = v.viewDate;
+		constructor([username,rawData]){
+			this.username = username;
+			this.lastYear = LastYear.calcLastYear(rawData,1980);
+			this.lastCount = this.lastYear==1980 ? 0 : rawData.dl[this.lastYear];
+			this.viewDate = rawData.viewDate;
 		}
 		static calcLastYear({dl},defaultYear=1980){ 
 			const keys = Object.keys(dl||{});
@@ -1455,7 +1462,7 @@
 			setTimeout(()=>window.location.href=`/${users[0].username}/gallery`,2000);
 	}
 
-	function saveTextToFile(text,filename){
+	function saveTextToFile({text,filename}){
 		const a = document.createElement("a");
 		a.href = URL.createObjectURL(new Blob([text])); // old way that doesn't handle '#' a.href = "data:text,"+text;
 		a.download = filename;
@@ -1468,7 +1475,7 @@
 	const gallery = new Gallery();
 
 	// UI / Views - general
-	const ui = new Layout( userAccess, gallery );
+	const uiLayout = new Layout( userAccess, gallery );
 
 	const keyPressActions = {
 		"79": /* o */ () => gallery.openLast(),
@@ -1528,8 +1535,19 @@
 		const startingState = structuredClone(currentUser.data._info);
 
 		// UI / view - currentUser
-		ui.showCurrentUser(currentUser, calendar);
-		
+		uiLayout.showCurrentUser(currentUser, calendar);
+
+		let xId = setInterval(function(){
+			[...document.querySelectorAll('span,h1')].filter(x=>x.innerHTML==userAccess.pageOwner)
+			.forEach(el=>{
+				console.log(el);
+				el.innerText = el.innerText + " 📋";
+				el.style.cursor="pointer";
+				el.addEventListener('click',() => navigator.clipboard.writeText(userAccess.pageOwner));
+				if(xId) { clearInterval(xId); xId=false; }
+			});
+		},500)
+
 		Object.assign(keyPressActions,{
 			"37": /*left*/ () => calendar.prev(),
 			"39": /*right*/ () => calendar.next(),
@@ -1564,7 +1582,20 @@
 						const lastYear = Object.keys(startingState.dl).reverse()[0]||storageTime.toDate(loadTimeNum).getYear();
 						console.print(`Downloads for ${lastYear}: %c${startingState.dl[lastYear]}`,downloadCountCss);
 						calendar.loadAsync();
+					} else {
+						// Check if user should be pruned
+						const lastYearInfo = new LastYear([userAccess.pageOwner,startingState]);
+						const earliestEmptyYear = new Date().getFullYear() - 4;
+						if( lastYearInfo.lastYear<earliestEmptyYear ){
+							uiLayout.appendButton(newEl('button').setText('Prune').on('click',function(){
+								userAccess.repo.remove(userAccess.pageOwner);
+								console.print(`[${userAccess.pageOwner}] pruned`);
+								this.remove();
+							}));
+							calendar.loadAsync();
+						}
 					}
+
 					await currentUser.scanForNewImagesAsync(); // Sets the View Date which we NEED
 
 					if(currentUser.newImages.length>0){
@@ -1597,3 +1628,13 @@
 	}
 
 })();
+
+// Counts: 1: 2284 > ignore, 2: 1842, 3: 4853 > follow, 4: 372, 5: 151, null > 59, undefined > 681
+// TODO:
+// Surface # of failures and make easy to resolve.
+// determine where null and undefined scores came from, and get rid of them
+	// Maybe undefined, the status never got set and null were set to 'new'?
+	// Should we merge null/undefined/ignore(score=1) ?
+
+// == How To ==
+// delete/remove the current user:   users.repo.remove(cmd.owner)

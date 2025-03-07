@@ -26,6 +26,23 @@
 // https://bookings-us.qudini.com/booking-widget/events/UZJLSRJUNZC/event/choose   - cafe classic
 // https://bookings-us.qudini.com/booking-widget/events/2HYM77D8NYO/event/choose   - how to design cozy holiday bed
 
+// Current time and Computers offset can be found: https://www.time.gov/
+
+// TODO:
+
+//   CTRL-SHIFT-R would not reload page.   I was over screen recorder.  WAS THAT THE PROBLEM?
+//   Log shows we found shows at 
+
+
+// 5 Don't have more than 1 or 2 # of show requests running at the same time.  If 1st doesn't return, neither will 2nd.
+// When making # of shows requests - log an id/counter before and after. to pair them up
+// Figure out why windows wouldn't reload, was it because
+//  - they are different windows and I was reloading the wrong one.
+//  - the windows was waiting for the outstanding fetches (awaiting) to resolve?
+// Show a BIG GD button/Indicator when we hit the timeout period so user knows the reload is broken.
+
+// Submit the data directly
+
 (function(){
 
 	// =======
@@ -98,10 +115,12 @@
 			const logAsString = JSON.stringify(items,null,'\t');
 			// Save to localStorage, file, clear localstorage
 			localStorage.savedLog = logAsString;
-			saveTextToFile(logAsString, prefix+' '+dateTimeStr()+'.txt');
+			const filename = prefix+' '+dateTimeStr()+'.txt';
+			saveTextToFile(logAsString, filename);
 			snooper._loadLog.length=0;
 			logger.entries.length=0;
 			delete localStorage.savedLog;
+			console.print(`Flushed ${items.length} items at ${new Date().toLocaleTimeString()}.`);
 		}
 		if(localStorage.savedLog!==undefined) {console.log("flushing previously savedLog"); flushLog(); }
 
@@ -277,11 +296,11 @@
 	// ::Waiter
 	//==================
 	class Waiter {
-		constructor(showService,logger){
+		constructor(showService,logger,postInterval){
 			this._showService = showService;
 			this._logger = logger;
 			this.pre = [60*MINUTES,15*MINUTES,2*MINUTES,20*SECONDS,0];
-			this.postInterval = 2*SECONDS;
+			this.postInterval = postInterval;
 			this.postRetryPeriod = 2*MINUTES;
 			if(this.pre[this.pre.length-1] != 0) this.pre.push(0);
 			// pre must be in descending order, and should end with 0
@@ -319,7 +338,8 @@
 		}
 
 		reload(reason=''){
-			this._logger.log({action:"reload()",reason}); location.reload();
+			this._logger.log({action:"reload()",reason});
+			location.reload(); /// !!! THIS DOESN'T WORK!
 		}
 
 		// == Phase 2 - waiting for shows ==
@@ -340,7 +360,7 @@
 				} catch (err){
 					logger.log(err);
 				}
-			},250);
+			},500);
 			const timeoutId = setTimeout(function(){ 
 				done('timed out waiting for show to appear'); 
 			}, timeout);
@@ -714,14 +734,16 @@
 				}
 			})
 		}
+		fetchAttempt = 0;
 		// called periodically to detect noshow-to-hasshows transition
 		async fetchShowsAsync(){
-			this._logger.log('querying: shows');
+			const attempt = ++this.fetchAttempt;
+			this._logger.log(`querying shows (attempt ${attempt}`);
 			                                        // https://bookings-us.qudini.com/booking-widget/event/events/2HYM77D8NYO/event/choose
 			const response = await unsafeWindow.fetch(`https://bookings-us.qudini.com/booking-widget/event/events/${this.orgId}`);
 			if(!response.ok) throw "bad response";
 			const shows = await response.json();
-			this._logger.log(`found: ${shows.length} shows.`);
+			this._logger.log(`found: ${shows.length} shows. (attempt ${attempt})`);
 			return shows;
 		}
 		// override to disable snoop - for testing
@@ -740,14 +762,14 @@
 	async function initPageAsync(){
 
 		let goTime = getNextThursday10Am();
-		let waitForShowsTimeout = 4*SECONDS;
+		let waitForShowsTimeout = 2*SECONDS;
 		const [,orgId,,eventId] = document.location.href.match(/events\/([^#\/]+)(.*\/event\/([^#\/]+))?/);
 		const isSnl = orgId == snlOrgId;
 
 		const logger = new TimeStampConsoleLogger();
 		const snooper = buildSnooper();
 		const showService = new ShowService( orgId, snooper, logger );
-		const waiter = new Waiter( showService, logger )
+		const waiter = new Waiter( showService, logger, waitForShowsTimeout );
 		const configRepo = new SyncedPersistentDict(orgId);
 		const myConfig = new MyConfig( configRepo );
 		const submitter = new Submitter(myConfig,showService,logger);

@@ -4,10 +4,11 @@ class SyncedPersistentDict{
 	constructor(storageKey,newValueGenerator=()=>({})){
 		let dict = null;
 		const updaters=[];
+		function print(...args) { queueMicrotask (console.log.bind (console, ...args)); }
 		function load(){ if(dict==null) dict = JSON.parse(localStorage[storageKey]||"{}"); }
 		function updateDict(dictUpdater){ load(); dictUpdater(dict); updaters.push(dictUpdater); }
 		function save(){ localStorage[storageKey] = '{\r\n'+Object.entries(dict).sort((a,b)=>a[0]<b[0]?-1:1).map(a=>a.map(JSON.stringify).join(':')).join(',\r\n')+'\r\n}'; }
-		function sync(){ dict=null; if(updaters.length>0) { load(); updaters.forEach(u=>u(dict)); console.print(updaters.length+' updates saved to '+storageKey); updaters.length=0; save(); } }
+		function sync(){ dict=null; if(updaters.length>0) { load(); updaters.forEach(u=>u(dict)); print(updaters.length+' updates saved to '+storageKey); updaters.length=0; save(); } }
 		setInterval( sync, 30000); window.addEventListener('beforeunload', sync, false);
 		// read function
 		this.keys = function(){ load(); return Object.keys(dict); }
@@ -16,7 +17,7 @@ class SyncedPersistentDict{
 		this.containsKey = function(key) { load(); return dict.hasOwnProperty(key); }
 		this.get = function(key) { load(); return dict.hasOwnProperty(key) ? dict[key] : newValueGenerator(); }
 		// Update functions
-		this.rename = function(oldKey,newKey){ updateDict( d=>{ if(oldKey in d) { d[newKey]=d[oldKey]; delete d[oldKey]; console.log(`Renamed [${oldKey}] to [${newKey}]`) }  else console.log(`${oldKey} not found.`); } ); }
+		this.rename = function(oldKey,newKey){ updateDict( d=>{ if(oldKey in d) { d[newKey]=d[oldKey]; delete d[oldKey]; print(`Renamed [${oldKey}] to [${newKey}]`) } else print(`[${oldKey}] not found.`); } ); }
 		this.remove = function(key){ updateDict(d=>delete d[key]); }
 		this.update = function(key,updater){ updateDict( d => {if(!d[key]) d[key]=newValueGenerator(); updater(d[key]); } ) }
 		this.sync = sync;

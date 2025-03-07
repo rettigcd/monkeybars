@@ -1,14 +1,14 @@
 // === Snooping on HTTP Requests ===
 
 class SnoopRequest{
-	constructor({method,url,body,responseText,headers,func}){
-		const readonly = {url,responseText,body,method,func,headers,timestamp:new Date().valueOf()};
+	constructor({method,url,body,responseText,headers,timestamp,func}){
+		const readonly = {url,responseText,body,method,func,headers,timestamp,duration:new Date().valueOf()-timestamp};
 		for(let prop in readonly)
 			Object.defineProperty(this,prop,{value:readonly[prop]});
 	}
 	toJSON(){
-		const {url,responseText,method,timestamp,headers,body} = this;
-		const result = {timestamp,method,url:url.toString(),responseText};
+		const {url,responseText,method,timestamp,duration,headers,body} = this;
+		const result = {timestamp,method,url:url.toString(),responseText,duration};
 		if(headers) result.headers=headers;
 		if(body) result.body=body;
 		return result;
@@ -29,13 +29,14 @@ function makeNewFetch(origFetch,loadHandlers,interceptor){
 		// !!! 1st parameter can be any of these: string, URL, Request
 		const fakeResponse = interceptor(url,options);
 		if(fakeResponse!==undefined) return fakeResponse;
+		const timestamp = new Date().valueOf();
 		const promise = origFetch(url,options);
 		if(loadHandlers.length)
 			promise
 				.then( response => response.clone().text() )
 				.then( responseText => {
 					const {method,body,headers} = options || {};
-					const record = new SnoopRequest({method,url:new URL(url,unsafeWindow.location),body,headers,responseText,func:'fetch'})
+					const record = new SnoopRequest({method,url:new URL(url,unsafeWindow.location),body,headers,responseText,timestamp,func:'fetch'})
 					loadHandlers.forEach(function(callback){
 						try{ callback( record ); } catch( err ){ console.error(err); }
 					});
@@ -53,6 +54,7 @@ function makeNewXMLHttpRequest(origConstructor,loadHandlers){
 		const origOpen = xhr.open; // capture so we can replace it and then call it.
 		xhr.open = function(){ // XMLHttpRequest.open(method, url[, async[, user[, password]]])
 			xhr._openArgs = arguments;
+			xhr._timestamp = new Date().valueOf();
 			return origOpen.apply(xhr,arguments);
 		};
 
@@ -71,10 +73,10 @@ function makeNewXMLHttpRequest(origConstructor,loadHandlers){
 		}
 
 		xhr.addEventListener('load', ()=>{
-			const {responseText,_openArgs:[method,url,sync,user,pw],_sendBody:body,_headers:headers} = xhr;
+			const {responseText,_openArgs:[method,url,sync,user,pw],_sendBody:body,_headers:headers,_timestamp:timestamp} = xhr;
 			const refUrl = new URL(unsafeWindow.location.href);
 			const urlObj = new URL(url,refUrl);
-			const record = new SnoopRequest({method,url:urlObj,body,responseText,headers,func:'XMLHttpRequest'});
+			const record = new SnoopRequest({method,url:urlObj,body,responseText,headers,timestamp,func:'XMLHttpRequest'});
 			loadHandlers.forEach(function(callback){
 				try{ callback( record ); } catch( err ){ console.error(err); }
 			});
@@ -93,9 +95,19 @@ function makeNewWebSocket(origConstructor,loadHandlers){
 		// onopen onmessage send(body)
 		const handler = {
 			get(target, prop, receiver) {
-				return Reflect.get(...arguments);
+				console.log('socket-get',prop);
+				if (typeof target[prop] === 'function') {
+					return function(...args) {
+					  console.log(`Intercepted method call: ${prop}(${args.join(', ')})`);
+					  return target[prop].apply(this, args);
+					};
+				  }
+				  return Reflect.get(target, prop, receiver);
 			},
 			set(obj, prop, value) {
+				const knownProps = ['binaryType'];
+				if(!knownProps.includes(prop))
+					console.log('socket-set',prop,value);
 				return Reflect.set(...arguments);
 			}
 		};
