@@ -18,16 +18,13 @@
 // @grant        unsafeWindow
 // ==/UserScript==
 
+// Requires (a) Developer Mode = Enabled & (b) Allow Local URLs
+
 (function() {
 	'use strict';
 
-	unsafeWindow.WebSocket = function(url,protocol){ 
-		console.print('opening socket',url,protocol);
-		return { 
-			send(body){ console.print('socket.send()',body); },
-			close(){ console.print('socket.close()'); }
-	 	};
-	}
+	unsafeWindow.WebSocket = makeNewWebSocket(unsafeWindow.WebSocket);
+
 
 	const storageTime = EpochTime.JavascriptTime;
 
@@ -214,6 +211,7 @@
 
 		constructor({owner,date,pics,following,lat,lng,liked}){
 			Object.assign(this,{owner,date,pics,following,lat,lng,liked});
+			this.sanitizedImgUrl = sanitizeImgUrl(pics[0].imgUrls[0]);
 		}
 
 		logFirst(){ this.pics[0].log(); }
@@ -289,7 +287,7 @@
 			const matching = this.imgUrls.filter(x => x.includes(requestedUrl)).reverse();
 			await download(matching[0] || requestedUrl, this.filename, notify);
 			this.downloaded=true;
-			console.log(`downloaded: ${this.filename}`);
+			console.print(`downloaded: ${this.filename}`);
 		}
 
 		// logs the smallest image of the lot
@@ -304,6 +302,7 @@
 		handle = (x) => {
 			const {url,body} = x;
 			if(this.matches(url,body)){
+				apiTimes.touch(this.constructor.name);
 				this.processResponse(x);
 				x.handled = this.constructor["name"];
 			}
@@ -317,11 +316,11 @@
 				const batch = this.findMediaArray(json)
 					.map(PicGroup.fromMediaWithUser);
 
-				this.lastBatch = x.batch = batch; // trigger event
+				this.lastBatch = x.batch = batch; // setting .lastBatch triggers event
 
 				if(batch.length){
 					const msg = `${this.constructor.name} extracted %c${batch.length}%c pic groups from json.`;
-					console.debug(msg,'background:green;color:white;font-size:18px;','color:black;background:white;font-size:12px;');
+					console.print(msg,'background:green;color:white;font-size:18px;','color:black;background:white;font-size:12px;');
 				}
 
 			}catch(err){
@@ -445,6 +444,8 @@
 	 		return pathname=='/api/v1/locations/web_info/';
 	 	}
 		findMediaArray(json){
+			apiTimes.touch(this.constructor.name);
+
 			const {ranked,recent,location_info} = json.native_location_data;
 			const {lat,lng,media_count} = location_info;
 			// Record Header info
@@ -478,22 +479,75 @@
 	 			&& pathname.endsWith('/sections/');
 	 	}
 		findMediaArray(json){
+			apiTimes.touch(this.constructor.name);
 			return this.mediaFromSectionParent(json);
 		}
 	}
 
-	// removes all properties of the haystack object tree that doesnot include the needle text
+	const apiTimes = new SyncedPersistentDict('apiTimes');
+	apiTimes.touch = function(key){ const ts = new Date().valueOf();  this.update(key, x => x.timeStamp=ts); }
+
+	// Searches GrqphQL response trees matching the [friendlyName] for [edges] property.
+	class GraphQLEdgeFinder {
+		constructor(friendlyName){
+			new Observable(this).define('lastBatch', []);
+			this.friendlyName = friendlyName;
+			this.handledLabel = `${this.constructor["name"]}(${friendlyName})`;
+		}
+		handle = (x) => {
+			apiTimes.touch(this.handledLabel);
+
+			const {url,body} = x;
+ 			if(url.pathname=='/graphql/query' && new URLSearchParams(body).get('fb_api_req_friendly_name')==this.friendlyName){
+				this.processResponse(x);
+				x.handled = this.handledLabel;
+			}
+		}
+		processResponse({data}){
+			// const edges = data.data.xdt_location_get_web_info_tab.edges; // hardcode path
+			const edges = findProp(data,'edges'); // alternate, more flexible, slower
+			this.lastBatch = edges.map(x=>x.node).map(PicGroup.fromMediaWithUser);
+		}
+	}
+
+	// removes all properties of the haystack object tree that does not include the needle text
 	function pruneHay( haystack, needle ){
-		const hays = [];
+		const hayOnly = [];
 		for(let hay in haystack){
 			const smallerHaystack = haystack[hay];
 			if( !JSON.stringify(smallerHaystack).includes(needle) )
-				hays.push(hay);
+				hayOnly.push(hay);
 			else if(typeof smallerHaystack == 'object')
 				pruneHay(smallerHaystack,needle);
 		}
-		hays.forEach(hay => delete haystack[hay]);
+		hayOnly.forEach(hay => delete haystack[hay]);
 	}
+
+	// Searches object tree for a property that matches the needle and returns that props value.
+	function findProp(host,needle){
+		if(typeof(host) == "object")
+			for(let prop in host){
+				if(prop==needle) return host[prop];
+				const value = findProp(host[prop],needle);
+				if(value !== undefined)
+					return value;
+			}
+		return undefined;
+	}
+
+	// Something like this could be used to find the Path to a particular string/value.
+	// function findProp(host,needle){
+	// 	const ns = `"${needle}"`;
+	// 	if(typeof(host) == "object")
+	// 		for(let prop in host){
+	// 			if(prop==needle) return host[prop];
+	// 			const value = host[prop],json = JSON.stringify(value) || '';
+	// 			if(json.contains(ns))
+	// 				return findProp(value,needle);
+	// 		}
+	// 	return undefined;
+	// }
+
 
 	// ===========
 	// ::User
@@ -712,14 +766,14 @@
 	// Add UI Elements
 	// ===============
 	async function addCopyButton(pageOwnerName){ // fire and forget
-		const h2El = await querySelectorAsync('h2');
+		const h2El = querySelectorAsync('h2');
 		const button = document.createElement('div');
-		button.textContent='⇕';
+		button.textContent='📋';// ⇕
 		button.onclick = async function(){
 			await navigator.clipboard.writeText(pageOwnerName);
 		}
-		Object.assign(button.style,{margin:'3px',border:'thin solid black',padding:'2px',cursor:'pointer',color:'black'});
-		const referenceEl = h2El.parentNode;
+		Object.assign(button.style,{margin:'3px',padding:'2px',cursor:'pointer',color:'black'});
+		const referenceEl = (await h2El).parentNode;
 		referenceEl.parentNode.insertBefore(button,referenceEl);
 	}
 
@@ -780,7 +834,7 @@
 	// Convert string to a # from 0..1
 	function strToFloat(str){
 		function cc(a,i=0){ return a.charCodeAt(i);}
-		const v = [0,1,2].map(i=>{const k=str[i],[b,o] = ('0'<=k&&k<'9')?['0',1]:('a'<=k&&k<'z')?['a',11]:[k,0]; return cc(str,i)-cc(b)+o; });
+		const v = [0,1,2].map(i=>{const k=str[i]||'0',[b,o] = ('0'<=k&&k<'9')?['0',1]:('a'<=k&&k<'z')?['a',11]:[k,0]; return cc(str,i)-cc(b)+o; });
 		return (v[0]*37*37 + v[1]*37 + v[2])/(37*37*37);
 	}
 
@@ -793,10 +847,10 @@
 		if(x.score===undefined) return false;
 		const {MONTHIS,WEEKS} = storageTime;
 		const timeframe = ({
-			'2':(x)=>2*MONTHS,
-			'3':(x)=>1*MONTHS,
-			'4':(x)=>2*WEEKS,
-			'5':(x)=>1*WEEKS,
+			'2':(x)=>3*MONTHS,
+			'3':(x)=>6*WEEKS,
+			'4':(x)=>3*WEEKS,
+			'5':(x)=>2*WEEKS,
 		})[x.score](x) || 6*MONTHS;
 		return (x.lastVisit||0) + timeframe 
 			+ Math.floor((strToFloat(x.username) - .5) * 4 * DAYS); // spread out over 4 days
@@ -860,16 +914,17 @@
 	class Gallery{
 
 		// Model portion
-		groups;
+		lookup; // dictionary: sanitirzedUrl => PicGroup
 		constructor(lastVisit){
-			this.groups = [];
+			this.lookup = {};
 			this.lastVisit = lastVisit;
 			this.strartWatchingThumbs();
 		}
 		monitorExtractors( basePicExtractors ){
 			for(let ex of basePicExtractors){
 				ex.listen('lastBatch',({lastBatch}) => {
-					this.groups.push(...lastBatch);
+					for(let picGroup of lastBatch)
+						this.lookup[picGroup.sanitizedImgUrl] = picGroup;
 				})
 			}
 		}
@@ -878,8 +933,12 @@
 		strartWatchingThumbs() { setInterval(()=>this.decorateThumbs(),1000); }
 
 		decorateThumbs(){
-			const rows = document.querySelectorAll('div._ac7v'); // for profile page
-			if(rows.length==0) return;
+			const thumbSelector = 'div._ac7v';
+			const rows = document.querySelectorAll(thumbSelector); // for profile page
+			if(rows.length==0) {
+				console.log(`no thumbs found matching selector:${'div._ac7v'}`);
+				return;
+			}
 
 			const rowOffset = rows[0].index // check 1st row
 				|| rows[rows.length-1].index - (rows.length-1) // check last row
@@ -887,28 +946,34 @@
 
 			for(let i=0;i<rows.length;++i){
 				const row = rows[i];
-				if(row.index!=null) continue;
 
 				// Add row-index label to row ("1..3", "64..66")
-				row.index = rowOffset+i;
-				row.style.position='relative';
-				const child = document.createElement('div');
-				child.textContent=`${row.index*3+1}-${row.index*3+3}`;
-				Object.assign(child.style,{position:'absolute',bottom:'5px',right:'10px',background:'rgba(0,0,0,0.2)',padding:'2px 10px',color:'white'});
-				row.appendChild(child);
+				if(row.index==null){
+					row.index = rowOffset+i;
+					row.style.position='relative';
+					const child = document.createElement('div');
+					child.textContent=`${row.index*3+1}-${row.index*3+3}`;
+					Object.assign(child.style,{position:'absolute',bottom:'5px',right:'10px',background:'rgba(0,0,0,0.2)',padding:'2px 10px',color:'white'});
+					row.appendChild(child);
+				}
 
 				// index child images (before adding label)
 				for(let j=0;j<row.children.length;++j){
 					const cell = row.children[j];
+					if(cell.decorated) continue;
 					const img = cell.querySelector('img');
 					if(img == null )
 						continue;
 
 					const imgIndex = row.index*3+j;
-					const picGroup = this.groups[imgIndex];
-					if(picGroup != null){
-						this.decorateThumb(img,picGroup);
-					}
+					const sanitizedImgUrl = sanitizeImgUrl(img.src);
+
+					let picGroup = this.lookup[sanitizedImgUrl];
+
+					if(picGroup == null) continue;
+
+					this.decorateThumb(img,picGroup);
+					cell.decorated = true;
 				}
 			}
 		}
@@ -1009,13 +1074,38 @@
 	// ===============
 	// ===  INIT  ====
 	// ===============
-	function reportLastVisit(lastVisit){
+	function reportLast(lastVisit,label){
 		// depends on: loadTimeMs
 		if(0<lastVisit){
 			const lvd = storageTime.toDate(lastVisit).toDateString();
 			const {ageText,ageColor} = msToAgeString(loadTimeMs-lastVisit);
 			const ageStyle =`color:white;background-color:${ageColor};`;
-			console.print(`Last Visit: %c${ageText}%c ago on %c${lvd}`,ageStyle,'color:black;background-color:white;',ageStyle);
+			console.print(`Last ${label}: %c${ageText}%c ago on %c${lvd}`,ageStyle,'color:black;background-color:white;',ageStyle);
+		}
+	}
+
+	class InitialLocationPageParser {
+		constructor(){
+			new Observable(this).define('lastBatch', []);
+			this.id = setInterval(()=>this.scanScriptsForMedia(),3000);
+		}
+		scanScriptsForMedia(){
+			const parsedScripts = [...unsafeWindow.document.querySelectorAll('script')]
+				.filter(x=>x.innerHTML.contains('edges')) // or 'xdt_location_get_web_info_tab'
+				.map(x=>findProp(JSON.parse(x.innerHTML),'edges')) // find property called 'edges'
+				.filter(x=>x!==undefined);
+			if(parsedScripts.length != 1){
+				console.log(`${parsedScripts.length} media-nodes scrips found.`); // not expected
+				return;
+			}
+			try{
+				// trigger event to notify everything that we have new data
+				this.lastBatch = parsedScripts[0].map(x=>x.node).map(PicGroup.fromMediaWithUser);
+				console.log("Initial Location Images",this.lastBatch);
+			} catch(ex){
+				console.error(ex);
+			}
+			clearInterval(this.id);
 		}
 	}
 
@@ -1034,7 +1124,7 @@
 			? structuredClone(locRepo.get(location)) // because repo will modify original object
 			: {}; // leave empty so we can detect not-visited
 		console.log(location,JSON.stringify(startingState,null,'\t'))
-		reportLastVisit(startingState.lastVisit);
+		reportLast(startingState.lastVisit,'Visit');
 
 		const gallery = new Gallery(startingState.lastVisit);
 
@@ -1055,9 +1145,13 @@
 		const extractors = [
 			new Location1Posts({startingState,locRepo}),
 			new Location2Posts(),
+			new GraphQLEdgeFinder('PolarisLocationPageTabContentQuery_connection'),
+			new GraphQLEdgeFinder('PolarisLocationPageTabContentQuery'),
 		];
 		for(let extractor of extractors)
 			snooper.addHandler( extractor.handle );
+
+		extractors.push(new InitialLocationPageParser()); // not a snooper, but does have .lastBatch event.
 
 		iiLookup.monitor(extractors);
 		userService.monitor(extractors);
@@ -1189,9 +1283,11 @@
 
 		trackKeyPresses(CTX);
 
-		// console.log('owner', pageOwner,startingState);
+		// Log
 		console.print(JSON.stringify(startingState,null,'\t'))
-		reportLastVisit(startingState.lastVisit);
+		reportLast(startingState.lastVisit,'Visit');
+		reportLast(startingState.lastUpload,'Upload');
+		reportLast(startingState.lastGood,'Good');
 
 		let missingStandIn = pageOwner != "thad_farris" ? pageOwner : "_missing_";
 	}
@@ -1207,6 +1303,8 @@
 	console.print('%cInstagram2.js loaded','background-color:#DFD'); // Last line of file
 
 })();
+
+// !!! For accounts that are private, need to differentiate lastVisited from lastViewed
 
 // Tracking...
 // * Notes: Don't Follow, Followed and removed, 
@@ -1236,3 +1334,11 @@
 //		Get Image Under Point
 //		Decorate Thumbs
 //		Report: when do users upload.
+
+// == Split all Groups into these ===
+//					
+// Tracking / Not
+// Following / Not
+// public / private
+// Has: Last Visit
+// Add: Last viewed (if private)
