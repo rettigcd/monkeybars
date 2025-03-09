@@ -35,8 +35,12 @@ class Observable {
 }
 
 // Enables events by adding to the host:
-// .on(eventName,handler) 
-// .trigger(eventname) to the host
+// 		.on(eventName,handler) 
+// 		.trigger(eventname) 
+// to the host
+// Example:
+// host.on('click',(v)=>alert(v));
+// host.trigger('click','hello');
 class HasEvents{
 	constructor(host){
 		let dict={};
@@ -45,9 +49,9 @@ class HasEvents{
 			else dict[key]=[handler];
 			return this;
 		}
-		host.trigger = function(key){
+		host.trigger = function(key,arg){
 			if(key in dict)
-				dict[key].forEach(h=>h());
+				dict[key].forEach(h=>h(arg));
 		}
 	}
 }
