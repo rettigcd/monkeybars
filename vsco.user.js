@@ -166,7 +166,8 @@
 		selectYear(year){ 
 			this._selectMonthByKeyFilter( k=>k.startsWith(year) );
 		}
-		selectMonthOfEveryYear(month){ 
+		selectMonthOfEveryYear(month){
+			if(month<10) month = '0'+month; // so '2' doesn't include '12'
 			this._selectMonthByKeyFilter( k=>k.endsWith(month), true );
 		}
 		_selectMonthByKeyFilter(keyFilter,reverse=false){ 
@@ -1540,7 +1541,6 @@
 		let xId = setInterval(function(){
 			[...document.querySelectorAll('span,h1')].filter(x=>x.innerHTML==userAccess.pageOwner)
 			.forEach(el=>{
-				console.log(el);
 				el.innerText = el.innerText + " 📋";
 				el.style.cursor="pointer";
 				el.addEventListener('click',() => navigator.clipboard.writeText(userAccess.pageOwner));

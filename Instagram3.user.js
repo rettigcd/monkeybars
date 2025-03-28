@@ -139,7 +139,12 @@
 	// When iiLookup can't find an image, scans snooper log for the image and logs it.
 	function reportMissingImages({iiLookup,snooper}){
 		iiLookup.on('missingImage',	(imgUrl)=>{
-			const noQueryUrl = imgUrl.match(/.*?jpg/)[0];
+			const matches = imgUrl.match(/.*?jpg/);
+			if(matches === undefined){
+				console.log('missing image:',imgUrl);
+				return;
+			}
+			const noQueryUrl = matches[0];
 			const candidateResponses = snooper._loadLog.filter(x=>x.responseText.contains(noQueryUrl));
 			const details = {
 				imgUrl,
@@ -266,11 +271,7 @@
 
 		static fromMedia({usertags,image_versions2,owner,date=throwExp("date")}){
 
-			const taggedUsers = usertags
-				&& usertags.in
-					.sort(by(({position})=>position[0]))
-					.map(x=>x.user.username)
-				|| [];
+			const taggedUsers = SingleImage.parseUserTags(usertags);
 
 			// tallest 3 images
 			const imgUrls = image_versions2.candidates
@@ -283,6 +284,23 @@
 			imgUrls.reverse();
 
 			return new SingleImage( taggedUsers, imgUrls, owner, date );
+		}
+
+		static parseUserTags(usertags){
+			try{
+				return usertags
+					&& usertags.in
+						.sort(by(({position})=>position[0]))
+						.map(x=>x.user.username)
+					|| [];
+			}
+			catch(err){
+				// this is expected on User's Tagged page
+				// this missing tags are found on the TaggedPopupWindow
+				// console.error('Unable to parse usertags:',JSON.stringify(usertags));
+				return [];
+			}
+
 		}
 
 		taggedUsers; // string[] - left to right
@@ -340,10 +358,10 @@
 
 				this.lastBatch = x.batch = batch; // setting .lastBatch triggers event
 
-				if(batch.length){
-					const msg = `${this.constructor.name} extracted %c${batch.length}%c pic groups from json.`;
-					console.print(msg,'background:green;color:white;font-size:18px;','color:black;background:white;font-size:12px;');
-				}
+				// if(batch.length){
+					// const msg = `${this.constructor.name} extracted %c${batch.length}%c pic groups from json.`;
+					// console.print(msg,'background:green;color:white;font-size:18px;','color:black;background:white;font-size:12px;');
+				// }
 
 			}catch(err){
 				if(this.handleError){
@@ -860,7 +878,7 @@
 					}
 					break;
 				default:
-					console.debug('which:',which);
+					// console.debug('which:',which);
 					break;
 			}// switch
 		});
@@ -1194,7 +1212,6 @@
 		const batchConsumers = [ iiLookup, gallery, new UserUpdateService({userRepo}) ];
 		for(let consumer of batchConsumers)
 			consumer.monitorLastBatch(batchProducers);
-
 		if(isTracking){
 			locRepo.update(location,x=>x.lastVisit=loadTimeMs)
 		} else {
@@ -1234,6 +1251,17 @@
 				this.oldestScoredLink(reports).appendTo(linkHost);
 				this.oldestTrackedLink(reports).appendTo(linkHost);
 				addCopyButton(pageOwner);
+
+				// # post in title
+				const id = setInterval(function(){
+					const span = document.querySelectorAll('span.html-span')[1];
+					if(span===undefined) return;
+					const c = span.innerText-0;
+//					const i = c<20?0:c<100?1:c<200?2:c<400?3:c<1000?4:5;
+					const a=[20,50,100,200,400,1000];for(var i=0;i<a.length;++i) if(c<a[i]) break;
+					document.title = i + ' ' + document.title;
+					clearInterval(id);
+				},1000)
 			}
 
 			reportMissingImages({iiLookup,snooper});
@@ -1310,13 +1338,14 @@
 			ctx.stop = function(){
 				ctx.old = userRepo.get(pageOwner);
 				userRepo.remove(pageOwner);
-				console.log('Stopped tracking:',CTX.old);
+				console.log('Stopped tracking:',ctx.old);
 			}
 			ctx.score = (score) => userRepo.update(pageOwner,x=>x.score=score);
 		}
 
 		initUntrackedUser({pageOwner}){
 			const {userRepo,ctx} = this;
+			ctx.stop = function(){ console.log('Tracking was previously stopped.'); }
 			ctx.score = function(score){ userRepo.update(pageOwner,u=>{
 				u.username=pageOwner;
 				u.lastVisit=loadTimeMs;
