@@ -29,7 +29,16 @@
 	const storageTime = EpochTime.JavascriptTime;
 
 	function buildRequestSnooper(){
-		return new RequestSnooper()
+
+		function fetchInterceptor(url,options){
+			if(url.contains('edge-chat.instagram.com')){
+				console.print("intercepted:",url);
+				return new Promise(()=>{}); // never resolves
+			}
+			return undefined;
+		}
+
+		return new RequestSnooper({fetchInterceptor})
 			.logRequests(({url})=> [
 					'https://www.instagram.com/logging/falco',
 					'https://graph.instagram.com/logging_client_events'
@@ -1167,7 +1176,7 @@
 			try{
 				// trigger event to notify everything that we have new data
 				this.lastBatch = parsedScripts[0].map(x=>x.node).map(PicGroup.fromMediaWithUser);
-				console.log("Initial Location Images",this.lastBatch);
+				// console.log("Initial Location Images",this.lastBatch);
 			} catch(ex){
 				console.error(ex);
 			}
