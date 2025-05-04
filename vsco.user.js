@@ -1368,7 +1368,7 @@
 		static extractPreloadedStateFromHtml(html){
 			let json = Fetcher.findStringBetween(html,'window.__PRELOADED_STATE__ = ','</script>'); // because string.match(regex) does not match unicode characters!
 			if(json == null){ console.log('Unable to find preloaded state in:',html); throw 'no preloaded state found'; }
-			json = json.replaceAll(":undefined,",":null,");
+			json = json.replaceAll(":undefined",":null");
 			return JSON.parse(json);
 		}
 		static findStringBetween(src,prefix,suffix){
@@ -1526,6 +1526,11 @@
 		},
 		downloads: []
 	}
+
+	setInterval(function(){
+		[...document.querySelectorAll("ins[data-google-query-id]")]
+			.forEach(x=>x.remove());
+	},5000);
 
 	// -----  Init User  -----
 	const matchesUser = unsafeWindow.location.href.match(/(?<=vsco.co\/).*(?=\/gallery)/);

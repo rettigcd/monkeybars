@@ -1086,6 +1086,19 @@
 					event.stopPropagation(); // don't open image
 					event.preventDefault(); // 
 
+					// Remove that damn overlay that grays out the cell
+					const hideGrayOverlay = () => {
+						try{
+							const aElement = this.parentNode.parentNode.parentNode;
+					    	const ul = aElement.querySelector('ul');
+							if(ul)
+								ul.parentNode.style.display = 'none';
+						} catch(error){
+							console.error(error); // some times the parentNode chain doesn't work...
+						}
+					}
+					hideGrayOverlay();
+
 					this.remove();
 
 					const numPerRow = 4;
@@ -1199,8 +1212,8 @@
 		const batchSnoopers = [
 			new Location1Posts({startingState,locRepo}),
 			new Location2Posts(),
-			new GraphQLEdgeFinder('PolarisLocationPageTabContentQuery_connection'),
-			new GraphQLEdgeFinder('PolarisLocationPageTabContentQuery'),
+			new GraphQLEdgeFinder('PolarisLocationPageTabContentQuery_connection'), // used: 2025-04-06
+			new GraphQLEdgeFinder('PolarisLocationPageTabContentQuery'),			// used: 2025-04-06
 		];
 		for(let extractor of batchSnoopers){
 			if(typeof(extractor.snoop) != "function")
@@ -1268,9 +1281,9 @@
 
 			const batchSnoopers = [
 				new GraphQLExtractor(),
-				new SavedPosts(),
-				new UserPosts(),
-				new TaggedPopupWindow(),
+				new SavedPosts(),			// used: 2025-04-04
+				new UserPosts(),  			// used: 2025-04-06
+				new TaggedPopupWindow(),	// used: 2025-04-06
 			];
 			const snoopers = [
 				...batchSnoopers,
@@ -1412,3 +1425,70 @@
 // public / private
 // Has: Last Visit
 // Add: Last viewed (if private)
+
+/*
+
+// == Add # to ICON
+
+function getFavIcons(){
+  return [...document.getElementsByTagName("link")]
+    .filter(x=>['icon','shortcut icon'].includes(x.getAttribute('rel')))
+}
+function getFavIconUrl(){ 
+  return getFavIcons().map(x=>x.getAttribute('href'))[0];
+} 
+function getImg(url){ 
+  return new Promise((res,rej)=>{
+    const img = new Image();
+    img.onload = () => res(img);
+    img.src = url;
+  });
+}
+async function bob(){
+  const canvas = document.createElement('canvas');
+  document.body.appendChild(canvas);
+  Object.assign(canvas.style, {position:'absolute',left:"120px",top:"120px"});
+  const ctx = canvas.getContext('2d');
+
+  const img = await getImg(getFavIconUrl());
+  ctx.drawImage(img,0,0);
+
+  ctx.font = '24px Arial';
+  ctx.textAlign = 'center'; // Set text alignment
+  ctx.textBaseline = 'middle'; // Set text baseline
+
+  ctx.fillStyle = 'black'; // Set fill color
+  ctx.fillText('10', 15, 15); // Filled text
+  ctx.fillText('10', 17, 17); // Filled text
+  ctx.fillText('10', 15, 17); // Filled text
+  ctx.fillText('10', 17, 15); // Filled text
+  ctx.fillStyle = 'white'; // Set fill color
+  ctx.fillText('10', 16, 16); // Filled text
+
+  //ctx.strokeStyle = 'blue'; // Set stroke color
+  //ctx.strokeText('10', 16, 16); // Stroked text
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data; // Uint8ClampedArray containing pixel data [r, g, b, a, r, g, b, a, ...]
+  console.log(data);
+}
+bob();
+
+x78zum5 x1q0g3np xieb3on
+
+function getFavIcons(){
+  return [...document.getElementsByTagName("link")]
+    .filter(x=>['icon','shortcut icon'].includes(x.getAttribute('rel')))
+}
+var bob = getFavIcons()[0];
+if(bob !== undefined)
+  bob.setAttribute('href','https://en.m.wikipedia.org/wiki/File:Solid_red.svg')
+
+getFavIcons().forEach(x=>x.setAttribute('href','https://en.m.wikipedia.org/wiki/File:Solid_red.svg'))
+
+https://en.m.wikipedia.org/wiki/File:Solid_yellow.svg
+https://en.m.wikipedia.org/wiki/File:Solid_red.svg
+https://en.m.wikipedia.org/wiki/File:Solid_green.svg
+https://en.m.wikipedia.org/wiki/File:Solid_blue.svg
+https://en.m.wikipedia.org/wiki/File:Solid_black.svg
+*/
