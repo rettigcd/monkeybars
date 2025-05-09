@@ -323,14 +323,16 @@
 			this.owner = owner;
 			this.date = date;
 
+			
+			const ext = imgUrls[0].contains(".webp") ? ".webp" : ".jpg";
 			this.filename = [owner,...taggedUsers].slice(0,10).join(' ')
-				+' '+formatDateForFilename(date)+'.jpg';
+				+' '+formatDateForFilename(date) + ext;
 			new Observable(this).define('downloaded',false);
 		}
 
 		async downloadAsync(requestedUrl,notify){
 			const matching = this.imgUrls.filter(x => x.includes(requestedUrl)).reverse();
-			await globalDownloadAsync({url:matching[0] || requestedUrl, filename:this.filename, notify });
+			await downloadImageAsync({url:matching[0] || requestedUrl, filename:this.filename, notify });
 			this.downloaded=true;
 			console.print(`downloaded: ${this.filename}`);
 		}
@@ -770,9 +772,9 @@
 			const urls = getSourcesUnder(point);
 			if(urls.length==0){ console.log('no img'); return; }
 			const imgUrl = urls[0];
-			let filename = 'instagram_img.jpg';
+			let filename = 'instagram_img';
 			console.debug(imgUrl,filename);
-			await globalDownloadAsync({url:imgUrl,filename});
+			await downloadImageAsync({url:imgUrl,filename});
 			console.log(`downloaded: ${filename}`);
 		}catch (ex){
 			console.error(ex);
@@ -794,13 +796,19 @@
 		return path;
 	}
 
-	async function globalDownloadAsync({url,filename,notify}){
+	async function downloadImageAsync({url,filename,notify,appendExtension}){
 		if(!notify) notify = ({loaded,total})=>{};
 
 		const response = await fetch(url);
 		const blob = await response.blob();
-		if(blob.type=='image/webp' && filename.endsWith('.jpg') )
-			filename = filename.substring(0,filename.length-3) + "webp";
+		if(appendExtension)
+			switch(blob.type){
+				case 'image/webp': filename += ".webp"; break;
+				case 'image/jpeg': filename += ".jpg"; break;
+				default:
+					console.log(`Unknown mimetype [${blob.type}]`);
+					filename += ".jpg"; break;
+			}
 
 		await new Promise((onload,onerror)=>{
 			GM_download({
