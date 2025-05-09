@@ -330,7 +330,7 @@
 
 		async downloadAsync(requestedUrl,notify){
 			const matching = this.imgUrls.filter(x => x.includes(requestedUrl)).reverse();
-			await download(matching[0] || requestedUrl, this.filename, notify);
+			await globalDownloadAsync({url:matching[0] || requestedUrl, filename:this.filename, notify });
 			this.downloaded=true;
 			console.print(`downloaded: ${this.filename}`);
 		}
@@ -772,7 +772,7 @@
 			const imgUrl = urls[0];
 			let filename = 'instagram_img.jpg';
 			console.debug(imgUrl,filename);
-			await download(imgUrl,filename);
+			await globalDownloadAsync({url:imgUrl,filename});
 			console.log(`downloaded: ${filename}`);
 		}catch (ex){
 			console.error(ex);
@@ -794,13 +794,20 @@
 		return path;
 	}
 
-	function download(url,filename,notify){
+	async function globalDownloadAsync({url,filename,notify}){
 		if(!notify) notify = ({loaded,total})=>{};
-		return new Promise((onload,onerror)=>{
+
+		const response = await fetch(url);
+		const blob = await response.blob();
+		if(blob.type=='image/webp' && filename.endsWith('.jpg') )
+			filename = filename.substring(0,filename.length-3) + "webp";
+
+		await new Promise((onload,onerror)=>{
 			GM_download({
-				url:url, name:filename,
+				url:blob,
+				name:filename,
 				onload,
-				onerror, // function(x){ console.error('download error:',x); onerror(x); },
+				onerror,
 				onprogress : notify,
 				ontimeout : x=>onerror({"error":"timeout"})
 			});
@@ -882,7 +889,7 @@
 				case 85: // 'u' - Save Users
 					if(ctrlKey && shiftKey){
 						const filename = `instagram.localStorage.users ${formatDateForFilename(new Date())}.json`;
-						saveTextToFile(localStorage.users,filename);
+						downloadTextToFile(localStorage.users,filename);
 						console.log("localStorage.users save to "+filename);
 					}
 					break;
@@ -1139,7 +1146,7 @@
 
 	}
 
-	function saveTextToFile(text,filename){
+	function downloadTextToFile(text,filename){
 		const a = document.createElement("a");
 		a.href = URL.createObjectURL(new Blob([text])); // old way that doesn't handle '#' a.href = "data:text,"+text;
 		a.download = filename;
