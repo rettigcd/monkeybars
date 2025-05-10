@@ -341,9 +341,9 @@
 			new Observable(this).define('downloaded',false);
 		}
 
-		async downloadAsync(requestedUrl,notify){
+		async downloadAsync(requestedUrl,onprogress){
 			const matching = this.imgUrls.filter(x => x.includes(requestedUrl)).reverse();
-			await downloadImageAsync({url:matching[0] || requestedUrl, filename:this.filename, notify });
+			await downloadImageAsync({url:matching[0] || requestedUrl, filename:this.filename, onprogress });
 			this.downloaded=true;
 			console.print(`downloaded: ${this.filename}`);
 		}
@@ -807,29 +807,24 @@
 		return path;
 	}
 
-	async function downloadImageAsync({url,filename,notify,appendExtension}){
-		if(!notify) notify = ({loaded,total})=>{};
-
-		const response = await fetch(url);
-		const blob = await response.blob();
-		if(appendExtension)
-			switch(blob.type){
+	async function downloadImageAsync({url,filename,onprogress,appendExtension}){
+		if(!onprogress) onprogress = ({loaded,total})=>{};
+		if(appendExtension){
+			// replace url with Blob (requires Tampermonkey beta)
+			const response = await fetch(url);
+			const url = await response.blob();
+			switch(url.type){
 				case 'image/webp': filename += ".webp"; break;
 				case 'image/jpeg': filename += ".jpg"; break;
 				default:
-					console.log(`Unknown mimetype [${blob.type}]`);
+					console.log(`Unknown mimetype [${url.type}]`);
 					filename += ".jpg"; break;
 			}
+		}
 
 		await new Promise((onload,onerror)=>{
-			GM_download({
-				url:blob,
-				name:filename,
-				onload,
-				onerror,
-				onprogress : notify,
-				ontimeout : x=>onerror({"error":"timeout"})
-			});
+			const ontimeout = (x)=>onerror({"error":"timeout"})
+			GM_download({ url, name:filename, onload, onerror, onprogress, ontimeout });
 		});
 	}
 
