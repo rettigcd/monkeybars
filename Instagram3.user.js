@@ -23,16 +23,27 @@
 (function() {
 	'use strict';
 
+	// Swallow apps console.log(...)
+	unsafeWindow.console = { 
+		__proto__:unsafeWindow.console,
+		log:function(){ this.logArgs.push(arguments); }, logArgs:[],
+		// error:function(){ this.errorArgs.push(arguments); }, errorArgs:[],
+	}
+
 	unsafeWindow.WebSocket = makeNewWebSocket(unsafeWindow.WebSocket);
 
 
 	const storageTime = EpochTime.JavascriptTime;
 
 	function buildRequestSnooper(){
-
+		let showLogMessage = true; 
 		function fetchInterceptor(url,options){
 			if(url.contains('edge-chat.instagram.com')){
-				console.print("intercepted:",url);
+				if(showLogMessage){
+					console.print("intercepted:",url);
+					console.print('additional interceptions will not be shown.');
+					showLogMessage = false;
+				}
 				return new Promise(()=>{}); // never resolves
 			}
 			return undefined;
@@ -1013,7 +1024,7 @@
 			const thumbSelector = 'div._ac7v';
 			const rows = document.querySelectorAll(thumbSelector); // for profile page
 			if(rows.length==0) {
-				console.log(`no thumbs found matching selector:${'div._ac7v'}`);
+				// console.log(`no thumbs found matching selector:${'div._ac7v'}`);
 				return;
 			}
 
