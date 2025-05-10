@@ -1006,7 +1006,8 @@
 		missingViewDate(sortLongestOutageFirst=false){
 			// this.repo.sync(); // save viewDate before we scan
 			const pageOwner = this.pageOwner;
-			const users = Object.entries(JSON.parse(localStorage.users))
+			// !!! TODO - go through SyncedPersistentDict, !DON'T access localStorage.users directly
+			const users = Object.entries(JSON.parse(localStorage.users||'{}'))
 				.filter(([u,v])=>2<=v.stars&&v.stars<=5 // 1 is 'ignored'
 						&& v.viewDate==undefined
 						&& u != pageOwner // this may be called before current .viewDate is set.
@@ -1026,7 +1027,7 @@
 		toPrune(yearsWithoutDownload=4){
 			const pageOwner = this.pageOwner;
 			const earliestEmptyYear = new Date().getFullYear() - yearsWithoutDownload;
-			const toPrune = Object.entries(JSON.parse(localStorage.users))
+			const toPrune = Object.entries(JSON.parse(localStorage.users||'{}'))
 				.filter(([u,v])=>2<=v.stars&&v.stars<=5 // 1 is 'ignored'
 					&& v.viewDate !== undefined // was viewed
 					&& u != pageOwner // this may be called before current .viewDate is set.
