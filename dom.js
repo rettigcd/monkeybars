@@ -25,6 +25,8 @@ function addStyleSheet(css){
 	newEl('style').attr('type','text/css').chain(x=>x.appendChild(document.createTextNode(css))).appendTo(document.getElementsByTagName('head')[0]);
 }
 
+queueMicrotask (console.log.bind (console, '%cdom.js loaded','background-color:#DFD'));
+
 /*
 class El {
 	constructor(x){ this.el = typeof x == "string" ? document.createElement(x) : x; }

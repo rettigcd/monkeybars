@@ -21,4 +21,4 @@ class EpochTime{
 	static get UnixTime(){ return new EpochTime( 1, num => EpochTime.isSeconds(num) ? num : Math.floor(num / 1000) ); }
 }
 
-queueMicrotask (console.debug.bind (console, '%cepoch_time.js loaded','background-color:#DFD')); // Last line of file
+queueMicrotask (console.log.bind (console, '%cepoch_time.js loaded','background-color:#DFD')); // Last line of file
