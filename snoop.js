@@ -55,13 +55,13 @@ function makeNewXMLHttpRequest(origConstructor,loadHandlers){
 		xhr.open = function(){ // XMLHttpRequest.open(method, url[, async[, user[, password]]])
 			xhr._openArgs = arguments;
 			xhr._timestamp = new Date().valueOf();
-			return origOpen.apply(xhr,arguments);
+				return origOpen.apply(xhr,arguments);
 		};
 
 		const origSend = xhr.send; // capture so we can replace it and then call it.
 		xhr.send = function(body){ // XMLHttpRequest.open(method, url[, async[, user[, password]]])
 			xhr._sendBody = body;
-			return origSend.call(xhr,body);
+				return origSend.call(xhr,body);
 		};
 
 		// xhr.setRequestHeader('Authorization', 'Bearer your_api_key');
@@ -73,7 +73,8 @@ function makeNewXMLHttpRequest(origConstructor,loadHandlers){
 		}
 
 		xhr.addEventListener('load', ()=>{
-			const {responseText,_openArgs:[method,url,sync,user,pw],_sendBody:body,_headers:headers,_timestamp:timestamp} = xhr;
+			const {responseType,_openArgs:[method,url,sync,user,pw],_sendBody:body,_headers:headers,_timestamp:timestamp} = xhr;
+			const responseText = (responseType=='' || responseType=='text') ? xhr.responseText : `[responseType:${responseType}]`;
 			const refUrl = new URL(unsafeWindow.location.href);
 			const urlObj = new URL(url,refUrl);
 			const record = new SnoopRequest({method,url:urlObj,body,responseText,headers,timestamp,func:'XMLHttpRequest'});
