@@ -623,20 +623,17 @@
 	} */
 
 	// Load followers by scrolling through list
-	class FollowerScrollerTracker{
-		constructor(userRepo){ this._userRepo = userRepo; }
+	class FollowingScrollerTracker{
+		constructor(){
+			new Observable(this).define("foundLeaders");
+		}
+
 		snoop = ({url,responseText}) => {
-			if(url.pathname=='/api/v1/friendships/1039022773/following/'){
-				const users = JSON.parse(responseText).users;
-				for(const user of users)
-					this._userRepo.update(user.username,u=>{
-						u.username  = user.username;
-						u.fullName  = user.full_name;
-						u.isPrivate = user.is_private;
-						u.id = user.id;
-						u.isFollowing = true;
-					})
-			}
+			const match = url.pathname.match(/friendships\/(\d+)\/following/);
+			if(match===null) return;
+			const followerId = match[1];
+			const leaders = JSON.parse(responseText).users;
+			this.foundLeaders = {followerId,leaders};
 		}
 	}
 
@@ -1275,6 +1272,7 @@
 	class UserPage {
 		constructor(){
 			this.userRepo = new SyncedPersistentDict('users');
+			this.followingTracker = new FollowingScrollerTracker();
 			this.snooper = buildRequestSnooper();
 			this.iiLookup = new ImageLookupByUrl();
 		}
@@ -1286,8 +1284,8 @@
 			const reports = new UserReports({userRepo,iiLookup});
 			const gallery = new Gallery(startingState.lastVisit);
 
-			// UI - Next links
 			window.onload = ()=>{
+				// UI - Next links
 				const linkHost = document.createElement('DIV'); 
 				Object.assign(linkHost.style,{position:"fixed",top:0,right:0,background:"#ddf",padding:"5px"});
 				document.body.appendChild(linkHost)
@@ -1300,7 +1298,6 @@
 					const span = document.querySelectorAll('span.html-span')[1];
 					if(span===undefined) return;
 					const c = span.innerText-0;
-//					const i = c<20?0:c<100?1:c<200?2:c<400?3:c<1000?4:5;
 					const a=[20,50,100,200,400,1000];for(var i=0;i<a.length;++i) if(c<a[i]) break;
 					document.title = i + ' ' + document.title;
 					clearInterval(id);
@@ -1317,7 +1314,7 @@
 			];
 			const snoopers = [
 				...batchSnoopers,
-				new FollowerScrollerTracker(userRepo),
+				this.followingTracker,
 				new UnfollowTracker(userRepo),
 				new VisitingUserTracker(userRepo),
 				new IdentifyUnhandledRequests() // always snoop this last
@@ -1329,12 +1326,15 @@
 			for( let consumer of batchConsumers)
 				consumer.monitorLastBatch(batchSnoopers);
 
+			this.followingTracker.listen('foundLeaders',({newValue})=>this.savePeopleIAmFollowing(newValue));
+
 			this.ctx = unsafeWindow.cmd = {
 				// global
 				snoopLog:snooper._loadLog,
 				userRepo,
 				iiLookup,
 				reports,
+				page:this,
 
 				next:() => this.oldestTrackedLink(reports).goto(),
 				nextScored: () => this.oldestScoredLink(reports).goto(),
@@ -1354,6 +1354,20 @@
 			trackKeyPresses({iiLookup});
 
 			this.logStartingState(startingState);
+		}
+
+		savePeopleIAmFollowing({followerId,leaders}){
+			console.log(`Found ${leaders.length} Leaders`);
+			if(followerId != '1039022773') return;
+			// save/add Users to the repo
+			for(const user of leaders)
+				this.userRepo.update(user.username,u=>{
+					u.username  = user.username;
+					u.fullName  = user.full_name;
+					u.isPrivate = user.is_private;
+					u.id = user.id;
+					u.isFollowing = true;
+				})
 		}
 
 		// Capture Starting State before anything modifies it.
