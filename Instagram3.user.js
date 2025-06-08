@@ -779,7 +779,12 @@
 			// and this filter is preventing downloading it.
 			const urls = getSourcesUnder(point);
 			if(urls.length==0){ console.log('no img'); return; }
+			if(urls[0].startsWith('blob:')){
+				console.log(`Has 'blog:' prefix. Not an image.` );
+				return;
+			}
 			const imgUrl = urls[0];
+
 			let filename = 'instagram_img';
 			console.debug(imgUrl,filename);
 			await downloadImageAsync({url:imgUrl,filename});
@@ -808,6 +813,7 @@
 		if(!onprogress) onprogress = ({loaded,total})=>{};
 		if(appendExtension){
 			// replace url with Blob (requires Tampermonkey beta)
+			console.log('fettching image as blob '+url);
 			const response = await fetch(url);
 			const url = await response.blob();
 			switch(url.type){
@@ -819,6 +825,7 @@
 			}
 		}
 
+		console.log('GM_download:'+url);
 		await new Promise((onload,onerror)=>{
 			const ontimeout = (x)=>onerror({"error":"timeout"})
 			GM_download({ url, name:filename, onload, onerror, onprogress, ontimeout });
@@ -1105,8 +1112,8 @@
 				showImagesSpan.innerText = `+ ${pics.length-1}`;
 				Object.assign(showImagesSpan.style,{ position:'absolute', bottom:0, zIndex:1000, 
 					color:"red", background:"white", border:"thin solid red","border-radius":"4px",
-					"font":"bold 16px Arial",
-					padding:"2px 6px",
+					"font":"bold 28px Arial",
+					padding:"4px 12px",
 				});
 				host.appendChild(showImagesSpan);
 				showImagesSpan.addEventListener('click',function(event){
@@ -1115,11 +1122,14 @@
 
 					// Remove that damn overlay that grays out the cell
 					const hideGrayOverlay = () => {
+
 						try{
 							const aElement = this.parentNode.parentNode.parentNode;
 					    	const ul = aElement.querySelector('ul');
-							if(ul)
+							if(ul){ // sometimes it the ui messes up and doesn't add the ul
 								ul.parentNode.style.display = 'none';
+								ul.parentNode.parentNode.style.display = 'none';
+							}
 						} catch(error){
 							console.error(error); // some times the parentNode chain doesn't work...
 						}
