@@ -772,7 +772,7 @@
 		return { singleImage:stub, imgUrl };
 	}
 
-	async function simpleDownloadImageUnderPoint(point){
+	async function simpleDownloadImageUnderPoint(point,pageOwner){
 
 		try{
 			// sometimes the image we want to download is missing imageInfo
@@ -785,8 +785,7 @@
 			}
 			const imgUrl = urls[0];
 
-			let filename = 'instagram_img';
-			console.debug(imgUrl,filename);
+			const filename = (pageOwner || 'instagram_img') + '.' + await getExtensionFromBlobType(imgUrl);
 			await downloadImageAsync({url:imgUrl,filename});
 			console.log(`downloaded: ${filename}`);
 		}catch (ex){
@@ -809,27 +808,27 @@
 		return path;
 	}
 
-	async function downloadImageAsync({url,filename,onprogress,appendExtension}){
-		if(!onprogress) onprogress = ({loaded,total})=>{};
-		if(appendExtension){
-			// replace url with Blob (requires Tampermonkey beta)
-			console.log('fettching image as blob '+url);
-			const response = await fetch(url);
-			const url = await response.blob();
-			switch(url.type){
-				case 'image/webp': filename += ".webp"; break;
-				case 'image/jpeg': filename += ".jpg"; break;
-				default:
-					console.log(`Unknown mimetype [${url.type}]`);
-					filename += ".jpg"; break;
-			}
+	async function getExtensionFromBlobType(url){
+		// replace url with Blob (requires Tampermonkey beta)
+		const response = await fetch(url);
+		const blobUrl = await response.blob();
+		switch(blobUrl.type){
+			case 'image/webp': return "webp";
+			case 'image/jpeg': return "jpg";
 		}
+		console.log(`Unknown mimetype [${url.type}]`);
+		return "jpg";
+	}
 
-		console.log('GM_download:'+url);
+	async function downloadImageAsync({url,filename,onprogress}){
+		if(!onprogress) onprogress = ({loaded,total})=>{};
+
+		console.debug('GM_download:',{url,filename});
 		await new Promise((onload,onerror)=>{
-			const ontimeout = (x)=>onerror({"error":"timeout"})
+			const ontimeout = (x)=>onerror({"error":"timeout"});
 			GM_download({ url, name:filename, onload, onerror, onprogress, ontimeout });
 		});
+
 	}
 
 	// =====================================
@@ -886,7 +885,7 @@
 	// =============
 	// Key Presses
 	// =============
-	function trackKeyPresses({iiLookup}){
+	function trackKeyPresses({iiLookup,pageOwner}){
 
 		unsafeWindow.addEventListener('keydown',function({which,repeat,ctrlKey,altKey,shiftKey}){
 			if(repeat) return;
@@ -896,7 +895,7 @@
 					singleImage.downloadAsync(imgUrl);
 					} break;
 				case 68: // 'd'
-					simpleDownloadImageUnderPoint(mousePos);
+					simpleDownloadImageUnderPoint(mousePos,pageOwner);
 					break;
 				case 70: // 'f'
 					break;
@@ -1361,7 +1360,7 @@
 			else
 				this.initUntrackedUser({pageOwner});
 
-			trackKeyPresses({iiLookup});
+			trackKeyPresses({iiLookup,pageOwner});
 
 			this.logStartingState(startingState);
 		}
