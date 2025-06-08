@@ -68,15 +68,19 @@
 		success: {color:"white", backgroundColor:'green'},
 		fail: {color:"white", backgroundColor:'red'},
 		input: {width:"100px"},
+		input50: {width:"50px"},
+		email: {width:"160px"},
 		log: 'font-style:italic; color:black; font-size:14px; font-weight:bold;text-shadow: 1px 1px 2px #55f;'
 	};
 
-	function getNextThursday10Am(){
+	function getNextThursday10Am(msDelay){
+console.log({msDelay});
 		const date = new Date();
 		const daysFromNow = ((7+4)-date.getDay())%7;
 		const targetDate = new Date(date.valueOf() + daysFromNow * DAYS);
 		const yyyy = targetDate.getFullYear(), mm = targetDate.getMonth(), dd = targetDate.getDate();
-		return new Date(yyyy,mm,dd,10,0,0,0);
+		const ms=msDelay%1000,s=(msDelay-ms)/1000;
+		return new Date(yyyy,mm,dd,10,0,s,ms);
 	}
 
 	function buildSnooper(){
@@ -153,7 +157,7 @@
 
 			const obs = new Observable(this);
 			// Form values
-			'firstName,lastName,email,phone,groupSize,show'.split(',').forEach(prop=>{
+			'firstName,lastName,email,phone,groupSize,show,msDelay'.split(',').forEach(prop=>{
 				obs.define(prop,'');
 			})
 			// Options
@@ -184,13 +188,13 @@
 			console.log('removed',configName);
 		}
 		saveUser(){
-			const {firstName,lastName,phone,email,groupSize,show,isDefault} = this;
+			const {firstName,lastName,phone,email,groupSize,show,isDefault,msDelay} = this;
 			if(isDefault){
 				if(this._lastDefaultConfigName)
 					this.repo.update(this._lastDefaultConfigName,x=>x.isDefault=false);
 				this._lastDefaultConfigName = this.configName;
 			}
-			this.repo.update(this.configName,x=>Object.assign(x,{firstName,lastName,phone,email,groupSize,show,isDefault}));
+			this.repo.update(this.configName,x=>Object.assign(x,{firstName,lastName,phone,email,groupSize,show,isDefault,msDelay}));
 			console.log('user saved');
 		}
 		toJSON(){
@@ -243,9 +247,9 @@
 		const statusBar = newEl('p').css(css.subBar).appendTo( topBar );
 		const timeEl = newEl('span').css(css.status).appendTo(statusBar);
 		const tMinusEl = newEl('span').css(css.status).appendTo(statusBar);
+		const refreshEl = newEl('span').css(css.status).appendTo(statusBar);
 		const watchEl = newEl('span').css(css.status).setText('Shows: ?').appendTo(statusBar);
 		newEl('button').css(css.reloadButton).setText('RELOAD').on('click',()=>waiter.reload('button click')).appendTo(statusBar);
-		const refreshEl = newEl('span').css(css.status).appendTo(statusBar);
 
 		waiter.listen('waitStatus',({newValue,oldValue})=>{
 			if(oldValue===undefined) watchEl.style.backgroundColor='#8F8';
@@ -276,9 +280,10 @@
 		newInput().css(css.input).attr('placeholder','first').chain(x=>bind.textInput(x,config,'firstName')).appendTo(inputBar);
 		newInput().css(css.input).attr('placeholder','last').chain(x=>bind.textInput(x,config,'lastName')).appendTo(inputBar);
 		newInput().css(css.input).attr('placeholder','phone').chain(x=>bind.textInput(x,config,'phone')).appendTo(inputBar);
-		newInput().css({width:"200px"}).attr('placeholder','email').chain(x=>bind.textInput(x,config,'email')).appendTo(inputBar);
+		newInput().css(css.email).attr('placeholder','email').chain(x=>bind.textInput(x,config,'email')).appendTo(inputBar);
 		newInput().css({width:"50px"}).attr('placeholder','1-4').chain(x=>bind.textInput(x,config,'groupSize')).appendTo(inputBar);
 		newSelect().chain(x=>bind.optionsToStringArr(x,config,'showOptions')).chain(x=>bind.selectValue(x,config,'show')).appendTo(inputBar);
+		newInput().css(css.input50).attr('placeholder','msDelay').chain(x=>bind.textInput(x,config,'msDelay')).appendTo(inputBar);
 		newInput('checkbox').css({height:"18px",width:"18px",'vertical-align':'top'}).chain(x=>bind.checkbox(x,config,'isDefault')).appendTo(inputBar);
 		newEl('button').setText('💾').on('click',()=>config.saveUser()).appendTo(inputBar);
 	}
@@ -316,7 +321,7 @@
 
 			this._logger.log({
 				action:'scheduleNext()',
-				goTime:this.target.toDateString()+' '+this.target.toLocaleString(), 
+				goTime:this.target.toLocaleString(), 
 				delay, phase, 
 				refreshTime:new Date( new Date().valueOf() + delay ).toLocaleTimeString()
 			});
@@ -761,7 +766,6 @@
 	// ===============
 	async function initPageAsync(){
 
-		let goTime = getNextThursday10Am();
 		let waitForShowsTimeout = 2*SECONDS;
 		const [,orgId,,eventId] = document.location.href.match(/events\/([^#\/]+)(.*\/event\/([^#\/]+))?/);
 		const isSnl = orgId == snlOrgId;
@@ -773,11 +777,13 @@
 		const configRepo = new SyncedPersistentDict(orgId);
 		const myConfig = new MyConfig( configRepo );
 		const submitter = new Submitter(myConfig,showService,logger);
-	
+
 		myConfig.showOptions = ["[none]",liveShow,dressRehearsal];
 		myConfig.configOptions = configRepo.keys();
 		myConfig.configName = configRepo.entries().filter(([,values])=>values.isDefault).map(([name,])=>name)[0];
 		downloadLogsOnUnload('snl '+orgId, snooper, logger);
+
+		let goTime = getNextThursday10Am(myConfig.msDelay);
 
 		if(localStorage.testUi){
 			delete localStorage.testUi;
