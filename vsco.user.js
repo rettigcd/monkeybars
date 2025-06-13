@@ -5,6 +5,7 @@
 // @description  Efficient VSCO Gallery surfer
 // @author       Dean Rettig
 // @match        http*://vsco.co/*
+// @match        http*://vsco.com/*
 // @require      file://C:/[monkeyBarsFolder]/dom.js
 // @require      file://C:/[monkeyBarsFolder]/epoch_time.js
 // @require      file://C:/[monkeyBarsFolder]/observable.js
