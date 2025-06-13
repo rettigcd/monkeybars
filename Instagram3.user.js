@@ -15,6 +15,7 @@
 // @exclude      https://www.instagram.com/p/*/
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=instagram.com
 // @grant        GM_download
+// @grant        GM_openInTab
 // @grant        unsafeWindow
 // ==/UserScript==
 
@@ -887,33 +888,56 @@
 	// =============
 	function trackKeyPresses({iiLookup,pageOwner}){
 
+		// Built In:
+		// L => Like / Un-Like a post
+		// S => Save / Un-Save a post
+
 		unsafeWindow.addEventListener('keydown',function({which,repeat,ctrlKey,altKey,shiftKey}){
 			if(repeat) return;
-			switch(which) {
-				case 32: {// ' ' - download image under mouse
-					const {singleImage,imgUrl} = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
-					singleImage.downloadAsync(imgUrl);
-					} break;
-				case 68: // 'd'
-					simpleDownloadImageUnderPoint(mousePos,pageOwner);
-					break;
-				case 70: // 'f'
-					break;
-				case 84: {// 't' - show Tagged Users under mouse
-					let {singleImage:{owner:imgOwner,taggedUsers}} = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
-					console.log(imgOwner,taggedUsers);
-					} break;
-				case 85: // 'u' - Save Users
-					if(ctrlKey && shiftKey){
-						const filename = `instagram.localStorage.users ${formatDateForFilename(new Date())}.json`;
-						downloadTextToFile(localStorage.users,filename);
-						console.log("localStorage.users save to "+filename);
-					}
-					break;
-				default:
-					// console.debug('which:',which);
-					break;
-			}// switch
+
+			function downloadImageInCenter(){
+				const {singleImage,imgUrl} = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
+				singleImage.downloadAsync(imgUrl);
+			}
+
+			function clickEl(css){ (document.querySelector(css) || {click:function(){console.log(`${css} not found.`)}}).click(); }
+			function previousInSet(){ clickEl('button[aria-label="Go back"]'); }
+			function nextInSet(){ clickEl('button[aria-label="Next"]') ; }
+
+			function downloadImageUnderMouse(){ simpleDownloadImageUnderPoint(mousePos,pageOwner); }
+
+			function openFocusUserProfilePage(){
+				const focusUser = document.querySelector('div.x10wlt62.xlyipyv').innerHTML;
+				if(focusUser){
+					GM_openInTab(`https://instagram.com/${focusUser}`);
+				} else
+					console.log('No focusUser found.');
+			}
+
+			function showTaggedUsersUnderMouse(){
+				const {singleImage:{owner:imgOwner,taggedUsers}} = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
+				console.log(imgOwner,taggedUsers);
+			}
+
+			function saveUsersToFile(){
+				if(ctrlKey && shiftKey){
+					const filename = `instagram.localStorage.users ${formatDateForFilename(new Date())}.json`;
+					downloadTextToFile(localStorage.users,filename);
+					console.log("localStorage.users save to "+filename);
+				}
+			}
+			const UP='&',DOWN='(';
+			const key=String.fromCharCode(which), actions = {
+				" ": downloadImageInCenter,
+				[UP]: previousInSet,
+				[DOWN]: nextInSet,
+				"D": downloadImageUnderMouse,
+				"P": openFocusUserProfilePage,
+				"T": showTaggedUsersUnderMouse,
+				"U": saveUsersToFile,
+			}, action = actions[key] || function(){console.debug('no action found')};
+			action();
+
 		});
 	}
 
