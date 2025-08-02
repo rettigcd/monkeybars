@@ -75,8 +75,8 @@
 			return b=='none' ? null : (b && b.substring(5,b.length-2));
 		}
 		return document.elementsFromPoint(clientX, clientY)
-			.map(el => el.src || getBackgroundImage(el))
-			.filter(src=>src!=null);
+			.map(el => ({ el, src:el.src || getBackgroundImage(el) }))
+			.filter(({src})=>src!=null);
 	}
 
 	function sanitizeImgUrl(url){ 
@@ -753,9 +753,9 @@
 
 		// sometimes the image we want to download is missing imageInfo
 		// and this filter is preventing downloading it.
-		const urls = getSourcesUnder(point);
-		if(urls.length==0){ console.log('no img'); return; }
-		const imgUrl = urls[0];
+		const sources = getSourcesUnder(point);
+		if(sources.length==0){ console.log('no img'); return; }
+		const imgUrl = sources[0].src;
 
 		const {singleImage} = iiLookup.getImageFor(imgUrl)
 
@@ -778,15 +778,30 @@
 		try{
 			// sometimes the image we want to download is missing imageInfo
 			// and this filter is preventing downloading it.
-			const urls = getSourcesUnder(point);
-			if(urls.length==0){ console.log('no img'); return; }
-			if(urls[0].startsWith('blob:')){
-				console.log(`Has 'blog:' prefix. Not an image.` );
+			const sources = getSourcesUnder(point);
+			if(sources.length==0){ console.log('no img'); return; }
+			const imgUrl = sources[0].src;
+			if(imgUrl.startsWith('blob:')){
+				console.log(`Has 'blob:' prefix. Not an image.`, imgUrl );
+				// assume video element, save current image.
+				const videoElement = sources[0].el;
+				const canvas = document.createElement("canvas");
+				const context = canvas.getContext("2d");
+				function extract(){
+					canvas.width = videoElement.videoWidth;
+					canvas.height = videoElement.videoHeight;
+					context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+					// Get the image data URL
+					const coverImageSrc = canvas.toDataURL("image/jpeg"); // canvas.toDataURL({ format: 'png' });
+					const extractFilename = (pageOwner || 'instagram_img') + ' '+formatDateForFilename(new Date())+ '.jpg';
+					GM_download({ url: coverImageSrc, name: extractFilename });
+				}
+				extract();
+				// videoElement.addEventListener("loadeddata", extract);
 				return;
 			}
-			const imgUrl = urls[0];
 
-			const filename = (pageOwner || 'instagram_img') + '.' + await getExtensionFromBlobType(imgUrl);
+			const filename = (pageOwner || 'instagram_img') + ' ' + formatDateForFilename(new Date()) + '.' + await getExtensionFromBlobType(imgUrl);
 			await downloadImageAsync({url:imgUrl,filename});
 			console.log(`downloaded: ${filename}`);
 		}catch (ex){
@@ -900,9 +915,9 @@
 				singleImage.downloadAsync(imgUrl);
 			}
 
-			function clickEl(css){ (document.querySelector(css) || {click:function(){console.log(`${css} not found.`)}}).click(); }
-			function previousInSet(){ clickEl('button[aria-label="Go back"]'); }
-			function nextInSet(){ clickEl('button[aria-label="Next"]') ; }
+			function findEl(css){ return (document.querySelector(css) || {click:function(){console.debug(`${css} not found.`)}}); }
+			function previousInSet(){ findEl('button[aria-label="Go back"]').click(); }
+			function nextInSet(){ findEl('button[aria-label="Next"]').click(); }
 
 			function downloadImageUnderMouse(){ simpleDownloadImageUnderPoint(mousePos,pageOwner); }
 
@@ -1302,6 +1317,36 @@
 		trackKeyPresses({iiLookup});
 	}
 
+	// Grab good title before Instagram replaces it with 'Instagram' OR never resolves
+	function getGoodTitleAsync(timeoutAfter = 2000){
+		return new Promise((resolve) => {
+			const timeoutAt = new Date().valueOf() + timeoutAfter;
+			const intervalId = setInterval(function(){
+				const title = document.title, isGood = title !== '' && title !== 'Instagram', timedOut = timeoutAt <= new Date().valueOf();
+				if(isGood) resolve(title);
+				if(timedOut) resolve('[Insta]')
+				if(isGood || timedOut) clearInterval(intervalId);
+			},100)
+		});
+	}
+	function getImageCountAsync(timeoutAfter = 2000){
+		return new Promise((resolve) => {
+			const timeoutAt = new Date().valueOf() + timeoutAfter;
+			const intervalId = setInterval(function(){
+				const span = document.querySelectorAll('span.html-span')[1];
+				const foundSpan = span !== undefined;
+				const timedOut = timeoutAt <= new Date().valueOf();
+				if(foundSpan) resolve(span.innerText-0);
+				if(foundSpan || timedOut) clearInterval(intervalId);
+			},500)
+		});
+	}
+	function getImageCountGroup(count){
+		const a=[20,50,100,200,400,1000];
+		for(var i=0;i<a.length;++i) if(count<a[i]) break;
+		return i;
+	}
+
 	class UserPage {
 		constructor(){
 			this.userRepo = new SyncedPersistentDict('users');
@@ -1317,7 +1362,8 @@
 			const reports = new UserReports({userRepo,iiLookup});
 			const gallery = new Gallery(startingState.lastVisit);
 
-			window.onload = ()=>{
+
+			window.addEventListener('load', ()=>{
 				// UI - Next links
 				const linkHost = document.createElement('DIV'); 
 				Object.assign(linkHost.style,{position:"fixed",top:0,right:0,background:"#ddf",padding:"5px"});
@@ -1325,17 +1371,10 @@
 				this.oldestScoredLink(reports).appendTo(linkHost);
 				this.oldestTrackedLink(reports).appendTo(linkHost);
 				addCopyButton(pageOwner);
+			});
 
-				// # post in title
-				const id = setInterval(function(){
-					const span = document.querySelectorAll('span.html-span')[1];
-					if(span===undefined) return;
-					const c = span.innerText-0;
-					const a=[20,50,100,200,400,1000];for(var i=0;i<a.length;++i) if(c<a[i]) break;
-					document.title = i + ' ' + document.title;
-					clearInterval(id);
-				},1000)
-			}
+			Promise.all([getGoodTitleAsync(),getImageCountAsync()])
+				.then( ([title,count]) => setTimeout( () => document.title = getImageCountGroup(count) + ' ' + title, 4000 ) );
 
 			reportMissingImages({iiLookup,snooper});
 
