@@ -1519,7 +1519,7 @@
 	}
 
 	const CMD = unsafeWindow.cmd = {
-		owner: document.location.href.match(/vsco.co.([^\/]+)/)[1],
+		owner: document.location.href.match(/vsco.com?.([^\/]+)/)[1],
 		missingViewDate: function(sortLongestOutageFirst=false){
 			userAccess.missingViewDate( sortLongestOutageFirst ).goto();
 		},
@@ -1535,7 +1535,7 @@
 	},5000);
 
 	// -----  Init User  -----
-	const matchesUser = unsafeWindow.location.href.match(/(?<=vsco.co\/).*(?=\/gallery)/);
+	const matchesUser = unsafeWindow.location.href.match(/(?<=vsco.com?\/).*(?=\/gallery)/);
 	if(matchesUser){
 		// Current User
 		const currentUser = userAccess.get( userAccess.pageOwner );
