@@ -795,7 +795,7 @@
 
 			const monitor = new ProgressMonitor( new ProgressBar(this._readySpan), ({loaded,total})=>loaded+' of '+total );
 			try{
-				await executePromisesInParallelAsync( unexecutedPromiseGenerators, 8, (x)=>monitor._progress(x) );
+				await executePromisesInParallelAsync( unexecutedPromiseGenerators, 1, (x)=>monitor._progress(x) );
 			} catch(err){
 				console.log(err);
 			}
@@ -1093,6 +1093,9 @@
 		get fetch(){ return new Fetcher(this.username, this.isPageOwner ); }
 
 		async scanForNewImagesAsync(){
+
+			await new Promise(resolve => setTimeout(resolve, 600)); // rate-limit - do 100/minute
+
 			try{
 				const newImages = await this._fetchNewImagesAsync();
 				this._update( data=>data.setViewDateAsCurrent() );
@@ -1125,7 +1128,7 @@
 			const {data} = this;
 			if( data.status!=UserStatus.following && data.status!=UserStatus.failed) return false;
 			const effectiveDownloadsInLastYear = data.downloadsInLastYear || 1;
-			const daysBetweenScans = Math.max( 0.75, 365/effectiveDownloadsInLastYear*0.35); // 35% of wait duration
+			const daysBetweenScans = Math.max( 5, 365/effectiveDownloadsInLastYear*0.6); // 60% of wait duration
 			const nextScanTime = Math.floor( daysBetweenScans*storageTime.DAYS ) + data._info.viewDate;
 			return nextScanTime < storageTime.now();
 		}
@@ -1137,7 +1140,7 @@
 		}
 
 	}
-
+	
 	class LastYearTracker{
 		constructor(){
 			const pageLoadDate = new Date();
