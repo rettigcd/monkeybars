@@ -922,7 +922,8 @@
 			function downloadImageUnderMouse(){ simpleDownloadImageUnderPoint(mousePos,pageOwner); }
 
 			function openFocusUserProfilePage(){
-				const focusUser = document.querySelector('div.x10wlt62.xlyipyv').innerHTML;
+				const focusUser = document.querySelector('div.x10wlt62.xlyipyv span').innerHTML;
+				console.debug('focus User', focusUser);
 				if(focusUser){
 					GM_openInTab(`https://instagram.com/${focusUser}`);
 				} else
@@ -1010,18 +1011,18 @@
 		constructor({userRepo,iiLookup}){
 			function showUsers(filter){ return userRepo.values().filter(filter); }
 			this.followed={
-				stale: (notVisitedDays=60)=>showUsers(filters.followed.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)),
+				stale: (notVisitedDays=60)=>showUsers( filters.followed.stale(notVisitedDays*storageTime.DAYS) ).sort(by(x=>x.lastVisit||0)),
 				public: ()=>showUsers(filters.followed.public),
 				lazy: ()=>showUsers(filters.followed.lazy).sort(by(x=>x.lastGood||0)),
 			};
 			this.tracked={
-				stale: (notVisitedDays=60)=>showUsers(filters.tracked.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)),
+				stale: (notVisitedDays=60)=>showUsers(filters.tracked.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)), // $$$
 				all: (notVisitedDays=60)=>showUsers(filters.tracked.all).sort(by(x=>x.username)),
 				private: (notVisitedDays=60)=>showUsers(filters.tracked.private).sort(by(x=>x.username)),
 			};
 			this.scored={
 				all: ()=>showUsers(filters.scored.all).sort(by(getRefreshTime)),
-				stale: ()=>showUsers(filters.scored.stale).sort(by(getRefreshTime)),
+				stale: ()=>showUsers(filters.scored.stale).sort(byDesc(x=>x.score).thenBy(getRefreshTime)),
 				//stale: (notVisitedDays=7)=>showUsers(filters.scored.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)),
 			}
 			this.dayOfWeek=function(){
@@ -1320,11 +1321,12 @@
 	// Grab good title before Instagram replaces it with 'Instagram' OR never resolves
 	function getGoodTitleAsync(timeoutAfter = 2000){
 		return new Promise((resolve) => {
+			function logAndResolve(val){console.debug('page title:'+val); resolve(val);}
 			const timeoutAt = new Date().valueOf() + timeoutAfter;
 			const intervalId = setInterval(function(){
 				const title = document.title, isGood = title !== '' && title !== 'Instagram', timedOut = timeoutAt <= new Date().valueOf();
-				if(isGood) resolve(title);
-				if(timedOut) resolve('[Insta]')
+				if(isGood) logAndResolve(title);
+				if(timedOut) logAndResolve('[-timeout-]')
 				if(isGood || timedOut) clearInterval(intervalId);
 			},100)
 		});
@@ -1373,8 +1375,9 @@
 				addCopyButton(pageOwner);
 			});
 
-			Promise.all([getGoodTitleAsync(),getImageCountAsync()])
-				.then( ([title,count]) => setTimeout( () => document.title = getImageCountGroup(count) + ' ' + title, 4000 ) );
+			// Set Tab/Title
+			Promise.all([getGoodTitleAsync(4000),getImageCountAsync()])
+				.then( ([title,count]) => setInterval( () => document.title = getImageCountGroup(count) + ' ' + title, 10000 ) );
 
 			reportMissingImages({iiLookup,snooper});
 

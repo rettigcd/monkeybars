@@ -23,7 +23,7 @@
 
 	const storageTime = EpochTime.UnixTime;
 
-	let formatDate = (function(){
+	const formatDate = (function(){
 		function pad(i){ return (i<10?'0':'')+i; }
 		const y=x=>x.getFullYear(), m=x=>pad(x.getMonth()+1), d=x=>pad(x.getDate());
 		const h=x=>pad(x.getHours()), n=x=>pad(x.getMinutes()), s=x=>pad(x.getSeconds());
@@ -39,27 +39,43 @@
 	function throwExp(msg){ console.trace(); throw msg; } 
 
 	// ===== CSS =====
-	function light(){ return {
-		winter:'#ddf', spring:'#9ab895', summer:'#d48e8e', fall:'#b3a174', old:'white',
-		attribute:'black', galleryRowBg:'white'
-	};}
-	function dark(){ return {
-		winter:'#668', spring:'#373', summer:'#844', fall:'#663', old:'#444',
-		attribute:'white', galleryRowBg:'#333'
-	};}
-	const colors = dark();
+	class Colors {
 
-	const msgCss           = 'color:#F88; background:black; font-size:1rem; padding:0.3rem 0.7rem;border-radius:8px;';
-	const importantCss     = 'color:#F88; background:black; font-size:1rem; padding:0.3rem 0.7rem;border-radius:8px;';
-	const downloadCountCss = 'color:red; font-weight:bold; font-size:1.5rem;';
+		static makeLight(){ return new Colors({
+			winter:'#ddf', spring:'#9ab895', summer:'#d48e8e', fall:'#b3a174', old:'white',
+			attribute:'black', galleryRowBg:'white'
+		});}
+		static makeDark(){ return new Colors({
+			winter:'#668', spring:'#373', summer:'#844', fall:'#663', old:'#444',
+			attribute:'white', galleryRowBg:'#333'
+		});}
 
-	const winter='#ddf',fall='#b3a174',spring='#9ab895',summer='#d48e8e'; 
-	const monthColors = [colors.winter,colors.winter,colors.spring,colors.spring,colors.spring,colors.summer,colors.summer,colors.summer,colors.fall,colors.fall,colors.fall,colors.winter];
-	const monthNames = "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec".split(',');
+		forMonth;
+		old;
+		attribute;
+		galleryRowBg;
+		video = 'purple';
+
+		constructor({winter,spring,summer,fall,old,attribute,galleryRowBg}){
+			Object.assign(this,{attribute,galleryRowBg,old});
+			this.forMonth = [winter,winter,spring,spring,spring,summer,summer,summer,fall,fall,fall,winter];
+		}
+	}
+	const colors = Colors.makeDark();
 
 	const css = {
 		spinner: { border:"8px solid", "border-color":"blue lightgray", 'border-radius':'50%', width:'16px',height:'16px', animation:'spin 2s linear infinite' },
+		imageRow: { "display":"flex","flex-direction":"row","justify-content":"flex-start", background:colors.galleryRowBg},
+		monthName: idx => ({color:colors.attribute,'background':colors.forMonth[idx]}),
 	};
+
+	const consoleCss = {
+		msg : 'color:#F88; background:black; font-size:1rem; padding:0.3rem 0.7rem;border-radius:8px;',
+		important : 'color:#F88; background:black; font-size:1rem; padding:0.3rem 0.7rem;border-radius:8px;',
+		downloadCount : 'color:red; font-weight:bold; font-size:1.5rem;'
+	}
+
+	const monthNames = "Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec".split(',');
 
 	// ===== LINQ =====
 	function makeCompareFunction(){
@@ -486,8 +502,7 @@
 			new HasEvents(this);
 			this.model = imageRowModel;
 
-			const rowCss = { "display":"flex","flex-direction":"row","justify-content":"flex-start", background:colors.galleryRowBg};
-			const rowDiv = newEl('div').css(rowCss).appendTo(container);
+			const rowDiv = newEl('div').css(css.imageRow).appendTo(container);
 			const closeTab = newEl('div').css({'width':'30px','border-top':'thin solid #808'}).appendTo( rowDiv );
 			const subContainer = newEl('div').css({'width':'100%'}).appendTo(rowDiv);
 			const label = new ImageRowLabelView( subContainer, this.model.labelText );
@@ -591,7 +606,7 @@
 		monthNames
 			.forEach((m,idx)=>newEl('td').appendTo(row).setText(m)
 				.css(headerCss)
-				.css({color:colors.attribute,'background':monthColors[idx]})
+				.css(css.monthName(idx))
 				.on('click', ()=>calendarModel.selectMonthOfEveryYear(idx+1))
 			)
 		return row;
@@ -861,9 +876,9 @@
 			const imgDate = this.model.imgDate;
 
 			const bgColor = (() => {
-				if(this.model.videoUrl) return 'purple';
+				if(this.model.videoUrl) return colors.video;
 				if(storageTime.now()-storageTime.toNum(imgDate) > 365 * storageTime.DAYS) return colors.old;
-				return monthColors[imgDate.getMonth()];
+				return colors.forMonth[imgDate.getMonth()];
 			})();
 			const containerCss = { width:boxSize+'px',	display:'inline-block','text-align':'center',margin:'5px',position:'relative',background:bgColor };
 			const markCss = {'cursor':'pointer','color':'white', 'padding-left':'5px'};
@@ -1094,7 +1109,7 @@
 
 		async scanForNewImagesAsync(){
 
-			await new Promise(resolve => setTimeout(resolve, 600)); // rate-limit - do 100/minute
+			await new Promise(resolve => setTimeout(resolve, 300)); // rate-limit - do 100/minute
 
 			try{
 				const newImages = await this._fetchNewImagesAsync();
@@ -1326,10 +1341,12 @@
 
 			let nextCursor = siteMedia.nextCursor;
 			while(nextCursor){
+
 				let response = await fetch(
 					'https://vsco.co/api/3.0/medias/profile?'+new URLSearchParams({site_id:siteId,limit:14,show_only:0,cursor:nextCursor}).toString(),
 					{headers:{"Authorization":"Bearer "+token}}
 				);
+
 				let json = await response.clone().json(); // ??? can we remove the .clone() ?
 				let newImgs = json.media
 					.map(({image:i}) => new ImageModel({
@@ -1346,6 +1363,7 @@
 				for(let img of newImgs) yield img;
 				nextCursor = json.next_cursor;
 			}
+
 		}
 
 		static _getPageImages(html){
@@ -1372,7 +1390,7 @@
 
 		static extractPreloadedStateFromHtml(html){
 			let json = Fetcher.findStringBetween(html,'window.__PRELOADED_STATE__ = ','</script>'); // because string.match(regex) does not match unicode characters!
-			if(json == null){ console.log('Unable to find preloaded state in:',html); throw 'no preloaded state found'; }
+			if(json == null){ console.debug('Unable to find preloaded state in:',html); throw 'no preloaded state found'; }
 			json = json.replaceAll(":undefined",":null");
 			return JSON.parse(json);
 		}
@@ -1444,10 +1462,12 @@
 		lines.push(msg);
 		sessionStorage.msgs = lines.join("\r\n");
 	}
+
 	function getNotifications(){
 		return (sessionStorage.msgs || '').split('\r\n').filter(x=>x.length>0);
 	}
-	for(let msg of getNotifications()) console.print(`%c${msg}`,msgCss)
+
+	for(let msg of getNotifications()) console.print(`%c${msg}`,consoleCss.msg)
 	sessionStorage.msgs = '';
 
 	class LastYear{
@@ -1532,10 +1552,30 @@
 		downloads: []
 	}
 
+	// Removes Google Ad
 	setInterval(function(){
 		[...document.querySelectorAll("ins[data-google-query-id]")]
 			.forEach(x=>x.remove());
 	},5000);
+
+	function addCopyUsernameUiElement(){
+		// !! Sometimes the matching element is inside a tree that is hidden so maybe we should put it someplace else.
+		// !! sometimes the element does not contain the Page owner, but some other name.
+		const pageOwner = userAccess.pageOwner;
+		function addCopyElInterval(){
+			const markerClass = 'name-copy-marker';
+			const els = [...document.querySelectorAll('h1.css-1u3pn9l.e19mt3zn0')].filter(x=>!x.classList.contains(markerClass));
+			els.forEach(el=>{
+					el.innerText = "📋 " + el.innerText;
+					el.style.cursor="pointer";
+					el.addEventListener('click',() => navigator.clipboard.writeText(pageOwner));
+					el.classList.add(markerClass);
+					addCopyElInterval();
+				});
+		}
+		// addCopyElInterval(); 
+		setTimeout(addCopyElInterval,500);
+	}
 
 	// -----  Init User  -----
 	const matchesUser = unsafeWindow.location.href.match(/(?<=vsco.com?\/).*(?=\/gallery)/);
@@ -1548,15 +1588,7 @@
 		// UI / view - currentUser
 		uiLayout.showCurrentUser(currentUser, calendar);
 
-		let xId = setInterval(function(){
-			[...document.querySelectorAll('span,h1')].filter(x=>x.innerHTML==userAccess.pageOwner)
-			.forEach(el=>{
-				el.innerText = el.innerText + " 📋";
-				el.style.cursor="pointer";
-				el.addEventListener('click',() => navigator.clipboard.writeText(userAccess.pageOwner));
-				if(xId) { clearInterval(xId); xId=false; }
-			});
-		},500)
+		addCopyUsernameUiElement();
 
 		Object.assign(keyPressActions,{
 			"37": /*left*/ () => calendar.prev(),
@@ -1588,9 +1620,9 @@
 					logStartingState();
 					// Show New Images !
 					if(startingState.viewDate===undefined){
-						console.print('%cNo View Date found',importantCss);
+						console.print('%cNo View Date found',consoleCss.important);
 						const lastYear = Object.keys(startingState.dl).reverse()[0]||storageTime.toDate(loadTimeNum).getYear();
-						console.print(`Downloads for ${lastYear}: %c${startingState.dl[lastYear]}`,downloadCountCss);
+						console.print(`Downloads for ${lastYear}: %c${startingState.dl[lastYear]}`,consoleCss.downloadCount);
 						calendar.loadAsync();
 					} else {
 						// Check if user should be pruned
@@ -1617,12 +1649,12 @@
 
 				case UserStatus.ignore:
 					logStartingState();
-					console.print(`%cstatus=Ignored`,importantCss);
+					console.print(`%cstatus=Ignored`,consoleCss.important);
 					break;
 
 				case UserStatus.failed:
 					logStartingState();
-					console.print(`%cstatus=Failed`,importantCss);
+					console.print(`%cstatus=Failed`,consoleCss.important);
 					break;
 
 				default:
