@@ -34,7 +34,8 @@
 		};
 	})();
 
-	console.print = function (...args) { queueMicrotask (console.log.bind (console, ...args)); }
+	console.logX = function (...args) { queueMicrotask (console.log.bind (console, ...args)); }
+	console.debugX = function (...args) { queueMicrotask (console.debug.bind (console, ...args)); }
 
 	function throwExp(msg){ console.trace(); throw msg; } 
 
@@ -314,7 +315,7 @@
 
 				GM_download({ url:this.url, name:this.localFileName,
 					onprogress : ({loaded,total}) => {
-						console.log('%cPROGRESS','color:red;font-weight:bold;font-size:18px;');
+						console.debugX(`%cdownloading... ${Math.floor(loaded/total*100)}%`,'color:blue;font-size:14px;');
 						this.downloadProgress = {status:'downloading',loaded,total};
 					},
 					onload : (x) => {
@@ -510,7 +511,7 @@
 
 			this.model.listen('isVisible',({isVisible})=>{
 				if(isVisible)
-					rowDiv.style.display=rowCss.display;
+					rowDiv.style.display=css.imageRow.display;
 				else{
 					rowDiv.style.display="none";
 					this.trigger('closed');
@@ -846,7 +847,7 @@
 					irm.listen('isVisible',({isVisible})=>{
 						if(!isVisible){
 							self._clearNewImages(user.username);
-							console.print(`closing row [${user.username}]`);
+							console.logX(`closing row [${user.username}]`);
 						}
 					})
 					return irm;
@@ -943,7 +944,7 @@
 			userAccess.get(this.model.owner).logDownloadImage(this.model);
 			this._showCheckmark();
 			CMD.downloads.push(this.model);
-			console.print('Image saved.');
+			console.logX('Image saved.');
 		}
 		_showCheckmark(){
 			newEl('span').setText('✓')
@@ -1278,7 +1279,7 @@
 					});
 					irm.listen('isVisible',({isVisible}) => {
 						if(!isVisible)
-							console.print(`closing row [${user.username}]`);
+							console.logX(`closing row [${user.username}]`);
 					})
 					return irm;
 				});
@@ -1439,7 +1440,7 @@
 		}
 		goto(){
 			const {label,count,nextUrl} = this, msg = `${label}: ${count}`;
-			console.print(msg);
+			console.logX(msg);
 			saveNotification(msg);
 			if(nextUrl)
 				setTimeout(()=>window.location.href=nextUrl,2000);
@@ -1467,7 +1468,7 @@
 		return (sessionStorage.msgs || '').split('\r\n').filter(x=>x.length>0);
 	}
 
-	for(let msg of getNotifications()) console.print(`%c${msg}`,consoleCss.msg)
+	for(let msg of getNotifications()) console.logX(`%c${msg}`,consoleCss.msg)
 	sessionStorage.msgs = '';
 
 	class LastYear{
@@ -1598,7 +1599,7 @@
 		});
 
 		// Init page - assume we have a user
-		function logStartingState(){ console.print('starting state => %c'+JSON.stringify(startingState,null,'\t'),'color:blue;'); }
+		function logStartingState(){ console.logX('starting state => %c'+JSON.stringify(startingState,null,'\t'),'color:blue;'); }
 		(async function(){
 			switch( currentUser.status ){
 				case UserStatus.new:
@@ -1620,9 +1621,9 @@
 					logStartingState();
 					// Show New Images !
 					if(startingState.viewDate===undefined){
-						console.print('%cNo View Date found',consoleCss.important);
+						console.logX('%cNo View Date found',consoleCss.important);
 						const lastYear = Object.keys(startingState.dl).reverse()[0]||storageTime.toDate(loadTimeNum).getYear();
-						console.print(`Downloads for ${lastYear}: %c${startingState.dl[lastYear]}`,consoleCss.downloadCount);
+						console.logX(`Downloads for ${lastYear}: %c${startingState.dl[lastYear]}`,consoleCss.downloadCount);
 						calendar.loadAsync();
 					} else {
 						// Check if user should be pruned
@@ -1631,7 +1632,7 @@
 						if( lastYearInfo.lastYear<earliestEmptyYear ){
 							uiLayout.appendButton(newEl('button').setText('Prune').on('click',function(){
 								userAccess.repo.remove(userAccess.pageOwner);
-								console.print(`[${userAccess.pageOwner}] pruned`);
+								console.logX(`[${userAccess.pageOwner}] pruned`);
 								this.remove();
 							}));
 							calendar.loadAsync();
@@ -1649,17 +1650,17 @@
 
 				case UserStatus.ignore:
 					logStartingState();
-					console.print(`%cstatus=Ignored`,consoleCss.important);
+					console.logX(`%cstatus=Ignored`,consoleCss.important);
 					break;
 
 				case UserStatus.failed:
 					logStartingState();
-					console.print(`%cstatus=Failed`,consoleCss.important);
+					console.logX(`%cstatus=Failed`,consoleCss.important);
 					break;
 
 				default:
 					logStartingState();
-					console.print(`%cUnknown status [${currentUser.status}]`,'color:#F88;background-color:black;');
+					console.logX(`%cUnknown status [${currentUser.status}]`,'color:#F88;background-color:black;');
 					break;
 			}
 

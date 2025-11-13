@@ -50,12 +50,34 @@
 			return undefined;
 		}
 
-		return new RequestSnooper({fetchInterceptor})
+		const snooper = new RequestSnooper({fetchInterceptor})
 			.logRequests(({url})=> [
 					'https://www.instagram.com/logging/falco',
 					'https://graph.instagram.com/logging_client_events'
 				].includes(url.toString()) == false
 			);
+
+		// scans log for the image and logs it.
+		snooper.checkLogForMissingImage = (imgUrl) => {
+			const matches = imgUrl.match(/.*?jpg/);
+			if(matches === undefined){
+				console.debug('missing image:',imgUrl);
+				return;
+			}
+			const noQueryUrl = matches[0];
+			const candidateResponses = snooper._loadLog.filter(x=>x.responseText.contains(noQueryUrl));
+			const details = {
+				imgUrl,
+				simpleUrl:noQueryUrl,
+				logMatches:candidateResponses,
+			};
+			if(candidateResponses.length != 0)
+				details.cssPath = detectPath(candidateResponses[0].responseText,noQueryUrl);
+			const css = candidateResponses.length != 0 ? 'color:purple' : '';
+			console.debug(`Missing info - found %c${details.logMatches.length} matches`,css,details);
+		}
+
+		return snooper;
 	}
 
 	// return YYYYMMYYHHMMSS
@@ -91,9 +113,15 @@
 	//      ImageInfo classes are initialized internally
 	//      caller just gets ImageInfo and modify them, never create them.
 	class ImageLookupByUrl{
-		constructor(){
+		constructor(snooper,batchProducer){
 			this._dict={};
 			new HasEvents(this);
+			this.on('missingImage',	snooper.checkSnoopLogForMissingImage);
+			batchProducer.listen('lastBatch',({lastBatch}) => {
+				lastBatch.forEach(picGroup=>{ 
+					this.addGroup( picGroup );
+				});
+			})
 		}
 		modValue(key,mod){
 			key = this.sanitize(key);
@@ -104,17 +132,6 @@
 		getValue(key){ key = this.sanitize(key); return this._dict[key]; }
 		hasKey(key){ key = this.sanitize(key); return this._dict.hasOwnProperty(key); }
 		sanitize(url){ return sanitizeImgUrl(url); } // extracts start through extension
-
-		// Begin Monitoring
-		monitorLastBatch( basePicExtractors ){
-			for(let ex of basePicExtractors){
-				ex.listen('lastBatch',({lastBatch}) => {
-					lastBatch.forEach(picGroup=>{ 
-						this.addGroup( picGroup );
-					});
-				})
-			}
-		}
 
 		addGroup(group){
 			try{
@@ -157,28 +174,6 @@
 		_missingStandIn = ""
 	}
 
-	// When iiLookup can't find an image, scans snooper log for the image and logs it.
-	function reportMissingImages({iiLookup,snooper}){
-		iiLookup.on('missingImage',	(imgUrl)=>{
-			const matches = imgUrl.match(/.*?jpg/);
-			if(matches === undefined){
-				console.log('missing image:',imgUrl);
-				return;
-			}
-			const noQueryUrl = matches[0];
-			const candidateResponses = snooper._loadLog.filter(x=>x.responseText.contains(noQueryUrl));
-			const details = {
-				imgUrl,
-				simpleUrl:noQueryUrl,
-				logMatches:candidateResponses,
-			};
-			if(candidateResponses.length != 0)
-				details.cssPath = detectPath(candidateResponses[0].responseText,noQueryUrl);
-			const css = candidateResponses.length != 0 ? 'color:purple' : '';
-			console.debug(`Missing info - found %c${details.logMatches.length} matches`,css,details);
-		});
-	}
-
 	// =======================
 	// :: BasePicExtractor 
 	// =======================
@@ -193,17 +188,12 @@
 
 	// Monitors Batches as they come in and updates User data
 	class UserUpdateService {
-		constructor({userRepo}){
+		constructor({userRepo,batchProducer}){
 			this.userRepo=userRepo || throwExp('UserService missing userRepo');
-		}
-
-		monitorLastBatch( basePicExtractors ){
-			for(let ex of basePicExtractors){
-				ex.listen('lastBatch',({lastBatch}) => {
-					this.onScan_UpdateFollowingLikedLastUpload(lastBatch);
-					this.onDownload_UpdateLastGood(lastBatch);
-				})
-			}
+			batchProducer.listen('lastBatch',({lastBatch}) => {
+				this.onScan_UpdateFollowingLikedLastUpload(lastBatch);
+				this.onDownload_UpdateLastGood(lastBatch);
+			})
 		}
 
 		onScan_UpdateFollowingLikedLastUpload(batch){
@@ -380,12 +370,6 @@
 					.map(PicGroup.fromMediaWithUser);
 
 				this.lastBatch = x.batch = batch; // setting .lastBatch triggers event
-
-				// if(batch.length){
-					// const msg = `${this.constructor.name} extracted %c${batch.length}%c pic groups from json.`;
-					// console.print(msg,'background:green;color:white;font-size:18px;','color:black;background:white;font-size:12px;');
-				// }
-
 			}catch(err){
 				if(this.handleError){
 					this.handleError(err,responseText,id);
@@ -398,14 +382,20 @@
 
 	// https://www.instagram.com/api/v1/feed/saved/posts/ ...stuff
 	class SavedPosts extends BasePicExtractor {
-		constructor(){super();}
+		constructor(snooper){
+			super();
+			snooper.addHandler( this.snoop );			
+		}
 		matches({pathname}){ return pathname=="/api/v1/feed/saved/posts/"; }
 		findMediaArray(json){ return json.items.map(x=>x.media); }
 	}
 
 	// https://www.instagram.com/api/v1/feed/user/1560767330/?count=12&max_id=3091713838536813928_1560767330
 	class UserPosts extends BasePicExtractor {
-		constructor(){super();}
+		constructor(snooper){
+			super();
+			snooper.addHandler( this.snoop );			
+		}
 		matches({pathname}){ 
 			return pathname.startsWith("/api/v1/feed/user/");
 		}
@@ -414,7 +404,10 @@
 
 	// Called for a Tagged Popup-Window (may be redundant)
 	class TaggedPopupWindow extends BasePicExtractor {
-		constructor(){super();}
+		constructor(snooper){
+			super();
+			snooper.addHandler( this.snoop );
+		}
 		// https://www.instagram.com/api/v1/media/3018008531365446145/info/
 		matches({pathname}){ return pathname.startsWith('/api/v1/media/') && pathname.endsWith('/info/'); }
 		findMediaArray(json){ return json.items; }
@@ -440,7 +433,10 @@
 		};
 		// Unknown: PolarisProfileSuggestedUsersWithPreloadableDirectQuery
 
-		constructor(){super();}
+		constructor(snooper){
+			super();
+			snooper.addHandler( this.snoop );
+		}
 
 		// override handle() so we can attach .friendlyName to object.
 		snoop = (x) => {
@@ -498,8 +494,9 @@
 
 	// Initial Load. Contains (Location-Header,top,recent)
 	 class Location1Posts extends LocationBase {
-		constructor({startingState,locRepo}){
+		constructor({snooper,startingState,locRepo}){
 			super();
+			snooper.addHandler( this.snoop );
 			this.startingState = startingState;
 			this.locRepo = locRepo;
 		}
@@ -536,6 +533,7 @@
 	 class Location2Posts extends LocationBase {
 	 	constructor(){
 	 		super();
+			snooper.addHandler( this.snoop );
 	 	}
 	 	matches({pathname}){
 	 		return pathname.startsWith('/api/v1/locations/') 
@@ -552,10 +550,11 @@
 
 	// Searches GrqphQL response trees matching the [friendlyName] for [edges] property.
 	class GraphQLEdgeFinder {
-		constructor(friendlyName){
+		constructor(snooper,friendlyName){
 			new Observable(this).define('lastBatch', []);
 			this.friendlyName = friendlyName;
 			this.handledLabel = `${this.constructor["name"]}(${friendlyName})`;
+			snooper.addHandler( this.snoop );
 		}
 		snoop = (x) => {
 			apiTimes.touch(this.handledLabel);
@@ -625,8 +624,9 @@
 
 	// Load followers by scrolling through list
 	class FollowingScrollerTracker{
-		constructor(){
+		constructor(snooper){
 			new Observable(this).define("foundLeaders");
+			snooper.addHandler( this.snoop );			
 		}
 
 		snoop = ({url,responseText}) => {
@@ -667,6 +667,9 @@
 	// Identifies UNHANDLED Snoop Requests
 	// Should always be processed LAST
 	class IdentifyUnhandledRequests {
+		constructor(snooper){
+			snooper.addHandler( this.snoop );			
+		}
 		snoop = (x) => {
 			if(x.handled) return;
 			let desc = this.getDescription(x);
@@ -694,7 +697,10 @@
 	// When visiting someones page (aka their 'Posts' tab)
 	// checks if we are following them and if so, saves following=true status to userRepo
 	class VisitingUserTracker {
-		constructor(userRepo){ this._userRepo = userRepo; }
+		constructor(snooper,userRepo){ 
+			this._userRepo = userRepo;
+			snooper.addHandler( this.snoop );
+		}
 		snoop = (snoopRequest) => {
 			const {url,body,responseText} = snoopRequest;
 			if(url.pathname=='/graphql/query' && new URLSearchParams(body).get('fb_api_req_friendly_name')=='PolarisProfilePageContentDirectQuery'){
@@ -721,7 +727,10 @@
 
 	// Unfollowing
 	class UnfollowTracker{
-		constructor(userRepo){this._userRepo=userRepo;}
+		constructor(snooper,userRepo){
+			this._userRepo=userRepo;
+			snooper.addHandler( this.snoop );
+		}
 		snoop = ({url,body,responseText}) => {
 			if(url.pathname=='/graphql/query' && new URLSearchParams(body).get('fb_api_req_friendly_name')=='usePolarisUnfollowMutation'){
 				const {data:{xdt_destroy_friendship:{username,friendship_status}}} = JSON.parse(responseText);
@@ -729,7 +738,6 @@
 				this._userRepo.update(username,x=>x.isFollowing=false);
 			}
 		}
-
 	}
 
 	// ======================
@@ -915,9 +923,9 @@
 				singleImage.downloadAsync(imgUrl);
 			}
 
-			function findEl(css){ return (document.querySelector(css) || {click:function(){console.debug(`${css} not found.`)}}); }
-			function previousInSet(){ findEl('button[aria-label="Go back"]').click(); }
-			function nextInSet(){ findEl('button[aria-label="Next"]').click(); }
+			function findEl(css){ return (document.querySelector(css)||{click:function(){console.debug(`${css} not found.`)}}); }
+			function previousInSet(){ findEl('div.html-div>div>button[aria-label="Go back"]').click(); }
+			function nextInSet(){ findEl('div.html-div>div>button[aria-label="Next"]').click(); }
 
 			function downloadImageUnderMouse(){ simpleDownloadImageUnderPoint(mousePos,pageOwner); }
 
@@ -973,10 +981,10 @@
 		if(x.score===undefined) return false;
 		const {MONTHIS,WEEKS} = storageTime;
 		const timeframe = ({
-			'2':(x)=>3*MONTHS,
-			'3':(x)=>6*WEEKS,
-			'4':(x)=>3*WEEKS,
-			'5':(x)=>2*WEEKS,
+			'2':(x)=>6*MONTHS,
+			'3':(x)=>3*MONTHS,
+			'4':(x)=>2*MONTHS,
+			'5':(x)=>1*MONTHS,
 		})[x.score](x) || 6*MONTHS;
 		return (x.lastVisit||0) + timeframe 
 			+ Math.floor((strToFloat(x.username) - .5) * 4 * DAYS); // spread out over 4 days
@@ -1037,25 +1045,23 @@
 		}
 	}
 
+	// Monitors batches and decorates thumbnails
 	class Gallery{
 
 		// Model portion
 		lookup; // dictionary: sanitirzedUrl => PicGroup
-		constructor(lastVisit){
+
+		constructor(lastVisit,batchProducer){
 			this.lookup = {};
 			this.lastVisit = lastVisit;
 			this.strartWatchingThumbs();
-		}
-		monitorLastBatch( basePicExtractors ){
-			for(let ex of basePicExtractors){
-				ex.listen('lastBatch',({lastBatch}) => {
-					for(let picGroup of lastBatch)
-						this.lookup[picGroup.sanitizedImgUrl] = picGroup;
-				})
-			}
+			batchProducer.listen('lastBatch',({lastBatch}) => {
+				for(let picGroup of lastBatch)
+					this.lookup[picGroup.sanitizedImgUrl] = picGroup;
+			})
 		}
 
-		// View portion
+		// View portion - Periodically updates thumbs and pulls images 
 		strartWatchingThumbs() { setInterval(()=>this.decorateThumbs(),1000); }
 
 		decorateThumbs(){
@@ -1251,71 +1257,63 @@
 		}
 	}
 
-	function initLocationPage(){
-		const userRepo = new SyncedPersistentDict('users');
-		const snooper = buildRequestSnooper();
-		const locRepo = new SyncedPersistentDict('locations');
-		const iiLookup = new ImageLookupByUrl();
+	class LocationPage{
+		constructor(){
+			const userRepo = new SyncedPersistentDict('users');
+			const snooper = buildRequestSnooper();
+			const locRepo = new SyncedPersistentDict('locations');
 
-		// Capture Starting State before anything modifies it.
-		const [,id,slug] = document.location.href.match(/instagram.com\/explore\/locations\/([^\/]+)\/([^\/]+)/);
-		const location = `${slug} ${id}`;
-		const isTracking = locRepo.containsKey(location);
-		const startingState = isTracking 
-			? structuredClone(locRepo.get(location)) // because repo will modify original object
-			: {}; // leave empty so we can detect not-visited
-		console.log(location,JSON.stringify(startingState,null,'\t'))
-		reportLast(startingState.lastVisit,'Visit');
+			// Capture Starting State before anything modifies it.
+			const [,id,slug] = document.location.href.match(/instagram.com\/explore\/locations\/([^\/]+)\/([^\/]+)/);
+			const location = `${slug} ${id}`;
+			const isTracking = locRepo.containsKey(location);
+			const startingState = isTracking 
+				? structuredClone(locRepo.get(location)) // because repo will modify original object
+				: {}; // leave empty so we can detect not-visited
+			console.log(location,JSON.stringify(startingState,null,'\t'))
+			reportLast(startingState.lastVisit,'Visit');
 
-		const gallery = new Gallery(startingState.lastVisit);
+			// Route Batch Producers to Batch Consumers
+			const batchProducer = new BatchProducerGroup([
+				new Location1Posts({snooper,startingState,locRepo}),
+				new Location2Posts(snooper),
+				new GraphQLEdgeFinder(snooper,'PolarisLocationPageTabContentQuery_connection'), // used: 2025-04-06
+				new GraphQLEdgeFinder(snooper,'PolarisLocationPageTabContentQuery'),			// used: 2025-04-06
+				new InitialLocationPageParser()
+			]);
+			new UserUpdateService({userRepo,batchProducer});
+			const gallery = new Gallery(startingState.lastVisit,batchProducer);
+			const iiLookup = new ImageLookupByUrl(snooper,batchProducer);
 
-		reportMissingImages({iiLookup,snooper});
+			const CTX = unsafeWindow.cmd = {
+				// global
+				snoopLog:snooper._loadLog,
+				userRepo,
+				iiLookup,
+				// location
+				location,
+				locRepo,
+				gallery,
+				startingState
+			};
+			CTX.reports = new UserReports(CTX);
 
-		const CTX = unsafeWindow.cmd = {
-			// global
-			snoopLog:snooper._loadLog,
-			userRepo,
-			iiLookup,
-			// location
-			location,
-			locRepo,
-			gallery,
-			startingState
-		};
-		CTX.reports = new UserReports(CTX);
+			if(isTracking){
+				locRepo.update(location,x=>x.lastVisit=loadTimeMs)
+			} else {
+				CTX.track = function(){ locRepo.update(location,u=>{
+					u.slug=slug;
+					u.id=id;
+					u.lastVisit=loadTimeMs;
+				}); }
+			}
+			CTX.stop = function(){
+				if(confirm(`Remove all tracking info for ${location}?`))
+					locRepo.remove(location);
+			}
 
-		// snoop
-		const batchSnoopers = [
-			new Location1Posts({startingState,locRepo}),
-			new Location2Posts(),
-			new GraphQLEdgeFinder('PolarisLocationPageTabContentQuery_connection'), // used: 2025-04-06
-			new GraphQLEdgeFinder('PolarisLocationPageTabContentQuery'),			// used: 2025-04-06
-		];
-		for(let extractor of batchSnoopers){
-			if(typeof(extractor.snoop) != "function")
-				throw extractor;
-			snooper.addHandler( extractor.snoop );
+			trackKeyPresses({iiLookup});
 		}
-
-		const batchProducers = [ ...batchSnoopers, new InitialLocationPageParser() ];
-		const batchConsumers = [ iiLookup, gallery, new UserUpdateService({userRepo}) ];
-		for(let consumer of batchConsumers)
-			consumer.monitorLastBatch(batchProducers);
-		if(isTracking){
-			locRepo.update(location,x=>x.lastVisit=loadTimeMs)
-		} else {
-			CTX.track = function(){ locRepo.update(location,u=>{
-				u.slug=slug;
-				u.id=id;
-				u.lastVisit=loadTimeMs;
-			}); }
-		}
-		CTX.stop = function(){
-			if(confirm(`Remove all tracking info for ${location}?`))
-				locRepo.remove(location);
-		}
-
-		trackKeyPresses({iiLookup});
 	}
 
 	// Grab good title before Instagram replaces it with 'Instagram' OR never resolves
@@ -1349,60 +1347,47 @@
 		return i;
 	}
 
-	class UserPage {
-		constructor(){
-			this.userRepo = new SyncedPersistentDict('users');
-			this.followingTracker = new FollowingScrollerTracker();
-			this.snooper = buildRequestSnooper();
-			this.iiLookup = new ImageLookupByUrl();
+	// contains Observable property .lastBatch that triggers event when it is set.
+	class BatchProducerGroup {
+		constructor(batchProviders){
+			new Observable(this).define('lastBatch', []);
+			for(let ex of batchProviders){
+				ex.listen('lastBatch',({lastBatch}) => {
+					this.lastBatch = lastBatch; // setting .lastBatch triggers event
+				});
+			}
 		}
+	}
 
-		init(){
-			const {userRepo,snooper,iiLookup} = this;
-			const {pageOwner,isTracking,startingState} = this.captureStartingState();
+	class UserPage {
+		userRepo;
+		snooper;
+		ctx;
+		reports;
+		pageOwner;
+		constructor(){
+			const userRepo = this.userRepo = new SyncedPersistentDict('users');
+			const snooper = this.snooper = buildRequestSnooper();
+			const {pageOwner,isTracking,startingState} = this.captureStartingState(userRepo);
 
-			const reports = new UserReports({userRepo,iiLookup});
-			const gallery = new Gallery(startingState.lastVisit);
+			// Misc Tracking
+			new UnfollowTracker(snooper,userRepo);
+			new VisitingUserTracker(snooper,userRepo);
+			new IdentifyUnhandledRequests(snooper); // always snoop this last - !!! make this event on snooper we can plug into so order doesn't matter
+			new FollowingScrollerTracker(snooper).listen('foundLeaders',({newValue})=>this.savePeopleIAmFollowing(newValue));
 
+			// Route Batch Producers to Batch Consumers
+			const batchProducer = new BatchProducerGroup([
+				new GraphQLExtractor(snooper),
+				new SavedPosts(snooper), // used: 2025-04-04,
+				new UserPosts(snooper), // used: 2025-04-06
+				new TaggedPopupWindow(snooper), // used: 2025-04-06
+			]);
+			new UserUpdateService({userRepo,batchProducer});
+			const gallery = new Gallery(startingState.lastVisit,batchProducer);
+			const iiLookup = new ImageLookupByUrl(snooper,batchProducer);
 
-			window.addEventListener('load', ()=>{
-				// UI - Next links
-				const linkHost = document.createElement('DIV'); 
-				Object.assign(linkHost.style,{position:"fixed",top:0,right:0,background:"#ddf",padding:"5px"});
-				document.body.appendChild(linkHost)
-				this.oldestScoredLink(reports).appendTo(linkHost);
-				this.oldestTrackedLink(reports).appendTo(linkHost);
-				addCopyButton(pageOwner);
-			});
-
-			// Set Tab/Title
-			Promise.all([getGoodTitleAsync(4000),getImageCountAsync()])
-				.then( ([title,count]) => setInterval( () => document.title = getImageCountGroup(count) + ' ' + title, 10000 ) );
-
-			reportMissingImages({iiLookup,snooper});
-
-			const batchSnoopers = [
-				new GraphQLExtractor(),
-				new SavedPosts(),			// used: 2025-04-04
-				new UserPosts(),  			// used: 2025-04-06
-				new TaggedPopupWindow(),	// used: 2025-04-06
-			];
-			const snoopers = [
-				...batchSnoopers,
-				this.followingTracker,
-				new UnfollowTracker(userRepo),
-				new VisitingUserTracker(userRepo),
-				new IdentifyUnhandledRequests() // always snoop this last
-			];
-			for( let extractor of snoopers )
-				snooper.addHandler( extractor.snoop );
-
-			const batchConsumers = [ iiLookup, gallery, new UserUpdateService({userRepo}) ];
-			for( let consumer of batchConsumers)
-				consumer.monitorLastBatch(batchSnoopers);
-
-			this.followingTracker.listen('foundLeaders',({newValue})=>this.savePeopleIAmFollowing(newValue));
-
+			const reports = this.reports = new UserReports({userRepo,iiLookup});
 			this.ctx = unsafeWindow.cmd = {
 				// global
 				snoopLog:snooper._loadLog,
@@ -1421,6 +1406,8 @@
 				startingState,
 			};
 
+			window.addEventListener('load', ()=>this.onWindowLoad());
+
 			if(isTracking)
 				this.initTrackedUser({pageOwner,startingState});
 			else
@@ -1429,6 +1416,11 @@
 			trackKeyPresses({iiLookup,pageOwner});
 
 			this.logStartingState(startingState);
+		}
+
+		scheduleSetTabTitle(){
+			Promise.all([getGoodTitleAsync(4000),getImageCountAsync()])
+				.then( ([title,count]) => setInterval( () => document.title = getImageCountGroup(count) + ' ' + title, 10000 ) );
 		}
 
 		savePeopleIAmFollowing({followerId,leaders}){
@@ -1445,10 +1437,24 @@
 				})
 		}
 
+		onWindowLoad(){
+			this.showNextLinks();
+			this.scheduleSetTabTitle();
+		}
+
+		showNextLinks(){
+			const {reports,pageOwner} = this;
+			const linkHost = document.createElement('DIV'); 
+			Object.assign(linkHost.style,{position:"fixed",top:0,right:0,background:"#ddf",padding:"5px"});
+			document.body.appendChild(linkHost)
+			this.oldestScoredLink(reports).appendTo(linkHost);
+			this.oldestTrackedLink(reports).appendTo(linkHost);
+			addCopyButton(pageOwner);
+		}
+
 		// Capture Starting State before anything modifies it.
-		captureStartingState(){
-			const {userRepo} = this;
-			const pageOwner = document.location.href.match(/instagram.com.([^\/]+)/)[1];
+		captureStartingState(userRepo){
+			const pageOwner = this.pageOwner = document.location.href.match(/instagram.com.([^\/]+)/)[1];
 			const isTracking = userRepo.containsKey(pageOwner);
 			const startingState = isTracking 
 				? structuredClone(userRepo.get(pageOwner)) // because repo will modify original object
@@ -1498,9 +1504,9 @@
 	const loadTimeMs = storageTime.now();
 
 	if(window.location.pathname.startsWith("/explore/locations"))
-		initLocationPage();
+		new LocationPage();
 	else if(window.location.pathname != "/")
-		new UserPage().init();
+		new UserPage();
 
 	console.print('%cInstagram2.js loaded','background-color:#DFD'); // Last line of file
 
