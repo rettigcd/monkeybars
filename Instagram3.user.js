@@ -28,13 +28,18 @@
 	unsafeWindow.console = { 
 		__proto__:unsafeWindow.console,
 		log:function(){ this.logArgs.push(arguments); }, logArgs:[],
-		// error:function(){ this.errorArgs.push(arguments); }, errorArgs:[],
 	}
 
 	unsafeWindow.WebSocket = makeNewWebSocket(unsafeWindow.WebSocket);
 
-
 	const storageTime = EpochTime.JavascriptTime;
+
+	const dom = {
+		get focusUser         (){ return document.querySelector('div.x10wlt62.xlyipyv span').innerHTML; },
+		get imageCountSpan    (){ return document.querySelectorAll('span.html-span')[1]; },
+		get presentationCenter(){ return document.querySelector('div._aatk'); },
+		get thumbRows         (){ return document.querySelectorAll('div._ac7v'); },
+	}
 
 	function buildRequestSnooper(){
 		let showLogMessage = true; 
@@ -250,6 +255,7 @@
 
 		logFirst(){ this.pics[0].log(); }
 		logAll(){ for(const pic of this.pics) pic.log(); }
+		get dateMs(){ return storageTime.toNum(this.date); }
 
 		static fromMediaWithUser(aaa){
 			const {user,taken_at,device_timestamp,carousel_media,usertags,image_versions2,lat,lng,has_liked} = aaa;
@@ -748,13 +754,11 @@
 	window.addEventListener('mousemove', ({clientX,clientY}) => { mousePos={clientX,clientY}; });
 
 	function getCenterOfPresentation(){
-		const el = document.querySelector('div._aatk');
+		const el = dom.presentationCenter;
 		if(el==null) return;
 		el.style.border="thick solid red";
 		const r = el.getBoundingClientRect();
-		const center = { clientX:(r.left+r.right)/2, clientY:(r.top+r.bottom)/2};
-		// console.debug(`center:${JSON.stringify(center)} mouse:${JSON.stringify(mousePos)}`);
-		return center;
+		return { clientX:(r.left+r.right)/2, clientY:(r.top+r.bottom)/2};
 	}
 
 	function getImageUnderPoint(point,iiLookup){
@@ -930,7 +934,7 @@
 			function downloadImageUnderMouse(){ simpleDownloadImageUnderPoint(mousePos,pageOwner); }
 
 			function openFocusUserProfilePage(){
-				const focusUser = document.querySelector('div.x10wlt62.xlyipyv span').innerHTML;
+				const focusUser = dom.focusUser;
 				console.debug('focus User', focusUser);
 				if(focusUser){
 					GM_openInTab(`https://instagram.com/${focusUser}`);
@@ -1050,27 +1054,70 @@
 
 		// Model portion
 		lookup; // dictionary: sanitirzedUrl => PicGroup
+		newGroups = [];
 
 		constructor(lastVisit,batchProducer){
 			this.lookup = {};
 			this.lastVisit = lastVisit;
 			this.strartWatchingThumbs();
-			batchProducer.listen('lastBatch',({lastBatch}) => {
-				for(let picGroup of lastBatch)
-					this.lookup[picGroup.sanitizedImgUrl] = picGroup;
+			batchProducer.listen('lastBatch',x=>this.storeBatch(x));
+		}
+
+		storeBatch({lastBatch}){
+			for(let picGroup of lastBatch){
+				this.lookup[picGroup.sanitizedImgUrl] = picGroup;
+				if(this.isNew(picGroup))
+					this.addNewGroup(picGroup);
+			}
+		}
+
+		addNewGroup(picGroup){
+			this.newGroups.push(picGroup);
+
+			if(this.newImageContainer == undefined)
+				this.createNewImageContainer();
+
+			const {liked,pics} = picGroup;
+//			const {ageText,ageColor} = msToAgeString(loadTimeMs-picGroup.dateMs);
+			const newImageStyle = {
+				width: "200px",
+				height:"200px",
+				border:"thick solid yellow",
+				display:"block",
+				cursor:"pointer",
+			};
+			pics.forEach((si,index) => {
+				const newImg = document.createElement('IMG');
+				newImg.setAttribute('src',si.imgUrls[0]);
+				Object.assign(newImg.style,newImageStyle);
+				newImg.addEventListener('click',async function(event){
+					newImg.style.cursor = "wait"; // feedback that is was clicked
+					const imgUrl = si.imgUrls[si.imgUrls.length-1];
+					await si.downloadAsync(imgUrl);
+					newImg.style.cursor = "default"; // feedback that is is complete
+					newImg.style.opacity = "0.3"; // feedback that it completed
+				});
+				this.newImageContainer.appendChild(newImg);
 			})
+		}
+
+		createNewImageContainer(){
+			const newImageContainer = this.newImageContainer = document.createElement('DIV'); 
+			Object.assign(newImageContainer.style,{
+				position:"fixed",top:"5px",left:"250px",width:"240px",height:"1200px",
+				"overflow-y":"auto", // or scroll
+				background:"#66C",
+				padding:"5px"
+			});
+			document.body.appendChild(newImageContainer);
 		}
 
 		// View portion - Periodically updates thumbs and pulls images 
 		strartWatchingThumbs() { setInterval(()=>this.decorateThumbs(),1000); }
 
 		decorateThumbs(){
-			const thumbSelector = 'div._ac7v';
-			const rows = document.querySelectorAll(thumbSelector); // for profile page
-			if(rows.length==0) {
-				// console.log(`no thumbs found matching selector:${'div._ac7v'}`);
-				return;
-			}
+			const rows = dom.thumbRows;
+			if(rows.length==0) return;
 
 			const rowOffset = rows[0].index // check 1st row
 				|| rows[rows.length-1].index - (rows.length-1) // check last row
@@ -1093,43 +1140,44 @@
 				for(let j=0;j<row.children.length;++j){
 					const cell = row.children[j];
 					if(cell.decorated) continue;
-					const img = cell.querySelector('img');
-					if(img == null )
+					const imgEl = cell.querySelector('img');
+					if(imgEl == null )
 						continue;
 
 					const imgIndex = row.index*3+j;
-					const sanitizedImgUrl = sanitizeImgUrl(img.src);
+					const sanitizedImgUrl = sanitizeImgUrl(imgEl.src);
 
 					let picGroup = this.lookup[sanitizedImgUrl];
 
 					if(picGroup == null) continue;
 
-					this.decorateThumb(img,picGroup);
+					this.decorateThumb({imgEl,picGroup});
 					cell.decorated = true;
 				}
 			}
 		}
 
-		decorateThumb(img,picGroup){
-			const {date,following,liked,pics} = picGroup;
-			const imageMs = storageTime.toNum(date);
-			const {ageText,ageColor} = msToAgeString(loadTimeMs-imageMs);
+		isNew(picGroup){ return this.lastVisit < picGroup.dateMs; }
+
+		decorateThumb({imgEl,picGroup}){
+			const {following,liked,pics} = picGroup;
+			const {ageText,ageColor} = msToAgeString(loadTimeMs-picGroup.dateMs);
+			const isNew = this.isNew(picGroup);
 
 			// Store the thumbUrl we used to find the pic-group
-			picGroup.thumbUrl = img.src;
+			picGroup.thumbUrl = imgEl.src;
 
 			// Verify urls match
-			const a = sanitizeImgUrl(img.src);
+			const a = sanitizeImgUrl(imgEl.src);
 			const b = sanitizeImgUrl(picGroup.pics[0].imgUrls[0]);
 			if( a != b )
 				console.warn("Group urls do not match", a, b);
 
 			// Setup host
-			const host = img.parentNode;
+			const host = imgEl.parentNode;
 			host.style.position='relative';
 
 			// Add top-left text
-			const isNew = this.lastVisit < imageMs; // if .lastVisit is undefined, don't override color
 			const style = {
 				...(isNew 
 					? {color:'black',background:'yellow'}
@@ -1184,7 +1232,7 @@
 					this.remove();
 
 					const numPerRow = 4;
-					const {width,height} = img, clipSize = width / numPerRow;
+					const {width,height} = imgEl, clipSize = width / numPerRow;
 
 					const clipStyle = {
 						position:'absolute',
@@ -1333,10 +1381,10 @@
 		return new Promise((resolve) => {
 			const timeoutAt = new Date().valueOf() + timeoutAfter;
 			const intervalId = setInterval(function(){
-				const span = document.querySelectorAll('span.html-span')[1];
-				const foundSpan = span !== undefined;
+				const imageCountSpan = dom.imageCountSpan;
+				const foundSpan = imageCountSpan !== undefined;
 				const timedOut = timeoutAt <= new Date().valueOf();
-				if(foundSpan) resolve(span.innerText-0);
+				if(foundSpan) resolve(imageCountSpan.innerText-0);
 				if(foundSpan || timedOut) clearInterval(intervalId);
 			},500)
 		});
@@ -1440,16 +1488,18 @@
 		onWindowLoad(){
 			this.showNextLinks();
 			this.scheduleSetTabTitle();
+			addCopyButton(this.pageOwner);
 		}
 
 		showNextLinks(){
-			const {reports,pageOwner} = this;
+			const {reports} = this;
+			// create container
 			const linkHost = document.createElement('DIV'); 
 			Object.assign(linkHost.style,{position:"fixed",top:0,right:0,background:"#ddf",padding:"5px"});
 			document.body.appendChild(linkHost)
+			// 
 			this.oldestScoredLink(reports).appendTo(linkHost);
 			this.oldestTrackedLink(reports).appendTo(linkHost);
-			addCopyButton(pageOwner);
 		}
 
 		// Capture Starting State before anything modifies it.
