@@ -159,21 +159,11 @@
 			if(this.hasKey(imgUrl)){
 				const {singleImage} = this.getValue(imgUrl);
 				if(singleImage)
-					return {singleImage};
+					return singleImage;
 			}
 
 			this.trigger('missingImage',imgUrl);
-
-			// get the username
-			const newMissingStandIn = prompt("Please enter username", this._missingStandIn);
-			if(newMissingStandIn == null) return null;
-			this._missingStandIn = newMissingStandIn
-
-			// still let them download it
-			const date = new Date();
-			filename = this._missingStandIn +' '+formatDateForFilename(date)+'.jpg';
-			const stub = new SingleImage([],[imgUrl],this._missingStandIn,date);
-			return {singleImage:stub};
+			return null;
 		}
 
 		_missingStandIn = ""
@@ -289,18 +279,11 @@
 		static fromMedia({usertags,image_versions2,owner,date=throwExp("date")}){
 
 			const taggedUsers = SingleImage.parseUserTags(usertags);
+			return new SingleImage( taggedUsers, image_versions2.candidates, owner, date ); // candidates is array of {url,width,height}
+		}
 
-			// tallest 3 images
-			const imgUrls = image_versions2.candidates
-				.sort(byDesc(({height})=>height))
-				.slice(0,3)
-				.map(({url})=>url);
-
-			// Make High res come last so if multiple urls sanitize to the same URL
-			// The last (HIGH res) wins
-			imgUrls.reverse();
-
-			return new SingleImage( taggedUsers, imgUrls, owner, date );
+		static fromUrlAndOwner(url,width,height,owner){
+			return new SingleImage([],[{url,width,height}],owner,new Date());
 		}
 
 		static parseUserTags(usertags){
@@ -322,25 +305,45 @@
 
 		taggedUsers; // string[] - left to right
 		imgUrls; // string[] - urls - biggest first
+		largestUrl;
+		smallestUrl;
+		largestDimensionName; // "width" or "height"
 
-		constructor(taggedUsers,imgUrls,owner,date){
+		constructor(taggedUsers,images,owner,date){ // images: array of {url,width,height}
 			this.taggedUsers = taggedUsers;
-			this.imgUrls = imgUrls; // low to high res
+
+			// Remove Squares
+			const nonSquareImages = images.filter(({height,width})=>height != width);
+			console.debug(`${nonSquareImages.length} of ${images.length} are non-square`);
+			if(images.length * 40 <= nonSquareImages.length * 100) images = nonSquareImages; // if at least 40% are non-square, use only them.
+
+			this.imgUrls = images
+				.sort(by(({height})=>height)) // smallest to largest
+				.map(({url})=>url);
+			this.smallestUrl = this.imgUrls[0];
+			this.largestUrl = this.imgUrls[this.imgUrls.length-1];
+			this.largestDimensionName = images[0].width < images[0].height ? "height" : "width";
 
 			// Needed for calculating filename, but can we remove otherwise?
 			this.owner = owner;
 			this.date = date;
-
 			
-			const ext = imgUrls[0].contains(".webp") ? ".webp" : ".jpg";
+			const ext = this.smallestUrl.contains(".webp") ? ".webp" : ".jpg";
 			this.filename = [owner,...taggedUsers].slice(0,10).join(' ')
 				+' '+formatDateForFilename(date) + ext;
 			new Observable(this).define('downloaded',false);
 		}
 
-		async downloadAsync(requestedUrl,onprogress){
+		// Downloads the cleaned-up URL of the requested url
+		async downloadAsync(requestedUrl,onprogress){ // $$$
 			const matching = this.imgUrls.filter(x => x.includes(requestedUrl)).reverse();
 			await downloadImageAsync({url:matching[0] || requestedUrl, filename:this.filename, onprogress });
+			this.downloaded=true;
+			console.print(`downloaded: ${this.filename}`);
+		}
+
+		async downloadLargestAsync(onprogress){
+			await downloadImageAsync({url:this.largestUrl, filename:this.filename, onprogress });
 			this.downloaded=true;
 			console.print(`downloaded: ${this.filename}`);
 		}
@@ -767,22 +770,19 @@
 		// and this filter is preventing downloading it.
 		const sources = getSourcesUnder(point);
 		if(sources.length==0){ console.log('no img'); return; }
-		const imgUrl = sources[0].src;
+		const source = sources[0], imgUrl = source.src;
 
-		const {singleImage} = iiLookup.getImageFor(imgUrl)
+		const singleImage = iiLookup.getImageFor(imgUrl);
 
 		if(singleImage != null) return { singleImage, imgUrl };
 
-		// return null-object ImageInfo
-		const stub = {
-			owner:'-none-',
-			taggedUsers: [],
-			downloadAsync(){
-				console.debug('No image found to download.');
-				return Promise.reject();
-			}
-		};
-		return { singleImage:stub, imgUrl };
+		// get the owner/username
+		const newMissingStandIn = prompt("Please enter username", this._missingStandIn);
+		if(newMissingStandIn == null) return null;
+		this._missingStandIn = newMissingStandIn;
+
+		// still let them download it
+		return { singleImage:SingleImage.fromUrlAndOwner(imgUrl,source.width,source.height,this._missingStandIn), imgUrl };
 	}
 
 	async function simpleDownloadImageUnderPoint(point,pageOwner){
@@ -924,7 +924,7 @@
 
 			function downloadImageInCenter(){
 				const {singleImage,imgUrl} = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
-				singleImage.downloadAsync(imgUrl);
+				singleImage.downloadAsync(imgUrl); // $$$
 			}
 
 			function findEl(css){ return (document.querySelector(css)||{click:function(){console.debug(`${css} not found.`)}}); }
@@ -1028,7 +1028,7 @@
 				lazy: ()=>showUsers(filters.followed.lazy).sort(by(x=>x.lastGood||0)),
 			};
 			this.tracked={
-				stale: (notVisitedDays=60)=>showUsers(filters.tracked.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)), // $$$
+				stale: (notVisitedDays=60)=>showUsers(filters.tracked.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)),
 				all: (notVisitedDays=60)=>showUsers(filters.tracked.all).sort(by(x=>x.username)),
 				private: (notVisitedDays=60)=>showUsers(filters.tracked.private).sort(by(x=>x.username)),
 			};
@@ -1078,22 +1078,19 @@
 				this.createNewImageContainer();
 
 			const {liked,pics} = picGroup;
-//			const {ageText,ageColor} = msToAgeString(loadTimeMs-picGroup.dateMs);
 			const newImageStyle = {
-				width: "200px",
-				height:"200px",
 				border:"thick solid yellow",
 				display:"block",
 				cursor:"pointer",
 			};
-			pics.forEach((si,index) => {
+			pics.forEach((singleImage,index) => {
 				const newImg = document.createElement('IMG');
-				newImg.setAttribute('src',si.imgUrls[0]);
+				newImg.setAttribute('src',singleImage.smallestUrl);
 				Object.assign(newImg.style,newImageStyle);
+				newImg.style[singleImage.largestDimensionName] = "200px";
 				newImg.addEventListener('click',async function(event){
 					newImg.style.cursor = "wait"; // feedback that is was clicked
-					const imgUrl = si.imgUrls[si.imgUrls.length-1];
-					await si.downloadAsync(imgUrl);
+					await singleImage.downloadLargestAsync();
 					newImg.style.cursor = "default"; // feedback that is is complete
 					newImg.style.opacity = "0.3"; // feedback that it completed
 				});
