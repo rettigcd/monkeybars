@@ -1050,29 +1050,18 @@
 		}
 	}
 
-	// Monitors batches and decorates thumbnails
-	class Gallery{
-
-		// Model portion
-		lookup; // dictionary: sanitirzedUrl => PicGroup
-		newGroups = [];
-
+	class SidePanel{
 		constructor(batchProducer){
-			this.lookup = {};
-			this.strartWatchingThumbs();
-			batchProducer.listen('lastBatch',x=>this.storeBatch(x));
+			batchProducer.listen('lastBatch',x=>this.showNewBatches(x));
 		}
 
-		storeBatch({lastBatch}){
-			for(let picGroup of lastBatch){
-				this.lookup[picGroup.sanitizedImgUrl] = picGroup;
+		showNewBatches({lastBatch}){
+			for(let picGroup of lastBatch)
 				if(picGroup.isNew)
 					this.addNewGroup(picGroup);
-			}
 		}
 
 		addNewGroup(picGroup){
-			this.newGroups.push(picGroup);
 
 			if(this.newImageContainer == undefined)
 				this.createNewImageContainer();
@@ -1107,6 +1096,25 @@
 				padding:"5px"
 			});
 			document.body.appendChild(newImageContainer);
+		}
+
+	}
+
+	// Monitors batches and decorates thumbnails
+	class Gallery{
+
+		// Model portion
+		lookup; // dictionary: sanitirzedUrl => PicGroup
+
+		constructor(batchProducer){
+			this.lookup = {};
+			this.strartWatchingThumbs();
+			batchProducer.listen('lastBatch',x=>this.storeBatch(x));
+		}
+
+		storeBatch({lastBatch}){
+			for(let picGroup of lastBatch)
+				this.lookup[picGroup.sanitizedImgUrl] = picGroup;
 		}
 
 		// View portion - Periodically updates thumbs and pulls images 
@@ -1326,6 +1334,7 @@
 			]);
 			new UserUpdateService({userRepo,batchProducer});
 			const gallery = new Gallery(batchProducer);
+			new SidePanel(batchProducer);
 			const iiLookup = new ImageLookupByUrl(snooper,batchProducer);
 
 			const CTX = unsafeWindow.cmd = {
@@ -1437,6 +1446,7 @@
 			]);
 			new UserUpdateService({userRepo,batchProducer});
 			const gallery = new Gallery(batchProducer);
+			new SidePanel(batchProducer);
 			const iiLookup = new ImageLookupByUrl(snooper,batchProducer);
 
 			const reports = this.reports = new UserReports({userRepo,iiLookup});
