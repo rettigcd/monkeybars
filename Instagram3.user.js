@@ -237,6 +237,7 @@
 		following; // type:bool			are we following owner
 		lat; lng;
 		liked;
+		isNew; // set by BatchProducerGroup
 
 		constructor({owner,date,pics,following,lat,lng,liked}){
 			Object.assign(this,{owner,date,pics,following,lat,lng,liked});
@@ -1056,9 +1057,8 @@
 		lookup; // dictionary: sanitirzedUrl => PicGroup
 		newGroups = [];
 
-		constructor(lastVisit,batchProducer){
+		constructor(batchProducer){
 			this.lookup = {};
-			this.lastVisit = lastVisit;
 			this.strartWatchingThumbs();
 			batchProducer.listen('lastBatch',x=>this.storeBatch(x));
 		}
@@ -1066,7 +1066,7 @@
 		storeBatch({lastBatch}){
 			for(let picGroup of lastBatch){
 				this.lookup[picGroup.sanitizedImgUrl] = picGroup;
-				if(this.isNew(picGroup))
+				if(picGroup.isNew)
 					this.addNewGroup(picGroup);
 			}
 		}
@@ -1154,12 +1154,10 @@
 			}
 		}
 
-		isNew(picGroup){ return this.lastVisit < picGroup.dateMs; }
-
 		decorateThumb({imgEl,picGroup}){
 			const {following,liked,pics} = picGroup;
 			const {ageText,ageColor} = msToAgeString(loadTimeMs-picGroup.dateMs);
-			const isNew = this.isNew(picGroup);
+			const isNew = picGroup.isNew;
 
 			// Store the thumbUrl we used to find the pic-group
 			picGroup.thumbUrl = imgEl.src;
@@ -1319,7 +1317,7 @@
 			reportLast(startingState.lastVisit,'Visit');
 
 			// Route Batch Producers to Batch Consumers
-			const batchProducer = new BatchProducerGroup([
+			const batchProducer = new BatchProducerGroup(startingState.lastVisit,[
 				new Location1Posts({snooper,startingState,locRepo}),
 				new Location2Posts(snooper),
 				new GraphQLEdgeFinder(snooper,'PolarisLocationPageTabContentQuery_connection'), // used: 2025-04-06
@@ -1327,7 +1325,7 @@
 				new InitialLocationPageParser()
 			]);
 			new UserUpdateService({userRepo,batchProducer});
-			const gallery = new Gallery(startingState.lastVisit,batchProducer);
+			const gallery = new Gallery(batchProducer);
 			const iiLookup = new ImageLookupByUrl(snooper,batchProducer);
 
 			const CTX = unsafeWindow.cmd = {
@@ -1394,14 +1392,23 @@
 
 	// contains Observable property .lastBatch that triggers event when it is set.
 	class BatchProducerGroup {
-		constructor(batchProviders){
+		lastVisit;
+		constructor(lastVisit,batchProviders){
+			this.lastVisit = lastVisit;
 			new Observable(this).define('lastBatch', []);
-			for(let ex of batchProviders){
-				ex.listen('lastBatch',({lastBatch}) => {
-					this.lastBatch = lastBatch; // setting .lastBatch triggers event
-				});
-			}
+			for(let source of batchProviders)
+				source.listen('lastBatch',this.routeBatch);
 		}
+		routeBatch = ({lastBatch}) => {
+			// all picGroups go through here...
+			// Apply .isNew to all picGroups
+			for(let picGroup of lastBatch)
+				picGroup.isNew = this.isNew(picGroup);
+
+			// forward
+			this.lastBatch = lastBatch; // .lastBatch is observable and this triggers event
+		}
+		isNew(picGroup){ return this.lastVisit < picGroup.dateMs; }		
 	}
 
 	class UserPage {
@@ -1422,14 +1429,14 @@
 			new FollowingScrollerTracker(snooper).listen('foundLeaders',({newValue})=>this.savePeopleIAmFollowing(newValue));
 
 			// Route Batch Producers to Batch Consumers
-			const batchProducer = new BatchProducerGroup([
+			const batchProducer = new BatchProducerGroup(startingState.lastVisit, [
 				new GraphQLExtractor(snooper),
 				new SavedPosts(snooper), // used: 2025-04-04,
 				new UserPosts(snooper), // used: 2025-04-06
 				new TaggedPopupWindow(snooper), // used: 2025-04-06
 			]);
 			new UserUpdateService({userRepo,batchProducer});
-			const gallery = new Gallery(startingState.lastVisit,batchProducer);
+			const gallery = new Gallery(batchProducer);
 			const iiLookup = new ImageLookupByUrl(snooper,batchProducer);
 
 			const reports = this.reports = new UserReports({userRepo,iiLookup});
