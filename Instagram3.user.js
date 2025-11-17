@@ -1053,6 +1053,23 @@
 	class SidePanel{
 		constructor(batchProducer){
 			batchProducer.listen('lastBatch',x=>this.showNewBatches(x));
+
+			this.containerCss = {
+				position:"fixed",
+				top:"5px",left:"100px",
+				width:"450px",height:"1200px",
+				"overflow-y":"auto", // or scroll
+				background:"#66C",
+				padding:"5px"
+			};
+
+			this.newImageCss = {
+				border:"thick solid yellow",
+//				display:"block",
+				cursor:"pointer",
+			};
+			this.newImageSize = "200px";
+
 		}
 
 		showNewBatches({lastBatch}){
@@ -1067,16 +1084,11 @@
 				this.createNewImageContainer();
 
 			const {liked,pics} = picGroup;
-			const newImageStyle = {
-				border:"thick solid yellow",
-				display:"block",
-				cursor:"pointer",
-			};
 			pics.forEach((singleImage,index) => {
 				const newImg = document.createElement('IMG');
 				newImg.setAttribute('src',singleImage.smallestUrl);
-				Object.assign(newImg.style,newImageStyle);
-				newImg.style[singleImage.largestDimensionName] = "200px";
+				Object.assign(newImg.style,this.newImageCss);
+				newImg.style[singleImage.largestDimensionName] = this.newImageSize;
 				newImg.addEventListener('click',async function(event){
 					newImg.style.cursor = "wait"; // feedback that is was clicked
 					await singleImage.downloadLargestAsync();
@@ -1089,12 +1101,7 @@
 
 		createNewImageContainer(){
 			const newImageContainer = this.newImageContainer = document.createElement('DIV'); 
-			Object.assign(newImageContainer.style,{
-				position:"fixed",top:"5px",left:"250px",width:"240px",height:"1200px",
-				"overflow-y":"auto", // or scroll
-				background:"#66C",
-				padding:"5px"
-			});
+			Object.assign(newImageContainer.style,this.containerCss);
 			document.body.appendChild(newImageContainer);
 		}
 
@@ -1403,7 +1410,7 @@
 	class BatchProducerGroup {
 		lastVisit;
 		constructor(lastVisit,batchProviders){
-			this.lastVisit = lastVisit;
+			this.lastVisit = lastVisit || 0; // if new/undefined, use 0 so everything is treated as new
 			new Observable(this).define('lastBatch', []);
 			for(let source of batchProviders)
 				source.listen('lastBatch',this.routeBatch);
