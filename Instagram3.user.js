@@ -1054,21 +1054,18 @@
 		constructor(batchProducer){
 			batchProducer.listen('lastBatch',x=>this.showNewBatches(x));
 
+			this.containerCollapsedWidth = "350px";
 			this.containerCss = {
 				position:"fixed",
-				top:"5px",left:"100px",
-				width:"450px",height:"1200px",
+				top:"5px",left:"150px",
+				width:"350px",height:"1200px",
 				"overflow-y":"auto", // or scroll
 				background:"#66C",
 				padding:"5px"
 			};
 
-			this.newImageCss = {
-				border:"thick solid yellow",
-//				display:"block",
-				cursor:"pointer",
-			};
-			this.newImageSize = "200px";
+			this.newImageCss = { border:"thick solid yellow", cursor:"pointer", };
+			this.newImageSize = "300px";
 
 		}
 
@@ -1100,9 +1097,25 @@
 		}
 
 		createNewImageContainer(){
+			// container
 			const newImageContainer = this.newImageContainer = document.createElement('DIV'); 
 			Object.assign(newImageContainer.style,this.containerCss);
 			document.body.appendChild(newImageContainer);
+			// header
+			const header = document.createElement('H2');
+			newImageContainer.appendChild(header);
+			header.appendChild(document.createTextNode("Hello World"));
+			// button
+			const toggle = this.toggle = document.createElement('SPAN');
+			Object.assign(toggle.style,{margin:"5px", font:"bold",cursor:"pointer"});
+			header.appendChild(toggle);
+			toggle.innerText = ">>";
+			toggle.addEventListener('click',(event) => {
+				const expand = toggle.innerText == ">>";
+				toggle.innerText = expand ? "<<" : ">>";
+				this.newImageContainer.style.width = expand ? "85%" : this.containerCollapsedWidth;
+			});
+
 		}
 
 	}
