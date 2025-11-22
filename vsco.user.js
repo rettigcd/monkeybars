@@ -15,6 +15,7 @@
 // @grant        GM_download
 // @grant        GM_setClipboard
 // @grant        GM_log
+// @grant        GM_openInTab
 // @grant        unsafeWindow
 // ==/UserScript==
 
@@ -841,7 +842,8 @@
 						labelText : user.username + ' ' + user.data.downloadsInLastYear,
 						images : user.newImages,
 						actions : { 
-							open: function(){window.open(user.fetch.galleryUrl, '_blank');},
+							//open: function(){window.open(user.fetch.galleryUrl, '_blank');},
+							open: function(){GM_openInTab(user.fetch.galleryUrl);},
 						}
 					});
 					irm.listen('isVisible',({isVisible})=>{
@@ -1081,7 +1083,7 @@
 		open(){ 
 			this.save();
 			this._access.repo.sync(); // flush 'save' before we open the next page.
-			window.open(this.fetch.galleryUrl, '_blank');
+			GM_openInTab(this.fetch.galleryUrl); // window.open(this.fetch.galleryUrl, '_blank');
 		}
 		mask(){ this._access.commonRepo.add(this.username); console.log(`${this.username} masked!`); }
 
