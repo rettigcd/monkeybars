@@ -992,7 +992,7 @@
 			'5':(x)=>1*MONTHS,
 		})[x.score](x) || 6*MONTHS;
 		return (x.lastVisit||0) + timeframe 
-			+ Math.floor((strToFloat(x.username) - .5) * 4 * DAYS); // spread out over 4 days
+			+ Math.floor((strToFloat(x.username) - .5) * 14 * DAYS); // spread out over 14 days
 	}
 	function withinLast(timestamp,threshold){ return loadTimeMs <= (timestamp||0) + threshold; }
 	const filters = {
@@ -1051,17 +1051,27 @@
 	}
 
 	class SidePanel{
+		picGroupCount = 0; // # of picGroups
+		imageCount = 0; // individual images
 		constructor(batchProducer){
 			batchProducer.listen('lastBatch',x=>this.showNewBatches(x));
 
 			this.containerCollapsedWidth = "350px";
-			this.containerCss = {
+			this.outerCss = {
 				position:"fixed",
 				top:"5px",left:"150px",
-				width:"350px",height:"1200px",
-				"overflow-y":"auto", // or scroll
+				height:"95%",
 				background:"#66C",
-				padding:"5px"
+				padding:"5px",
+				"margin-right":"120px",
+				width:"350px"
+			};
+			this.headerCss = { "margin-bottom":"8px", "font-size":"16px", "font-weight":"bold", "font-family":"Tahoma","color":"white",
+				display:"flex", "justify-content":"space-between", "flex-direction":"row",
+			 };
+			this.innerCss = {
+				"overflow-y":"auto", // or scroll
+				"width":"100%", height:"100%",
 			};
 
 			this.newImageCss = { border:"thick solid yellow", cursor:"pointer", };
@@ -1073,6 +1083,12 @@
 			for(let picGroup of lastBatch)
 				if(picGroup.isNew)
 					this.addNewGroup(picGroup);
+			this.updateHeaderText();
+		}
+
+		updateHeaderText(){
+			if(this.headerTextEl) // may not be initialized yet
+				this.headerTextEl.nodeValue = `Groups:${this.picGroupCount} Images:${this.imageCount}`;
 		}
 
 		addNewGroup(picGroup){
@@ -1080,8 +1096,11 @@
 			if(this.newImageContainer == undefined)
 				this.createNewImageContainer();
 
+			++this.picGroupCount;
+
 			const {liked,pics} = picGroup;
 			pics.forEach((singleImage,index) => {
+				++this.imageCount;
 				const newImg = document.createElement('IMG');
 				newImg.setAttribute('src',singleImage.smallestUrl);
 				Object.assign(newImg.style,this.newImageCss);
@@ -1094,28 +1113,35 @@
 				});
 				this.newImageContainer.appendChild(newImg);
 			})
+
+
 		}
 
 		createNewImageContainer(){
-			// container
-			const newImageContainer = this.newImageContainer = document.createElement('DIV'); 
-			Object.assign(newImageContainer.style,this.containerCss);
-			document.body.appendChild(newImageContainer);
+			// Outer Container
+			const outer = this.outer = document.createElement("DIV");
+			Object.assign(outer.style,this.outerCss);
+			document.body.appendChild(outer);
 			// header
 			const header = document.createElement('H2');
-			newImageContainer.appendChild(header);
-			header.appendChild(document.createTextNode("Hello World"));
+			Object.assign(header.style,this.headerCss);
+			outer.appendChild(header);
+			this.headerTextEl = document.createTextNode("Hello World");
+			header.appendChild(this.headerTextEl);
 			// button
 			const toggle = this.toggle = document.createElement('SPAN');
-			Object.assign(toggle.style,{margin:"5px", font:"bold",cursor:"pointer"});
+			Object.assign(toggle.style,{cursor:"pointer"});
 			header.appendChild(toggle);
 			toggle.innerText = ">>";
 			toggle.addEventListener('click',(event) => {
 				const expand = toggle.innerText == ">>";
 				toggle.innerText = expand ? "<<" : ">>";
-				this.newImageContainer.style.width = expand ? "85%" : this.containerCollapsedWidth;
+				this.outer.style.width = expand ? "auto" : this.containerCollapsedWidth;
 			});
-
+			// inner
+			const newImageContainer = this.newImageContainer = document.createElement('DIV'); 
+			Object.assign(newImageContainer.style,this.innerCss);
+			outer.appendChild(newImageContainer);
 		}
 
 	}
