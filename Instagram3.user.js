@@ -19,7 +19,10 @@
 // @grant        unsafeWindow
 // ==/UserScript==
 
-// Requires (a) Developer Mode = Enabled & (b) Allow Local URLs
+// Requires:
+// (a) Developer mode
+// (b) Allow User Scripts
+// (c) Allow access to file URLs
 
 (function() {
 	'use strict';
@@ -118,10 +121,9 @@
 	//      ImageInfo classes are initialized internally
 	//      caller just gets ImageInfo and modify them, never create them.
 	class ImageLookupByUrl{
-		constructor(snooper,batchProducer){
+		constructor(batchProducer){
 			this._dict={};
 			new HasEvents(this);
-			this.on('missingImage',	snooper.checkSnoopLogForMissingImage);
 			batchProducer.listen('lastBatch',({lastBatch}) => {
 				lastBatch.forEach(picGroup=>{ 
 					this.addGroup( picGroup );
@@ -765,6 +767,7 @@
 		return { clientX:(r.left+r.right)/2, clientY:(r.top+r.bottom)/2};
 	}
 
+	let missingStandIn = "";
 	function getImageUnderPoint(point,iiLookup){
 
 		// sometimes the image we want to download is missing imageInfo
@@ -778,12 +781,12 @@
 		if(singleImage != null) return { singleImage, imgUrl };
 
 		// get the owner/username
-		const newMissingStandIn = prompt("Please enter username", this._missingStandIn);
+		const newMissingStandIn = prompt("Please enter username", missingStandIn);
 		if(newMissingStandIn == null) return null;
-		this._missingStandIn = newMissingStandIn;
+		missingStandIn = newMissingStandIn;
 
 		// still let them download it
-		return { singleImage:SingleImage.fromUrlAndOwner(imgUrl,source.width,source.height,this._missingStandIn), imgUrl };
+		return { singleImage:SingleImage.fromUrlAndOwner(imgUrl,source.width,source.height,missingStandIn), imgUrl };
 	}
 
 	async function simpleDownloadImageUnderPoint(point,pageOwner){
@@ -1342,7 +1345,8 @@
 			new UserUpdateService({userRepo,batchProducer});
 			const gallery = new Gallery(batchProducer);
 			new SidePanel(batchProducer);
-			const iiLookup = new ImageLookupByUrl(snooper,batchProducer);
+			const iiLookup = new ImageLookupByUrl(batchProducer);
+			iiLookup.on('missingImage',	snooper.checkLogForMissingImage);
 
 			const CTX = unsafeWindow.cmd = {
 				// global
@@ -1454,7 +1458,8 @@
 			new UserUpdateService({userRepo,batchProducer});
 			const gallery = new Gallery(batchProducer);
 			new SidePanel(batchProducer);
-			const iiLookup = new ImageLookupByUrl(snooper,batchProducer);
+			const iiLookup = new ImageLookupByUrl(batchProducer);
+			iiLookup.on('missingImage',	snooper.checkLogForMissingImage);
 
 			const reports = this.reports = new UserReports({userRepo,iiLookup});
 			this.ctx = unsafeWindow.cmd = {
