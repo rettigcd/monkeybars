@@ -45,6 +45,7 @@ class HasEvents{
 	constructor(host){
 		let dict={};
 		host.on = function(key,handler){
+			if(handler===undefined) throw new Error("Handler is undefined for event "+key);
 			if(key in dict) dict[key].push(handler); 
 			else dict[key]=[handler];
 			return this;
