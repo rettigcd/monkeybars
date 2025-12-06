@@ -1345,6 +1345,8 @@
 			let nextCursor = siteMedia.nextCursor;
 			while(nextCursor){
 
+				await new Promise(resolve => setTimeout(resolve, 60*1000/150)); // rate-limit - do 200/minute
+
 				let response = await fetch(
 					'https://vsco.co/api/3.0/medias/profile?'+new URLSearchParams({site_id:siteId,limit:14,show_only:0,cursor:nextCursor}).toString(),
 					{headers:{"Authorization":"Bearer "+token}}
