@@ -150,7 +150,7 @@
 		}
 
 		addSingle(singleImage){
-			singleImage.imgUrls.forEach(url=> {
+			singleImage.images.forEach(({url})=> {
 				this.modValue(url, x=> Object.assign(x,{singleImage}) );
 			});
 		}
@@ -189,7 +189,7 @@
 			this.userRepo=userRepo || throwExp('UserService missing userRepo');
 			batchProducer.listen('lastBatch',({lastBatch}) => {
 				this.onScan_UpdateFollowingLikedLastUpload(lastBatch);
-				this.onDownload_UpdateLastGood(lastBatch);
+				this.onDownload_RecordDownload(lastBatch);
 			})
 		}
 
@@ -202,8 +202,6 @@
 						x.username = owner;
 						if(following)
 							x.isFollowing = following;
-						if(liked && (x.lastGood||0)<dateMs)
-							x.lastGood = dateMs;
 						if((x.lastUpload||0)<dateMs)
 							x.lastUpload = dateMs;
 					})
@@ -212,20 +210,21 @@
 			});
 		}
 
-		onDownload_UpdateLastGood(batch){
-			const updateLastGood = ({host:singleImage,downloaded}) => {
+		onDownload_RecordDownload(batch){
+			const recordDownload = ({host:singleImage,downloaded}) => {
 				const {owner,date} = singleImage;
 				if(downloaded && owner && this.userRepo.containsKey(owner)){
 					const date = storageTime.toNum(singleImage.date);
+					const year = singleImage.date.getFullYear();
 					this.userRepo.update(owner,u=>{
-						if((u.lastGood||0)<date)
-							u.lastGood = date;
+						if(u.dl === undefined) u.dl = {};
+						u.dl[year] = (u.dl[year] || 0) +1;
 					});
 				}
 			}
 			for(let {pics} of batch)
 				for(let pic of pics)
-					pic.listen('downloaded', updateLastGood);
+					pic.listen('downloaded', recordDownload);
 		}
 
 	}
@@ -243,11 +242,9 @@
 
 		constructor({owner,date,pics,following,lat,lng,liked}){
 			Object.assign(this,{owner,date,pics,following,lat,lng,liked});
-			this.sanitizedImgUrl = sanitizeImgUrl(pics[0].imgUrls[0]);
+			this.sanitizedImgUrl = sanitizeImgUrl(pics[0].smallestUrl);
 		}
 
-		logFirst(){ this.pics[0].log(); }
-		logAll(){ for(const pic of this.pics) pic.log(); }
 		get dateMs(){ return storageTime.toNum(this.date); }
 
 		static fromMediaWithUser(aaa){
@@ -277,6 +274,7 @@
 	}
 
 	// The different resolution urls and tagged users for 1 Image
+	// observable: downloaded
 	class SingleImage{
 
 		static fromMedia({usertags,image_versions2,owner,date=throwExp("date")}){
@@ -307,7 +305,7 @@
 		}
 
 		taggedUsers; // string[] - left to right
-		imgUrls; // string[] - urls - biggest first
+		images; // images: array of {url,width,height}
 		largestUrl;
 		smallestUrl;
 		largestDimensionName; // "width" or "height"
@@ -320,11 +318,9 @@
 			console.debug(`${nonSquareImages.length} of ${images.length} are non-square`);
 			if(images.length * 40 <= nonSquareImages.length * 100) images = nonSquareImages; // if at least 40% are non-square, use only them.
 
-			this.imgUrls = images
-				.sort(by(({height})=>height)) // smallest to largest
-				.map(({url})=>url);
-			this.smallestUrl = this.imgUrls[0];
-			this.largestUrl = this.imgUrls[this.imgUrls.length-1];
+			this.images = images.sort(by(({height})=>height)); // smallest to largest
+			this.smallestUrl = this.images[0].url;
+			this.largestUrl = this.images[this.images.length-1].url;
 			this.largestDimensionName = images[0].width < images[0].height ? "height" : "width";
 
 			// Needed for calculating filename, but can we remove otherwise?
@@ -337,9 +333,14 @@
 			new Observable(this).define('downloaded',false);
 		}
 
+		getThumbUrl(minSize=0){
+			const largerThanRequested = this.images.filter(({width,height})=>minSize<Math.max(width,height));
+			return largerThanRequested.length ? largerThanRequested[0].url : this.largestUrl;
+		}
+
 		// Downloads the cleaned-up URL of the requested url
 		async downloadAsync(requestedUrl,onprogress){ // $$$
-			const matching = this.imgUrls.filter(x => x.includes(requestedUrl)).reverse();
+			const matching = this.images.filter(({url}) => url.includes(requestedUrl)).reverse();
 			await downloadImageAsync({url:matching[0] || requestedUrl, filename:this.filename, onprogress });
 			this.downloaded=true;
 			console.print(`downloaded: ${this.filename}`);
@@ -351,8 +352,6 @@
 			console.print(`downloaded: ${this.filename}`);
 		}
 
-		// logs the smallest image of the lot
-		log(){ unsafeWindow.console.image(this.imgUrls[this.imgUrls.length-1],50); }
 	}
 
 	class BasePicExtractor {
@@ -630,7 +629,6 @@
 	/* class User{ 
 		id; username; fullName isPrivate; isFollowing; 
 		lastVisit;  // visted profile page
-		lastGood; // photo date of downloaded or liked
 		lastUpload; 
 	} */
 
@@ -928,7 +926,7 @@
 
 			function downloadImageInCenter(){
 				const {singleImage,imgUrl} = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
-				singleImage.downloadAsync(imgUrl); // $$$
+				singleImage.downloadAsync(imgUrl);
 			}
 
 			function findEl(css){ return (document.querySelector(css)||{click:function(){console.debug(`${css} not found.`)}}); }
@@ -1004,8 +1002,6 @@
 			stale: (timeframe) => (x) => x.isFollowing && !withinLast(x.lastVisit,timeframe),
 			// FOLLOWED that are public. - and maybe LOTS of followers.
 			public: (x) => x.isFollowing && !x.isPrivate,
-			// FOLLOWED that aren't producing. (limit this to lazy-public?)
-			lazy: (x) => x.isFollowing && withinLast(x.lastVisit,2*storageTime.MONTHS) && !withinLast(x.lastGood,1*storageTime.YEARS),
 		},
 		tracked:{ // AKA - not following
 			//	- ALL tracked
@@ -1029,7 +1025,6 @@
 			this.followed={
 				stale: (notVisitedDays=60)=>showUsers( filters.followed.stale(notVisitedDays*storageTime.DAYS) ).sort(by(x=>x.lastVisit||0)),
 				public: ()=>showUsers(filters.followed.public),
-				lazy: ()=>showUsers(filters.followed.lazy).sort(by(x=>x.lastGood||0)),
 			};
 			this.tracked={
 				stale: (notVisitedDays=60)=>showUsers(filters.tracked.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)),
@@ -1078,7 +1073,7 @@
 			};
 
 			this.newImageCss = { border:"thick solid yellow", cursor:"pointer", };
-			this.newImageSize = "300px";
+			this.newImageSize = 300;
 
 		}
 
@@ -1105,9 +1100,9 @@
 			pics.forEach((singleImage,index) => {
 				++this.imageCount;
 				const newImg = document.createElement('IMG');
-				newImg.setAttribute('src',singleImage.smallestUrl);
+				newImg.setAttribute('src',singleImage.getThumbUrl(this.newImageSize));
 				Object.assign(newImg.style,this.newImageCss);
-				newImg.style[singleImage.largestDimensionName] = this.newImageSize;
+				newImg.style[singleImage.largestDimensionName] = this.newImageSize + 'px';
 				newImg.addEventListener('click',async function(event){
 					newImg.style.cursor = "wait"; // feedback that is was clicked
 					await singleImage.downloadLargestAsync();
@@ -1221,7 +1216,7 @@
 
 			// Verify urls match
 			const a = sanitizeImgUrl(imgEl.src);
-			const b = sanitizeImgUrl(picGroup.pics[0].imgUrls[0]);
+			const b = sanitizeImgUrl(picGroup.pics[0].smallestUrl);
 			if( a != b )
 				console.warn("Group urls do not match", a, b);
 
@@ -1297,7 +1292,7 @@
 					const rowsNeeded = Math.floor((thumbPics.length-1) / numPerRow) + 1;
 					thumbPics.forEach((si,index) => {
 						const newImg = document.createElement('IMG');
-						newImg.setAttribute('src',si.imgUrls[0])
+						newImg.setAttribute('src',si.smallestUrl)
 						Object.assign(newImg.style,clipStyle);
 						const colIndex = index % numPerRow, rowIndex = (index - colIndex)/numPerRow;
 						newImg.style.left = (colIndex*clipSize)+"px";
@@ -1581,7 +1576,6 @@
 			console.print(JSON.stringify(startingState,null,'\t'))
 			reportLast(startingState.lastVisit,'Visit');
 			reportLast(startingState.lastUpload,'Upload');
-			reportLast(startingState.lastGood,'Good');
 		}
 
 		initTrackedUser({pageOwner,startingState}){
