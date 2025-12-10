@@ -240,15 +240,16 @@
 		liked;
 		isNew; // set by BatchProducerGroup
 
-		constructor({owner,date,pics,following,lat,lng,liked}){
-			Object.assign(this,{owner,date,pics,following,lat,lng,liked});
+		constructor({owner,date,pics,following,lat,lng,liked,captionText}){
+			Object.assign(this,{owner,date,pics,following,lat,lng,liked,captionText});
 			this.sanitizedImgUrl = sanitizeImgUrl(pics[0].smallestUrl);
 		}
 
 		get dateMs(){ return storageTime.toNum(this.date); }
 
-		static fromMediaWithUser(aaa){
-			const {user,taken_at,device_timestamp,carousel_media,usertags,image_versions2,lat,lng,has_liked} = aaa;
+		static fromMediaWithUser(dto){
+			const {user,taken_at,device_timestamp,carousel_media,usertags,image_versions2,lat,lng,has_liked,caption} = dto;
+			const captionText = caption && caption.text;
 			// other tags:  has_liked, has_privately_liked, has_viewer_saved
 			// lat, lng
 			// owner.id, owner.username
@@ -268,7 +269,7 @@
 				.map(({usertags,image_versions2}) => SingleImage.fromMedia({usertags,image_versions2,owner,date})) 
 					|| [SingleImage.fromMedia({usertags,image_versions2,owner,date})];
 			const following = isFollowing(user && user.friendship_status);
-			return new PicGroup({owner,date,pics,following,liked:has_liked,lat,lng});
+			return new PicGroup({owner,date,pics,following,liked:has_liked,lat,lng,captionText});
 		}
 
 	}
@@ -1095,8 +1096,17 @@
 				this.createNewImageContainer();
 
 			++this.picGroupCount;
+			const {liked,pics,captionText,date} = picGroup;
 
-			const {liked,pics} = picGroup;
+			// Separator
+			const separator = document.createElement('DIV');
+			separator.innerText = date.toDateString();
+			Object.assign(separator.style,{background:"blue",height:this.newImageSize+'px',width:"30px",display:"inline-block","writing-mode": "vertical-lr",color:"white"});
+			separator.addEventListener('click',()=>{ console.log(captionText); })
+			this.newImageContainer.appendChild(separator);
+
+			// date
+
 			pics.forEach((singleImage,index) => {
 				++this.imageCount;
 				const newImg = document.createElement('IMG');
