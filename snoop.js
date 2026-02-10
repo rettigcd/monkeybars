@@ -1,5 +1,7 @@
 // === Snooping on HTTP Requests ===
 
+// Created at the time a (snooped-on) response comes back.
+// Encapsulates: (a) the request & (b) the response.
 class SnoopRequest{
 	constructor({method,url,body,responseText,headers,timestamp,func}){
 		const readonly = {url,responseText,body,method,func,headers,timestamp,duration:new Date().valueOf()-timestamp};
@@ -16,16 +18,10 @@ class SnoopRequest{
 	get data(){ return JSON.parse( this.responseText ); }
 }
 
-// Generates GUID-IDs for HTTP requests above
-function uuidv4() {
-	return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
-		(c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-	);
-}
-
-// Snooping on fetch
-function makeNewFetch(origFetch,loadHandlers,interceptor){
-	return function(url,options){
+// Replaces fetch with one that sends SnoopRequests to the loadHandlers
+function makeNewFetch(myWindow,loadHandlers,interceptor){
+	const origFetch = myWindow.fetch;
+	myWindow.fetch = function(url,options){
 		// !!! 1st parameter can be any of these: string, URL, Request
 		const fakeResponse = interceptor(url,options);
 		if(fakeResponse!==undefined) return fakeResponse;
@@ -36,7 +32,7 @@ function makeNewFetch(origFetch,loadHandlers,interceptor){
 				.then( response => response.clone().text() )
 				.then( responseText => {
 					const {method,body,headers} = options || {};
-					const record = new SnoopRequest({method,url:new URL(url,unsafeWindow.location),body,headers,responseText,timestamp,func:'fetch'})
+					const record = new SnoopRequest({method,url:new URL(url,myWindow.location),body,headers,responseText,timestamp,func:'fetch'})
 					loadHandlers.forEach(function(callback){
 						try{ callback( record ); } catch( err ){ console.error(err); }
 					});
@@ -45,10 +41,10 @@ function makeNewFetch(origFetch,loadHandlers,interceptor){
 	}
 }
 
-// Snooping on XMLHttpRequest
-function makeNewXMLHttpRequest(origConstructor,loadHandlers){
-
-	return function(){ // replacement constructor that captures results
+// Replaces XMLHttpRequest with one that sends Snoop results to the loadHandlers
+function makeNewXMLHttpRequest(myWindow,loadHandlers){
+	const origConstructor = myWindow.XMLHttpRequest;
+	myWindow.XMLHttpRequest = function(){ // replacement constructor that captures results
 		let xhr = new origConstructor(); // create the real/original one
 
 		const origOpen = xhr.open; // capture so we can replace it and then call it.
@@ -75,7 +71,7 @@ function makeNewXMLHttpRequest(origConstructor,loadHandlers){
 		xhr.addEventListener('load', ()=>{
 			const {responseType,_openArgs:[method,url,sync,user,pw],_sendBody:body,_headers:headers,_timestamp:timestamp} = xhr;
 			const responseText = (responseType=='' || responseType=='text') ? xhr.responseText : `[responseType:${responseType}]`;
-			const refUrl = new URL(unsafeWindow.location.href);
+			const refUrl = new URL(myWindow.location.href);
 			const urlObj = new URL(url,refUrl);
 			const record = new SnoopRequest({method,url:urlObj,body,responseText,headers,timestamp,func:'XMLHttpRequest'});
 			loadHandlers.forEach(function(callback){
@@ -119,12 +115,12 @@ function makeNewWebSocket(origConstructor,loadHandlers){
 	}
 }
 
-
+// Hub that manages snoopers and their handlers.
 class RequestSnooper{
-	constructor(config){
+	constructor(myWindow,config){
 		const {fetchInterceptor} = config||{};
-		unsafeWindow.XMLHttpRequest = makeNewXMLHttpRequest(unsafeWindow.XMLHttpRequest,this._loadHandlers);
-		unsafeWindow.fetch = makeNewFetch(unsafeWindow.fetch,this._loadHandlers,fetchInterceptor || (()=>undefined) );
+		makeNewXMLHttpRequest(myWindow,this._loadHandlers);
+		makeNewFetch(myWindow,this._loadHandlers,fetchInterceptor || (()=>undefined) );
 	}
 	addHandler(method,runOld=true){
 		if(runOld)

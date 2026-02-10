@@ -58,7 +58,7 @@
 			return undefined;
 		}
 
-		const snooper = new RequestSnooper({fetchInterceptor})
+		const snooper = new RequestSnooper(unsafeWindow,{fetchInterceptor})
 			.logRequests(({url})=> [
 					'https://www.instagram.com/logging/falco',
 					'https://graph.instagram.com/logging_client_events'

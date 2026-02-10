@@ -89,7 +89,7 @@ console.log({msDelay});
 			if(url.toString().includes('ingest.sentry.io') ) return new Promise(()=>{});
 			return undefined;
 		}
-		return new RequestSnooper({fetchInterceptor}).logRequests();
+		return new RequestSnooper(unsafeWindow,{fetchInterceptor}).logRequests();
 	}
 
 	function saveTextToFile(text,filename){

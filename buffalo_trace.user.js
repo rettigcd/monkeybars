@@ -65,7 +65,7 @@
 		unsafeWindow.flushLog = flushLog;
 	}
 
-	var snooper = new RequestSnooper().logRequests();
+	var snooper = new RequestSnooper(unsafeWindow).logRequests();
 	const logger = new TimeStampConsoleLogger();
 	downloadLogsOnUnload('buffalo',snooper,logger);
 
