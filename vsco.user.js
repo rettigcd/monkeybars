@@ -803,7 +803,7 @@
 			this._newImagesSpan.innerText='images:'+this._newImageUsers.length;
 		}
 		async scanReadyAsync(){
-			const numToScan = 100;
+			const numToScan = 500;
 			const toScan = this._readyToScanUsers
 				.sort(by(user=>user.data.viewDate))
 				.slice(0,numToScan); // only scan 200 oldest
