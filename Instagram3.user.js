@@ -39,7 +39,7 @@
 
 	const dom = {
 		get focusUser         (){ return document.querySelector('div.x10wlt62.xlyipyv span').innerHTML; },
-		get imageCountSpan    (){ return document.querySelectorAll('span.html-span')[1]; },
+		get imageCountSpan    (){ return document.querySelector('div.x40hh3e span.html-span'); },
 		get presentationCenter(){ return document.querySelector('div._aatk'); },
 		get thumbRows         (){ return document.querySelectorAll('div._ac7v'); },
 	}
@@ -543,7 +543,7 @@
 
 	// https://www.instagram.com/api/v1/locations/web_info/?location_id=1251125&show_nearby=false
 	 class Location2Posts extends LocationBase {
-	 	constructor(){
+	 	constructor(snooper){
 	 		super();
 			snooper.addHandler( this.snoop );
 	 	}
@@ -1102,7 +1102,10 @@
 			const separator = document.createElement('DIV');
 			separator.innerText = date.toDateString();
 			Object.assign(separator.style,{background:"blue",height:this.newImageSize+'px',width:"30px",display:"inline-block","writing-mode": "vertical-lr",color:"white"});
-			separator.addEventListener('click',()=>{ console.log(captionText); })
+			separator.addEventListener('click',()=>{ 
+				console.log(captionText);
+				GM_openInTab(`https://instagram.com/${picGroup.owner}`);
+			})
 			this.newImageContainer.appendChild(separator);
 
 			// date
@@ -1441,7 +1444,7 @@
 			const timeoutAt = new Date().valueOf() + timeoutAfter;
 			const intervalId = setInterval(function(){
 				const imageCountSpan = dom.imageCountSpan;
-				const foundSpan = imageCountSpan !== undefined;
+				const foundSpan = imageCountSpan != undefined;
 				const timedOut = timeoutAt <= new Date().valueOf();
 				if(foundSpan) resolve(imageCountSpan.innerText-0);
 				if(foundSpan || timedOut) clearInterval(intervalId);
