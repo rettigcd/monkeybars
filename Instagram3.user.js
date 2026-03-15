@@ -1052,7 +1052,8 @@
 	class SidePanel{
 		picGroupCount = 0; // # of picGroups
 		imageCount = 0; // individual images
-		constructor(batchProducer){
+		constructor({batchProducer,userRepo}){
+			this._userRepo = userRepo;
 			batchProducer.listen('lastBatch',x=>this.showNewBatches(x));
 
 			this.containerCollapsedWidth = "350px";
@@ -1096,12 +1097,16 @@
 				this.createNewImageContainer();
 
 			++this.picGroupCount;
-			const {liked,pics,captionText,date} = picGroup;
+			const {owner,liked,pics,captionText,date} = picGroup;
+			const isTracking = this._userRepo.containsKey(owner);
 
 			// Separator
 			const separator = document.createElement('DIV');
-			separator.innerText = date.toDateString();
-			Object.assign(separator.style,{background:"blue",height:this.newImageSize+'px',width:"30px",display:"inline-block","writing-mode": "vertical-lr",color:"white"});
+			separator.innerText = `${date.toDateString()} (${owner}) ${isTracking?" - TRACKING!":""}`;
+			separator.classList.add('groupHeader');
+//			const separatorCss = {background:"blue",height:this.newImageSize+'px',width:"30px",display:"inline-block","writing-mode": "vertical-lr",color:"white"};
+			const separatorCss = {background:"blue",height:this.newImageSize+'px',height:"30px",display:"block",color:"white"};
+			Object.assign(separator.style,separatorCss);
 			separator.addEventListener('click',()=>{ 
 				console.log(captionText);
 				GM_openInTab(`https://instagram.com/${picGroup.owner}`);
@@ -1391,7 +1396,7 @@
 			]);
 			new UserUpdateService({userRepo,batchProducer});
 			const gallery = new Gallery(batchProducer);
-			new SidePanel(batchProducer);
+			new SidePanel({userRepo,batchProducer});
 			const iiLookup = new ImageLookupByUrl(batchProducer);
 			iiLookup.on('missingImage',	snooper.checkLogForMissingImage);
 
@@ -1427,16 +1432,18 @@
 	}
 
 	// Grab good title before Instagram replaces it with 'Instagram' OR never resolves
-	function getGoodTitleAsync(timeoutAfter = 2000){
+	function getGoodTitleAsync(timeoutAfter = 10000){
 		return new Promise((resolve) => {
 			function logAndResolve(val){console.debug('page title:'+val); resolve(val);}
 			const timeoutAt = new Date().valueOf() + timeoutAfter;
+			const titleLog = [];
 			const intervalId = setInterval(function(){
 				const title = document.title, isGood = title !== '' && title !== 'Instagram', timedOut = timeoutAt <= new Date().valueOf();
+				titleLog.push(title);
 				if(isGood) logAndResolve(title);
-				if(timedOut) logAndResolve('[-timeout-]')
+				if(timedOut) { console.debug(titleLog); logAndResolve( document.location.pathname.split('/')[1] ); }
 				if(isGood || timedOut) clearInterval(intervalId);
-			},100)
+			},200)
 		});
 	}
 	function getImageCountAsync(timeoutAfter = 2000){
@@ -1504,7 +1511,7 @@
 			]);
 			new UserUpdateService({userRepo,batchProducer});
 			const gallery = new Gallery(batchProducer);
-			new SidePanel(batchProducer);
+			new SidePanel({batchProducer,userRepo});
 			const iiLookup = new ImageLookupByUrl(batchProducer);
 			iiLookup.on('missingImage',	snooper.checkLogForMissingImage);
 
@@ -1633,6 +1640,15 @@
 	console.print('%cInstagram2.js loaded','background-color:#DFD'); // Last line of file
 
 })();
+
+// ==== Ideas ====
+// 'X' closes a PicGroup and 'O' opens back up.
+// Show tracking-status, owner, comment, in separator
+// 'S' saves a user account for review later
+// SHow total # at top.
+// ===============
+
+
 
 // !!! For accounts that are private, need to differentiate lastVisited from lastViewed
 
