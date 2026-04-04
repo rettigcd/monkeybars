@@ -239,9 +239,11 @@
 		lat; lng;
 		liked;
 		isNew; // set by BatchProducerGroup
+		isVisible; // used by SidePanel to hide/show groups
 
 		constructor({owner,date,pics,following,lat,lng,liked,captionText}){
 			Object.assign(this,{owner,date,pics,following,lat,lng,liked,captionText});
+			new Observable(this).define('isVisible',true); // observable for hiding/showing in side panel
 			this.sanitizedImgUrl = sanitizeImgUrl(pics[0].smallestUrl);
 		}
 
@@ -916,7 +918,7 @@
 	// =============
 	// Key Presses
 	// =============
-	function trackKeyPresses({iiLookup,pageOwner}){
+	function trackKeyPresses({iiLookup,pageOwner,sidePanel}){
 
 		// Built In:
 		// L => Like / Un-Like a post
@@ -966,7 +968,9 @@
 				"P": openFocusUserProfilePage,
 				"T": showTaggedUsersUnderMouse,
 				"U": saveUsersToFile,
-			}, action = actions[key] || function(){console.debug('no action found')};
+				"O": () => sidePanel.openLast(),
+				"X": () => sidePanel.closeFirst(),
+			}, action = actions[key] || function(){console.debug(`no action found for which:${which}`)};
 			action();
 
 		});
@@ -1050,33 +1054,19 @@
 	}
 
 	class SidePanel{
-		picGroupCount = 0; // # of picGroups
-		imageCount = 0; // individual images
+		picGroups = [];
+
+		outerCss = { position: "fixed", top: "5px", left: "150px", height: "95%", background: "#66C", padding: "5px", "margin-right": "120px", width: "350px" };
+		headerCss = { "margin-bottom": "8px","font-size": "16px","font-weight": "bold","font-family": "Tahoma",color: "white",display: "flex","justify-content": "space-between","flex-direction": "row" };
+		innerCss = { "overflow-y": "auto",width: "100%",height: "100%" };
+		newImageCss = { border: "thick solid yellow", cursor: "pointer" };
+		newImageSize = 300;		
+		containerCollapsedWidth = "350px";
+		elementId = "sidePanel";
+
 		constructor({batchProducer,userRepo}){
 			this._userRepo = userRepo;
 			batchProducer.listen('lastBatch',x=>this.showNewBatches(x));
-
-			this.containerCollapsedWidth = "350px";
-			this.outerCss = {
-				position:"fixed",
-				top:"5px",left:"150px",
-				height:"95%",
-				background:"#66C",
-				padding:"5px",
-				"margin-right":"120px",
-				width:"350px"
-			};
-			this.headerCss = { "margin-bottom":"8px", "font-size":"16px", "font-weight":"bold", "font-family":"Tahoma","color":"white",
-				display:"flex", "justify-content":"space-between", "flex-direction":"row",
-			 };
-			this.innerCss = {
-				"overflow-y":"auto", // or scroll
-				"width":"100%", height:"100%",
-			};
-
-			this.newImageCss = { border:"thick solid yellow", cursor:"pointer", };
-			this.newImageSize = 300;
-
 		}
 
 		showNewBatches({lastBatch}){
@@ -1086,9 +1076,24 @@
 			this.updateHeaderText();
 		}
 
+		closeFirst(){
+			// interact with model instead of view
+			const visibleModels = this.picGroups
+				.filter(m=>m && m.isVisible);
+			if(visibleModels.length) visibleModels[0].isVisible=false;
+		}
+		openLast(){
+			// interact with model instead of view
+			const visibleModels = this.picGroups
+				.filter(m=>m && !m.isVisible)
+				.reverse();
+			if(visibleModels.length) visibleModels[0].isVisible=true;
+		}
+
 		updateHeaderText(){
-			if(this.headerTextEl) // may not be initialized yet
-				this.headerTextEl.nodeValue = `Groups:${this.picGroupCount} Images:${this.imageCount}`;
+			if(!this.headerTextEl) return; // may not be initialized yet
+			const count = this.picGroups.filter(x=>x.isVisible).length;
+			this.headerTextEl.nodeValue = `Groups: ${count}`;
 		}
 
 		addNewGroup(picGroup){
@@ -1096,47 +1101,73 @@
 			if(this.newImageContainer == undefined)
 				this.createNewImageContainer();
 
-			++this.picGroupCount;
+			this.picGroups.push(picGroup);
 			const {owner,liked,pics,captionText,date} = picGroup;
-			const isTracking = this._userRepo.containsKey(owner);
+
+			const rowDiv = document.createElement('DIV');
 
 			// Separator
+			const separator = this.buildSeparator({date,owner,captionText});
+			rowDiv.appendChild(separator);
+			// this.newImageContainer.appendChild(separator);
+
+			// Images
+			pics.forEach((singleImage,index) => {
+				const newImg = this.buildThump({singleImage});
+				rowDiv.appendChild(newImg); // this.newImageContainer.appendChild(newImg);
+			});
+			picGroup.listen('isVisible',({isVisible})=>{
+				rowDiv.style.display=isVisible ? "block" : "none";
+				this.updateHeaderText();
+			});
+
+			this.newImageContainer.appendChild(rowDiv);
+		}
+
+		buildSeparator({date,owner,captionText}){
+			const isTracking = this._userRepo.containsKey(owner);
+
 			const separator = document.createElement('DIV');
 			separator.innerText = `${date.toDateString()} (${owner}) ${isTracking?" - TRACKING!":""}`;
 			separator.classList.add('groupHeader');
 //			const separatorCss = {background:"blue",height:this.newImageSize+'px',width:"30px",display:"inline-block","writing-mode": "vertical-lr",color:"white"};
-			const separatorCss = {background:"blue",height:this.newImageSize+'px',height:"30px",display:"block",color:"white"};
+			const separatorCss = {background:"blue",height:this.newImageSize+'px',height:"30px",display:"block",color:"white",cursor:"pointer"};
 			Object.assign(separator.style,separatorCss);
 			separator.addEventListener('click',()=>{ 
-				console.log(captionText);
-				GM_openInTab(`https://instagram.com/${picGroup.owner}`);
-			})
-			this.newImageContainer.appendChild(separator);
+				// console.log(captionText);
+				if( isTracking )
+					GM_openInTab(`https://instagram.com/${owner}`);
+				else {
+					const key = 'newOwners', v = localStorage[key], newOwners = v && v.split('\r\n') || [];
+					newOwners.push(`${owner}\t${new Date().valueOf()}`);
+					localStorage[key] = newOwners.join('\r\n');
+					console.print(`Add ${owner} => ${newOwners.length}`);
+					Object.assign(separator.style,{background:"RebeccaPurple",cursor:"default"});
+				}
+			});
+			return separator;
+		}
 
-			// date
-
-			pics.forEach((singleImage,index) => {
-				++this.imageCount;
-				const newImg = document.createElement('IMG');
-				newImg.setAttribute('src',singleImage.getThumbUrl(this.newImageSize));
-				Object.assign(newImg.style,this.newImageCss);
-				newImg.style[singleImage.largestDimensionName] = this.newImageSize + 'px';
-				newImg.addEventListener('click',async function(event){
-					newImg.style.cursor = "wait"; // feedback that is was clicked
-					await singleImage.downloadLargestAsync();
-					newImg.style.cursor = "default"; // feedback that is is complete
-					newImg.style.opacity = "0.3"; // feedback that it completed
-				});
-				this.newImageContainer.appendChild(newImg);
-			})
-
-
+		buildThump({singleImage}){
+			const newImg = document.createElement('IMG');
+			newImg.setAttribute('src',singleImage.getThumbUrl(this.newImageSize));
+			Object.assign(newImg.style,this.newImageCss);
+			newImg.style[singleImage.largestDimensionName] = this.newImageSize + 'px';
+			newImg.addEventListener('click',async function(event){
+				newImg.style.cursor = "wait"; // feedback that is was clicked
+				await singleImage.downloadLargestAsync();
+				newImg.style.cursor = "default"; // feedback that is is complete
+				newImg.style.opacity = "0.3"; // feedback that it completed
+			});
+			return newImg;
 		}
 
 		createNewImageContainer(){
 			// Outer Container
+			// const outer = newEl("DIV").css(this.outerCss).attr('id',this.elementId).appendTo(document.body);
 			const outer = this.outer = document.createElement("DIV");
 			Object.assign(outer.style,this.outerCss);
+			outer.setAttribute('id',this.elementId);
 			document.body.appendChild(outer);
 			// header
 			const header = document.createElement('H2');
@@ -1396,7 +1427,7 @@
 			]);
 			new UserUpdateService({userRepo,batchProducer});
 			const gallery = new Gallery(batchProducer);
-			new SidePanel({userRepo,batchProducer});
+			const sidePanel = new SidePanel({userRepo,batchProducer});
 			const iiLookup = new ImageLookupByUrl(batchProducer);
 			iiLookup.on('missingImage',	snooper.checkLogForMissingImage);
 
@@ -1427,7 +1458,7 @@
 					locRepo.remove(location);
 			}
 
-			trackKeyPresses({iiLookup});
+			trackKeyPresses({iiLookup,sidePanel});
 		}
 	}
 
@@ -1511,7 +1542,7 @@
 			]);
 			new UserUpdateService({userRepo,batchProducer});
 			const gallery = new Gallery(batchProducer);
-			new SidePanel({batchProducer,userRepo});
+			const sidePanel = new SidePanel({batchProducer,userRepo});
 			const iiLookup = new ImageLookupByUrl(batchProducer);
 			iiLookup.on('missingImage',	snooper.checkLogForMissingImage);
 
@@ -1541,7 +1572,7 @@
 			else
 				this.initUntrackedUser({pageOwner});
 
-			trackKeyPresses({iiLookup,pageOwner});
+			trackKeyPresses({iiLookup,pageOwner,sidePanel});
 
 			this.logStartingState(startingState);
 		}
@@ -1642,12 +1673,9 @@
 })();
 
 // ==== Ideas ====
-// 'X' closes a PicGroup and 'O' opens back up.
-// Show tracking-status, owner, comment, in separator
 // 'S' saves a user account for review later
-// SHow total # at top.
+// Update Header Count when hiding/showing rows
 // ===============
-
 
 
 // !!! For accounts that are private, need to differentiate lastVisited from lastViewed
