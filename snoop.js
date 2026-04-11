@@ -21,12 +21,15 @@ class SnoopRequest{
 // Replaces fetch with one that sends SnoopRequests to the loadHandlers
 function makeNewFetch(myWindow,loadHandlers,interceptor){
 	const origFetch = myWindow.fetch;
-	myWindow.fetch = function(url,options){
+	myWindow.fetch = function(...args){
+		const [p0,options] = args;
+		const url = p0 instanceof Request ? p0.url : p0;
+
 		// !!! 1st parameter can be any of these: string, URL, Request
 		const fakeResponse = interceptor(url,options);
 		if(fakeResponse!==undefined) return fakeResponse;
 		const timestamp = new Date().valueOf();
-		const promise = origFetch(url,options);
+		const promise = origFetch(...args);
 		if(loadHandlers.length)
 			promise
 				.then( response => response.clone().text() )
