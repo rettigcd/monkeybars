@@ -1,56 +1,74 @@
+(function(){
 
-// Extend HTMLElement
-function $el(tag){ return document.createElement(tag); }
-function $q(css){ return [...document.querySelectorAll(css)]; }
-for(const [prop,fn] of Object.entries({
-	init: function(action){ action(this); return this; },
-	css: function(style){ Object.assign(this.style,style); return this; },
-	setText: function(text){ this.innerText = text; return this; },
-	attr: function(name,val){ this.setAttribute(name,val); return this; },
-	addClass: function(className){ this.classList.add(className); return this; },
-	setData: function(key,value){ this.dataset[key] = value; return this; },
-	on: function(eventName,handler){ this.addEventListener(eventName,handler); return this;},
-	appendTo: function(host){ host.appendChild(this); return this; },
-	appendMany: function(...children){ this.append(...children); return this; },
-}))
-	Object.defineProperty(HTMLElement.prototype, prop, { value:fn , writable: true, configurable: true });
-
-// Loading Image - async
-async function loadImageAsync(img,src,timeoutMs=500) {
-	return new Promise((resolve, reject) => {
-		const timerId = setTimeout(()=>reject('timeout'),timeoutMs);
-		img.onload = () => { clearTimeout(timerId); resolve(img); }
-		img.onerror = (err) => { clearTimeout(timerId); reject(err); }
-		img.src = src;
+	const extend = (proto, methods, name = proto.constructor.name) => {
+		for (const [prop, fn] of Object.entries(methods)) {
+			if (prop in proto) throw new Error(`${name} already contains ${prop}`);
+			Object.defineProperty(proto, prop, { value: fn, writable: true, configurable: true });
+		}
+	};
+	
+	extend(HTMLElement.prototype, {
+		css(style) { Object.assign(this.style, style); return this; },
+		txt(value) { this.textContent = value; return this; },
+		html(value) { this.innerHTML = value; return this; },
+		attr(name, value) { this.setAttribute(name, value); return this; },
+		addClass(name) { this.classList.add(name); return this; },
+		removeClass(name) { this.classList.remove(name); return this; },
+		toggleClass(name, force) { this.classList.toggle(name, force); return this; },
+		data(key, value) { this.dataset[key] = value; return this; },
+		on(eventName, handler, options) { this.addEventListener(eventName, handler, options); return this; },
+		off(eventName, handler, options) { this.removeEventListener(eventName, handler, options); return this; },
+		appendTo(host) { host.appendChild(this); return this; },
+		appendMany(...children) { this.append(...children); return this; },
+		do(action) { action(this); return this; },
 	});
-}
 
-// Delay
-async function delayAsync(ms){ return new Promise((resolve,reject)=>{ setTimeout(resolve,ms); }) }
+	// What uses this?
+	// extend(HTMLSelectElement.prototype, {
+	// 	addOptions(items) {
+	// 		for (const item of items)
+	// 			this.add(typeof item === "string" ? new Option(item, item) : new Option(item.text, item.value));
+	// 		return this;
+	// 	},
+	// 	addOption(text, value = text) { this.add(new Option(text, value)); return this; },
+	// 	removeOptionByValue(value) {
+	// 		for (let i = 0; i < this.options.length; i++)
+	// 			if (this.options[i].value === value) { this.remove(i); break; }
+	// 		return this;
+	// 	},
+	// });
 
-async function downloadImageAsync(source, filename) {
-	const url = (typeof source === "string") ? source
-		: (source instanceof HTMLImageElement) ? (source.currentSrc || source.src)
-		: (()=>{throw new Error(msg);})();
+	// What uses this?
+	// extend(HTMLInputElement.prototype, {
+	// 	bindValue(host, prop) {
+	// 		this.value = host[prop] ?? "";
+	// 		this.addEventListener("input", () => { host[prop] = this.value; });
+	// 		host.listen(prop, ({ newValue }) => {
+	// 			if (this.value !== newValue) this.value = newValue ?? "";
+	// 		});
+	// 		return this;
+	// 	},
 
-	filename ??= (function(url) {
-		try { return new URL(url).pathname.split("/").pop(); } catch { return null; }
-	})(url);
+	// 	bindChecked(host, prop) {
+	// 		this.checked = !!host[prop];
+	// 		this.addEventListener("change", () => { host[prop] = this.checked; });
+	// 		host.listen(prop, ({ newValue }) => {
+	// 			const next = !!newValue;
+	// 			if (this.checked !== next) this.checked = next;
+	// 		});
+	// 		return this;
+	// 	},
+	// });
 
-	// Fetch image as a blob to support cross-origin downloads
-	const response = await fetch(url);
-	if (!response.ok) throw new Error("Failed to fetch image");
-	const blob = await response.blob();
-	const objectUrl = URL.createObjectURL(blob);
+})();
 
-	// Create a temporary download link
-	const a = document.createElement("a");
-	a.href = objectUrl;
-	a.download = filename || extractFilename(url) || "image";
-	document.body.appendChild(a);
-	a.click();
+const el = (x) => document.createElement(x);
+const input = (type = "text") => el("input").attr("type", type);
+const sel = () => el("select");
+const opt = (text, value = text) => new Option(text, value);
+const addStyleSheet = (cssText) => el("style").attr("type", "text/css").txt(cssText).appendTo(document.head);
 
-	// Cleanup
-	document.body.removeChild(a);
-	URL.revokeObjectURL(objectUrl);
-}
+const $q = (css) => document.querySelector(css);
+const $qAll = (css) => [...document.querySelectorAll(css)];
+
+queueMicrotask(() => console.log("%cdom.js loaded", "background-color:#DFD"));
