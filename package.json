@@ -1,0 +1,19 @@
+{
+	"name": "tampermonkey-typescript-starter",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"build": "node build.mjs",
+		"build:watch": "node build.mjs --watch",
+		"build:dev": "node build.mjs --dev",
+		"clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('dist', { recursive: true, force: true }))\""
+	},
+	"devDependencies": {
+		"@typescript-eslint/eslint-plugin": "^8.58.2",
+		"@typescript-eslint/parser": "^8.58.2",
+		"esbuild": "^0.25.4",
+		"eslint": "^10.2.1",
+		"typescript": "^5.9.3"
+	}
+}

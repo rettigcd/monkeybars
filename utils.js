@@ -88,5 +88,3 @@ unsafeWindow.JSON.format = function(s){ return JSON.stringify(JSON.parse(s),null
 
 // const { get, set, update, createStore } = await import('https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm');
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import
-
-console.debug('%cutils.js loaded','background-color:#DFD'); // Last line of file

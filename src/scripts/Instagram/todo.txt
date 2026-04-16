@@ -1,0 +1,43 @@
+FIX Problems
+	tsconfig.json						1
+	Instagram4.user.ts					40
+
+Use import type whenever possible.
+
+Convert from makeEventHost to EventHostBase
+
+Decide how to handle globals:
+		unsafeWindow / window  ==> any script that we want to run inside or outside tampermonkey needs to be able to pick the window.
+		document
+			document.location
+			document.title
+		dom
+		storageTime
+		$, $q, $qAll
+
+Consolidate GraphQL extractors
+Consolidate Instagram Types in 1 file.
+
+UserReports
+	=> regroup to:
+		Missing DL and lastVisit
+		Missing DL (never downloaded anything) => caused by visiting something before we started tracking downloads
+		Missing lastVisit => downloaded stuff but never visited their page
+		Has Both => split into stale and not stale
+			Stale => we have exceeded the stale threshold based on downloads
+			Not Stale => recently viewed
+	
+	=> To Prune:
+		No downloads in the last 4 years 
+			&& (Have downloads || Have visited since we started tracking downloads)
+
+Remove downloads that are no-longer use.
+
+Tests:
+	storageDate can detect all the oposing date Types
+
+Convert storage dates to Seconds.
+
+Remove deprecated properties from users in localStorage.
+
+Wrap UserRepo so nothing interacts with UserRepo directly.

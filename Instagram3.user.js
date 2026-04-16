@@ -189,9 +189,7 @@
 	// out of the snooped HTTP responses
 
 	function isFollowing(fs/* friendship_status */){
-		return fs && (fs.following 
-			|| fs.outgoing_request	// !!! this is wrong, need to group these with the Tracked, not the followed.
-		);
+		return fs && (fs.following );
 	}
 
 	// Monitors Batches as they come in and updates User data

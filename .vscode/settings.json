@@ -1,0 +1,21 @@
+{
+	"editor.insertSpaces": false,
+	"editor.tabSize": 4,
+	"editor.showUnused": true,
+	"editor.codeActionsOnSave": {
+		"source.organizeImports": "explicit"
+	},
+
+	"[javascript]": {
+		"editor.insertSpaces": false,
+		"editor.tabSize": 4
+	},
+
+	"[json]": {
+		"editor.insertSpaces": false,
+		"editor.tabSize": 4
+	},
+
+	"workbench.tree.indent": 20,
+
+}
