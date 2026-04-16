@@ -9,17 +9,19 @@
 	
 	extend(HTMLElement.prototype, {
 		css(style) { Object.assign(this.style, style); return this; },
-		txt(value) { this.textContent = value; return this; },
-		html(value) { this.innerHTML = value; return this; },
-		attr(name, value) { this.setAttribute(name, value); return this; },
+		txt(value) { if(arguments.length === 0) return this.textContent; this.textContent = value; return this; },
+		html(value) { if(arguments.length === 0) return this.innerHTML; this.innerHTML = value; return this; },
+		prop(name, value) { if(arguments.length === 1) return this[name]; this[name] = value; return this; },
+		attr(name, value) { if(arguments.length === 1) return this.getAttribute(name); this.setAttribute(name, value); return this; },
+		cls(...names) { this.classList.add(...names); return this; },
 		addClass(name) { this.classList.add(name); return this; },
 		removeClass(name) { this.classList.remove(name); return this; },
 		toggleClass(name, force) { this.classList.toggle(name, force); return this; },
-		data(key, value) { this.dataset[key] = value; return this; },
+		data(key, value) { if(arguments.length === 1) return this.dataset[key]; this.dataset[key] = value; return this; },
 		on(eventName, handler, options) { this.addEventListener(eventName, handler, options); return this; },
 		off(eventName, handler, options) { this.removeEventListener(eventName, handler, options); return this; },
 		appendTo(host) { host.appendChild(this); return this; },
-		appendMany(...children) { this.append(...children); return this; },
+		withChildren(...children) { this.append(...children.filter(x => x != null)); return this; },
 		do(action) { action(this); return this; },
 	});
 
