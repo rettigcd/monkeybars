@@ -1159,15 +1159,13 @@
 
 	}
 	
-	class LastYearTracker{
-		constructor(){
-			const pageLoadDate = new Date();
-			this.thisYear = pageLoadDate.getFullYear();
-			const startNext = new Date(this.thisYear+1, 0, 0);
-			this.percentYearLeft = (storageTime.toNum(startNext)-storageTime.toNum(pageLoadDate)) / (365*storageTime.DAYS);
-		}
-		downloadsInLastYear(byYear){ return (byYear[this.thisYear]||0) + Math.round( (byYear[this.thisYear-1]||0)*this.percentYearLeft ); }
-	}
+	const calcDownloadsInLastYear = (function(now = new Date()) {
+		const thisYear = now.getFullYear();
+		const fractionOfPreviousYearToInclude = (storageTime.toNum(new Date(thisYear + 1, 0, 1)) - storageTime.toNum(now)) / (365*storageTime.DAYS);
+		return function(byYear={}) {
+			return (byYear[thisYear] || 0) + Math.round((byYear[thisYear - 1] || 0) * fractionOfPreviousYearToInclude);
+		};
+	})();
 
 	// ::UserData - read-only fascade around user info
 	class UserData {
@@ -1183,7 +1181,7 @@
 			return convert.toStatus(this._info.stars);
 		}
 
-		get downloadsInLastYear() { return UserData._lastYearTracker.downloadsInLastYear(this.byYear); }
+		get downloadsInLastYear() { return calcDownloadsInLastYear(this._info.dl); }
 		get byYear(){ return this._info.dl; }
 		trackImage(imageYear){
 			// !!! BUG - until this.byYear is written back to storage,
@@ -1215,7 +1213,6 @@
 			this._info.viewDate = storageTime.now();
 			delete this._info.failure;
 		}
-		static _lastYearTracker = new LastYearTracker();
 	}
 
 	const UserStatus = {
