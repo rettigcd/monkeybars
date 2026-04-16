@@ -3,7 +3,7 @@
 	const extend = (proto, methods, name = proto.constructor.name) => {
 		for (const [prop, fn] of Object.entries(methods)) {
 			if (prop in proto) throw new Error(`${name} already contains ${prop}`);
-			Object.defineProperty(proto, prop, { value: fn, writable: true, configurable: true });
+			Object.defineProperty(proto, prop, { value: fn, writable: true, configurable: true, enumerable: false });
 		}
 	};
 	
@@ -21,7 +21,7 @@
 		on(eventName, handler, options) { this.addEventListener(eventName, handler, options); return this; },
 		off(eventName, handler, options) { this.removeEventListener(eventName, handler, options); return this; },
 		appendTo(host) { host.appendChild(this); return this; },
-		withChildren(...children) { this.append(...children.filter(x => x != null)); return this; },
+		withChildren(...children) { this.append(...children.flat(Infinity).filter(x => x != null)); return this; },
 		do(action) { action(this); return this; },
 	});
 
