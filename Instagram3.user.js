@@ -9,6 +9,7 @@
 // @require      file://C:/[monkeyBarsFolder]/epoch_time.js
 // @require      file://C:/[monkeyBarsFolder]/utils.js
 // @require      file://C:/[monkeyBarsFolder]/snoop.js
+// @require      file://C:/[monkeyBarsFolder]/dom2.js
 // @require      file://C:/[monkeyBarsFolder]/observable.js
 // @require      file://C:/[monkeyBarsFolder]/Instagram3.user.js
 // @match        https://www.instagram.com/*
@@ -95,6 +96,16 @@
 		function pad(x){ return (x<10?'0':'')+x;}
 		return parts.map(pad).join('');
 	}
+
+	const calcDownloadsInLastYear = (function(now = new Date()) {
+		const thisYear = now.getFullYear();
+		const fractionOfPreviousYearToInclude = (storageTime.toNum(new Date(thisYear + 1, 0, 1)) - storageTime.toNum(now)) / (365*storageTime.DAYS);
+		return function(byYear={}) {
+			return (byYear[thisYear] || 0) + Math.round((byYear[thisYear - 1] || 0) * fractionOfPreviousYearToInclude);
+		};
+	})();
+	function getTotalDownloads(byYear = {}) { return Object.values(byYear).reduce((sum, count) => sum + count, 0);}
+	const countUserDownloads = x => calcDownloadsInLastYear(x.dl||{});
 
 	// Returns urls of images under the given coords
 	function getSourcesUnder({clientX,clientY}){
@@ -185,11 +196,14 @@
 
 	// Monitors Batches as they come in and updates User data
 	class UserUpdateService {
-		constructor({userRepo,batchProducer}){
+		constructor({userRepo,batchProducer,pageOwner}){
 			this.userRepo=userRepo || throwExp('UserService missing userRepo');
+			this.pageOwner = pageOwner;
+
+			this.singlePicDownloadListener = this.singlePicDownloadListener.bind(this);
 			batchProducer.listen('lastBatch',({lastBatch}) => {
 				this.onScan_UpdateFollowingLikedLastUpload(lastBatch);
-				this.onDownload_RecordDownload(lastBatch);
+				this.registerDownloadListeners(lastBatch);
 			})
 		}
 
@@ -197,36 +211,34 @@
 
 			batch.forEach(({owner,following,liked,date})=>{
 				if(following || this.userRepo.containsKey(owner)){
-					const dateMs=storageTime.toNum(date);
 					this.userRepo.update(owner,x=>{
 						x.username = owner;
 						if(following)
 							x.isFollowing = following;
-						if((x.lastUpload||0)<dateMs)
-							x.lastUpload = dateMs;
 					})
 				}
 
 			});
 		}
 
-		onDownload_RecordDownload(batch){
-			const recordDownload = ({host:singleImage,downloaded}) => {
-				const {owner,date} = singleImage;
-				if(downloaded && owner && this.userRepo.containsKey(owner)){
-					const date = storageTime.toNum(singleImage.date);
-					const year = singleImage.date.getFullYear();
-					this.userRepo.update(owner,u=>{
-						if(u.dl === undefined) u.dl = {};
-						u.dl[year] = (u.dl[year] || 0) +1;
-					});
-				}
-			}
+		registerDownloadListeners(batch){
 			for(let {pics} of batch)
 				for(let pic of pics)
-					pic.listen('downloaded', recordDownload);
+					pic.listen('downloaded', this.singlePicDownloadListener);
 		}
 
+		singlePicDownloadListener({host:{owner,date},downloaded}){
+			if(downloaded && owner ){ // && this.userRepo.containsKey(owner) - don't require this anymore, allow saving without prior tracking
+				const year = date.getFullYear();
+				this.userRepo.update(owner,u=>{
+					u.username ??= owner; // temporary until we no longer need username.
+					u.dl ??= {};
+					u.dl[year] = (u.dl[year] || 0) +1;
+					if (owner === this.pageOwner && (u.lastVisit || 0) < loadTimeMs)
+						u.lastVisit = loadTimeMs;
+				});
+			}
+		}
 	}
 
 	// 1 entire media group. May contain 1..many pics
@@ -632,7 +644,6 @@
 	/* class User{ 
 		id; username; fullName isPrivate; isFollowing; 
 		lastVisit;  // visted profile page
-		lastUpload; 
 	} */
 
 	// Load followers by scrolling through list
@@ -664,13 +675,13 @@
 		}
 		// UI stuff
 		appendTo(host){
-			const {label,nextUrl,count} = this;
-			if(!nextUrl) return;
-			const div = document.createElement('DIV');
-			div.innerText = `${label}: ${count}`;
-			Object.assign(div.style,{'text-decoration':'underline','cursor':'pointer','font-size':'12px'});
-			div.addEventListener('click', () => document.location.href = nextUrl);
-			host.appendChild(div);
+			const { label, nextUrl, count } = this;
+			if (!nextUrl) return;
+			el("div")
+				.txt(`${label}: ${count}`)
+				.css({ textDecoration: "underline", cursor: "pointer", fontSize: "12px" })
+				.on("click", () => document.location.href = nextUrl)
+				.appendTo(host);
 		}
 		static forFirstUser(label,users){
 			return new NextLink({ label, count:users.length, nextUrl:users.length?'/'+users[0].username+'/':undefined });
@@ -720,9 +731,7 @@
 				snoopRequest.handled = this.constructor["name"];
 				const {user} = snoopRequest.data;
 				const following = isFollowing(user.friendship_status);
-				if(following 			// add followed
-					|| userRepo.containsKey(user.username)	// update if in repo
-				){
+				if(following || this._userRepo.containsKey(user.username)){
 					// record Following - lastVisit
 					this._userRepo.update(user.username,u=>{
 						u.id = user.id;
@@ -886,12 +895,12 @@
 	// ===============
 	async function addCopyButton(pageOwnerName){ // fire and forget
 		const h2El = querySelectorAsync('h2');
-		const button = document.createElement('div');
-		button.textContent='📋';// ⇕
-		button.onclick = async function(){
-			await navigator.clipboard.writeText(pageOwnerName);
-		}
-		Object.assign(button.style,{margin:'3px',padding:'2px',cursor:'pointer',color:'black'});
+		const button = el("div")
+			.txt("📋")
+			.css({ margin: "3px", padding: "2px", cursor: "pointer", color: "black" })
+			.on("click", async () => {
+				await navigator.clipboard.writeText(pageOwnerName);
+			});
 		const referenceEl = (await h2El).parentNode;
 		referenceEl.parentNode.insertBefore(button,referenceEl);
 	}
@@ -928,7 +937,9 @@
 			if(repeat) return;
 
 			function downloadImageInCenter(){
-				const {singleImage,imgUrl} = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
+				const imageInfo = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
+				if(imageInfo==null) return;
+				const {singleImage,imgUrl} = imageInfo;
 				singleImage.downloadAsync(imgUrl);
 			}
 
@@ -948,7 +959,9 @@
 			}
 
 			function showTaggedUsersUnderMouse(){
-				const {singleImage:{owner:imgOwner,taggedUsers}} = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
+				const found = getImageUnderPoint(getCenterOfPresentation()||mousePos,iiLookup);
+				if(found==null) return;
+				const {singleImage:{owner:imgOwner,taggedUsers}} = found;
 				console.log(imgOwner,taggedUsers);
 			}
 
@@ -988,23 +1001,27 @@
 	// ===============
 
 	// AKA younger than
-	function getRefreshTime(x){ // only works for scored 2..5
-		if(x.score===undefined) return false;
-		const {MONTHIS,WEEKS} = storageTime;
-		const timeframe = ({
-			'2':(x)=>6*MONTHS,
-			'3':(x)=>3*MONTHS,
-			'4':(x)=>2*MONTHS,
-			'5':(x)=>1*MONTHS,
-		})[x.score](x) || 6*MONTHS;
-		return (x.lastVisit||0) + timeframe 
-			+ Math.floor((strToFloat(x.username) - .5) * 14 * DAYS); // spread out over 14 days
+	function getRefreshTime(x) {
+		const downloads = calcDownloadsInLastYear(x.dl);
+		if (downloads <= 0) return false;
+
+		const { MONTHS, DAYS } = storageTime;
+		const timeframe = downloads >= 20 ? 1 * MONTHS
+			: downloads >= 10 ? 2 * MONTHS
+			: downloads >= 5  ? 3 * MONTHS
+			: downloads >= 1  ? 6 * MONTHS 
+			: 6 * MONTHS;
+
+		return (x.lastVisit || 0) + timeframe
+			+ Math.floor((strToFloat(x.username) - 0.5) * 14 * DAYS); // spread out over 14 days
 	}
-	function withinLast(timestamp,threshold){ return loadTimeMs <= (timestamp||0) + threshold; }
+
+	function lastVisitWithinThreshold(lastVisit,threshold){ return loadTimeMs <= (lastVisit||0) + threshold; }
+	function lastVisitOlderThanThresholdOrMissing(lastVisit,threshold){ return !lastVisitWithinThreshold(lastVisit,threshold); } // AKA "stale"
 	const filters = {
 		followed:{
 			// FOLLOWED with unknown status.
-			stale: (timeframe) => (x) => x.isFollowing && !withinLast(x.lastVisit,timeframe),
+			stale: (timeframe) => (x) => x.isFollowing && lastVisitOlderThanThresholdOrMissing(x.lastVisit,timeframe),
 			// FOLLOWED that are public. - and maybe LOTS of followers.
 			public: (x) => x.isFollowing && !x.isPrivate,
 		},
@@ -1012,17 +1029,29 @@
 			//	- ALL tracked
 			all: (x) => !x.isFollowing,
 			//	- TRACKED that have not been visited in a while
-			stale: (timeframe) => (x) => !x.isFollowing && !x.isPrivate && !withinLast(x.lastVisit,timeframe),
+			stale: (timeframe) => (x) => !x.isFollowing && !x.isPrivate && lastVisitOlderThanThresholdOrMissing(x.lastVisit,timeframe),
 			//	- PRIVATE that might be public now.
 			private: (x) => !x.isFollowing && x.isPrivate,
 		},
-		//	- SCORED that have not been visited in a while (stale)
-		scored:{
-			all: (x) => x.score !== undefined,
-			stale: (x) => x.score !== undefined && getRefreshTime(x) < loadTimeMs,
-			// stale: (timeframe) => (x) => x.score!==undefined && !withinLast(x.lastVisit,timeframe),
+		//	- DOWNLOADED that have not been visited in a while (stale)
+		downloaded:{
+			all: (x) => 0 < calcDownloadsInLastYear(x.dl),
+			stale: (x) => 0 < calcDownloadsInLastYear(x.dl) && getRefreshTime(x) < loadTimeMs,
 		}
 	}
+/*
+Might want to review:
+	Last Visit		Downloads
+	T				T				=> process normal, if no downloads in last 4 years, prune
+	F				T				=> need to visit, download anything between existing downloads and now, gives it a lastVisit
+	T				F				=> may have had downloads prior to tracking downloads, need to identify if any downloads in last 2 or 4 years or else prune.
+	F				F				=> Why are we tracking?  Either download something or prune.  Maybe these are people we are following?  Or Private?
+
+	Order: Normal => Have Downloads (easy to visit) => Identify old downloads or prune => prune
+
+	Following / Private		=> might want to review to see if we want to keep following.
+	
+*/
 
 	class UserReports{
 		constructor({userRepo,iiLookup}){
@@ -1036,20 +1065,20 @@
 				all: (notVisitedDays=60)=>showUsers(filters.tracked.all).sort(by(x=>x.username)),
 				private: (notVisitedDays=60)=>showUsers(filters.tracked.private).sort(by(x=>x.username)),
 			};
-			this.scored={
-				all: ()=>showUsers(filters.scored.all).sort(by(getRefreshTime)),
-				stale: ()=>showUsers(filters.scored.stale).sort(byDesc(x=>x.score).thenBy(getRefreshTime)),
-				//stale: (notVisitedDays=7)=>showUsers(filters.scored.stale(notVisitedDays*storageTime.DAYS)).sort(by(x=>x.lastVisit||0)),
-			}
-			this.dayOfWeek=function(){
-				const counts = [0,0,0,0,0,0,0];
-				const dayNames = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+			this.downloaded = {
+				all: () => showUsers(filters.downloaded.all).sort(byDesc(countUserDownloads).thenBy(getRefreshTime)),
+				stale: () => showUsers(filters.downloaded.stale).sort(byDesc(countUserDownloads).thenBy(getRefreshTime)),
+			};
+			this.dayOfWeek = function() {
+				const counts = [0, 0, 0, 0, 0, 0, 0];
+				const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 				const imageDays = Object.values(iiLookup._dict)
-					.filter(x=>x.image != null && x.image.date!=null)
-					.map(x=>x.date.getDay());
-				for(const day of imageDays) counts[day]++;
-				return counts.map((count,idx)=> [dayNames[idx],count]);
-			}
+					.filter(x => x.singleImage != null && x.singleImage.date != null)
+					.map(x => x.singleImage.date.getDay());
+
+				for (const day of imageDays) counts[day]++;
+				return counts.map((count, idx) => [dayNames[idx], count]);
+			};			
 		}
 	}
 
@@ -1064,8 +1093,9 @@
 		containerCollapsedWidth = "350px";
 		elementId = "sidePanel";
 
-		constructor({batchProducer,userRepo}){
+		constructor({batchProducer,userRepo,pageOwner}){
 			this._userRepo = userRepo;
+			this.pageOwner = pageOwner;
 			batchProducer.listen('lastBatch',x=>this.showNewBatches(x));
 		}
 
@@ -1090,105 +1120,121 @@
 			if(visibleModels.length) visibleModels[0].isVisible=true;
 		}
 
-		updateHeaderText(){
-			if(!this.headerTextEl) return; // may not be initialized yet
-			const count = this.picGroups.filter(x=>x.isVisible).length;
-			this.headerTextEl.nodeValue = `Groups: ${count}`;
+		updateHeaderText() {
+			if (!this.headerTextEl) return;
+			const count = this.picGroups.filter(x => x.isVisible).length;
+			this.headerTextEl.txt(`Groups: ${count}`);
 		}
 
-		addNewGroup(picGroup){
+		// addNewGroup(picGroup){
 
-			if(this.newImageContainer == undefined)
+		// 	if(this.newImageContainer == undefined)
+		// 		this.createNewImageContainer();
+
+		// 	this.picGroups.push(picGroup);
+		// 	const {owner,liked,pics,captionText,date} = picGroup;
+
+		// 	const rowDiv = document.createElement('DIV');
+
+		// 	// Separator
+		// 	const separator = this.buildSeparator({date,owner,captionText});
+		// 	rowDiv.appendChild(separator);
+		// 	// this.newImageContainer.appendChild(separator);
+
+		// 	// Images
+		// 	pics.forEach((singleImage,index) => {
+		// 		const newImg = this.buildThumb({singleImage});
+		// 		rowDiv.appendChild(newImg); // this.newImageContainer.appendChild(newImg);
+		// 	});
+		// 	picGroup.listen('isVisible',({isVisible})=>{
+		// 		rowDiv.style.display=isVisible ? "block" : "none";
+		// 		this.updateHeaderText();
+		// 	});
+
+		// 	this.newImageContainer.appendChild(rowDiv);
+		// }
+
+		addNewGroup(picGroup) {
+			if (this.newImageContainer == undefined)
 				this.createNewImageContainer();
 
 			this.picGroups.push(picGroup);
-			const {owner,liked,pics,captionText,date} = picGroup;
+			const { owner, pics, captionText, date } = picGroup;
 
-			const rowDiv = document.createElement('DIV');
+			const rowDiv = el("div").withChildren(
+				this.buildSeparator({ date, owner, captionText }),
+				...pics.map(singleImage => this.buildThumb({ singleImage }))
+			);
 
-			// Separator
-			const separator = this.buildSeparator({date,owner,captionText});
-			rowDiv.appendChild(separator);
-			// this.newImageContainer.appendChild(separator);
-
-			// Images
-			pics.forEach((singleImage,index) => {
-				const newImg = this.buildThump({singleImage});
-				rowDiv.appendChild(newImg); // this.newImageContainer.appendChild(newImg);
-			});
-			picGroup.listen('isVisible',({isVisible})=>{
-				rowDiv.style.display=isVisible ? "block" : "none";
+			picGroup.listen("isVisible", ({ isVisible }) => {
+				rowDiv.style.display = isVisible ? "block" : "none";
 				this.updateHeaderText();
 			});
 
-			this.newImageContainer.appendChild(rowDiv);
+			rowDiv.appendTo(this.newImageContainer);
 		}
 
-		buildSeparator({date,owner,captionText}){
+		buildSeparator({ date, owner, captionText }) {
+			const separatorCss = { background: "blue", height: "30px", display: "block", color: "white" };
+			const buttonCss = { margin: "0 5px", cursor: "pointer", border: "2px outset", padding: "1px 4px", fontSize: "10px" };
+			const clickedButtonCss = { cursor: "default", opacity: "0.5", pointerEvents: "none", border: "2px inset", display: "inline-block" };
+
+			const user = this._userRepo.get(owner) || {};
 			const isTracking = this._userRepo.containsKey(owner);
 
-			const separator = document.createElement('DIV');
-			separator.innerText = `${date.toDateString()} (${owner}) ${isTracking?" - TRACKING!":""}`;
-			separator.classList.add('groupHeader');
-//			const separatorCss = {background:"blue",height:this.newImageSize+'px',width:"30px",display:"inline-block","writing-mode": "vertical-lr",color:"white"};
-			const separatorCss = {background:"blue",height:this.newImageSize+'px',height:"30px",display:"block",color:"white",cursor:"pointer"};
-			Object.assign(separator.style,separatorCss);
-			separator.addEventListener('click',()=>{ 
-				// console.log(captionText);
-				if( isTracking )
-					GM_openInTab(`https://instagram.com/${owner}`);
-				else {
-					const key = 'newOwners', v = localStorage[key], newOwners = v && v.split('\r\n') || [];
-					newOwners.push(`${owner}\t${new Date().valueOf()}`);
-					localStorage[key] = newOwners.join('\r\n');
-					console.print(`Add ${owner} => ${newOwners.length}`);
-					Object.assign(separator.style,{background:"RebeccaPurple",cursor:"default"});
-				}
-			});
-			return separator;
+			const downloadsInLastYear = countUserDownloads(user);
+			const totalDownloads = getTotalDownloads(user.dl);
+			const onOwnersPage = owner === this.pageOwner;
+
+			const downloadText = totalDownloads > 0
+				? ` ↓ ${downloadsInLastYear}/${totalDownloads}`
+				: "";
+
+			return el("div").cls("groupHeader").css(separatorCss).withChildren(
+				el("span").txt(`${date.toDateString()} (${owner})${downloadText}${isTracking ? " - TRACKING!" : ""}`),
+				onOwnersPage ? null : el("span").txt("OPEN").css(buttonCss).on("click", ({ currentTarget }) => {GM_openInTab(`https://instagram.com/${owner}`);currentTarget.txt("OPENED").css(clickedButtonCss);}),
+				(onOwnersPage || isTracking) ? null : el("span").txt("NEW - SAVE").css(buttonCss).on("click", ({ currentTarget }) => {this.addOwnerToTracking(owner);currentTarget.txt("SAVED").css(clickedButtonCss);})
+			);
+		}		
+
+		addOwnerToTracking(owner) {
+			const newOwners = this.getNewOwners();
+			newOwners.push(`${owner}\t${Date.now()}`);
+			this.saveNewOwners(newOwners);
+
+			console.print(`Add ${owner} => ${newOwners.length}`);
+		}
+		getNewOwners() { const value = localStorage["newOwners"]; return value ? value.split("\r\n") : []; }
+		saveNewOwners(newOwners) { localStorage["newOwners"] = newOwners.join("\r\n"); }
+
+		buildThumb({singleImage}){
+			return el("img")
+				.attr("src", singleImage.getThumbUrl(this.newImageSize))
+				.css(this.newImageCss)
+				.do(img => { img.style[singleImage.largestDimensionName] = `${this.newImageSize}px`; })
+				.on("click", async (event) => {
+					const img = event.currentTarget;
+					img.css({ cursor: "wait" });
+					await singleImage.downloadLargestAsync();
+					img.css({ cursor: "default", opacity: "0.3" });
+				});
 		}
 
-		buildThump({singleImage}){
-			const newImg = document.createElement('IMG');
-			newImg.setAttribute('src',singleImage.getThumbUrl(this.newImageSize));
-			Object.assign(newImg.style,this.newImageCss);
-			newImg.style[singleImage.largestDimensionName] = this.newImageSize + 'px';
-			newImg.addEventListener('click',async function(event){
-				newImg.style.cursor = "wait"; // feedback that is was clicked
-				await singleImage.downloadLargestAsync();
-				newImg.style.cursor = "default"; // feedback that is is complete
-				newImg.style.opacity = "0.3"; // feedback that it completed
-			});
-			return newImg;
-		}
-
-		createNewImageContainer(){
-			// Outer Container
-			// const outer = newEl("DIV").css(this.outerCss).attr('id',this.elementId).appendTo(document.body);
-			const outer = this.outer = document.createElement("DIV");
-			Object.assign(outer.style,this.outerCss);
-			outer.setAttribute('id',this.elementId);
-			document.body.appendChild(outer);
-			// header
-			const header = document.createElement('H2');
-			Object.assign(header.style,this.headerCss);
-			outer.appendChild(header);
-			this.headerTextEl = document.createTextNode("Hello World");
-			header.appendChild(this.headerTextEl);
-			// button
-			const toggle = this.toggle = document.createElement('SPAN');
-			Object.assign(toggle.style,{cursor:"pointer"});
-			header.appendChild(toggle);
-			toggle.innerText = ">>";
-			toggle.addEventListener('click',(event) => {
-				const expand = toggle.innerText == ">>";
-				toggle.innerText = expand ? "<<" : ">>";
-				this.outer.style.width = expand ? "auto" : this.containerCollapsedWidth;
-			});
-			// inner
-			const newImageContainer = this.newImageContainer = document.createElement('DIV'); 
-			Object.assign(newImageContainer.style,this.innerCss);
-			outer.appendChild(newImageContainer);
+		createNewImageContainer() {
+			this.outer = el("div").attr("id", this.elementId).css(this.outerCss).withChildren(
+				el("h2").css(this.headerCss).withChildren(
+					this.headerTextEl=el("span").txt("Hello World"), 
+					this.toggle=el("span").txt(">>").css({ cursor: "pointer" })
+						.on("click", (event) => {
+							const toggle = event.currentTarget;
+							const expand = toggle.textContent == ">>";
+							toggle.txt(expand ? "<<" : ">>");
+							this.outer.style.width = expand ? "auto" : this.containerCollapsedWidth;
+						})
+				),
+				this.newImageContainer=el("div").css(this.innerCss)
+			)
+			.appendTo(document.body);
 		}
 
 	}
@@ -1525,7 +1571,8 @@
 		constructor(){
 			const userRepo = this.userRepo = new SyncedPersistentDict('users');
 			const snooper = this.snooper = buildRequestSnooper();
-			const {pageOwner,isTracking,startingState} = this.captureStartingState(userRepo);
+			const {pageOwner,isTracking,startingState} = this.captureStartingState();
+			this.pageOwner = pageOwner;
 
 			// Misc Tracking
 			new UnfollowTracker(snooper,userRepo);
@@ -1540,9 +1587,9 @@
 				new UserPosts(snooper), // used: 2025-04-06
 				new TaggedPopupWindow(snooper), // used: 2025-04-06
 			]);
-			new UserUpdateService({userRepo,batchProducer});
+			new UserUpdateService({userRepo,batchProducer,pageOwner});
 			const gallery = new Gallery(batchProducer);
-			const sidePanel = new SidePanel({batchProducer,userRepo});
+			const sidePanel = new SidePanel({batchProducer,userRepo,pageOwner});
 			const iiLookup = new ImageLookupByUrl(batchProducer);
 			iiLookup.on('missingImage',	snooper.checkLogForMissingImage);
 
@@ -1556,8 +1603,7 @@
 				page:this,
 
 				next:() => this.oldestTrackedLink(reports).goto(),
-				nextScored: () => this.oldestScoredLink(reports).goto(),
-				mark: () => userRepo.update(pageOwner,x=>x.special=true),
+				nextDownloaded: () => this.oldestDownloadedLink(reports).goto(),
 
 				// owner/user based
 				pageOwner,
@@ -1599,26 +1645,38 @@
 		onWindowLoad(){
 			this.showNextLinks();
 			this.scheduleSetTabTitle();
+			this.addDownloadCountBadge();
 			addCopyButton(this.pageOwner);
 		}
 
-		showNextLinks(){
-			const {reports} = this;
-			// create container
-			const linkHost = document.createElement('DIV'); 
-			Object.assign(linkHost.style,{position:"fixed",top:0,right:0,background:"#ddf",padding:"5px"});
-			document.body.appendChild(linkHost)
-			// 
-			this.oldestScoredLink(reports).appendTo(linkHost);
+		addDownloadCountBadge() {
+			const user = this.userRepo.get(this.pageOwner) || {};
+			const count = countUserDownloads(user);
+			if (count <= 0) return;
+			querySelectorAsync('h2').then(h2El => {
+				const badge = el("div")
+					.txt(`↓ ${count} last year`)
+					.css({ margin: "3px", padding: "2px 6px", color: "white", background: "#446", borderRadius: "4px", fontSize: "12px", display: "inline-block" });
+				const referenceEl = h2El.parentNode;
+				referenceEl.parentNode.insertBefore(badge, referenceEl.nextSibling);
+			});
+		}
+
+		showNextLinks() {
+			const { reports } = this;
+			const linkHost = el("div")
+				.css({position: "fixed",top: 0,right: 0,background: "#ddf",padding: "5px",})
+				.appendTo(document.body);
+			this.oldestDownloadedLink(reports).appendTo(linkHost);
 			this.oldestTrackedLink(reports).appendTo(linkHost);
 		}
 
 		// Capture Starting State before anything modifies it.
-		captureStartingState(userRepo){
+		captureStartingState(){
 			const pageOwner = this.pageOwner = document.location.href.match(/instagram.com.([^\/]+)/)[1];
-			const isTracking = userRepo.containsKey(pageOwner);
+			const isTracking = this.userRepo.containsKey(pageOwner);
 			const startingState = isTracking 
-				? structuredClone(userRepo.get(pageOwner)) // because repo will modify original object
+				? structuredClone(this.userRepo.get(pageOwner)) // because repo will modify original object
 				: {}; // leave empty so we can detect not-visited
 			return {pageOwner,isTracking,startingState};
 		}
@@ -1626,7 +1684,6 @@
 		logStartingState(startingState){
 			console.print(JSON.stringify(startingState,null,'\t'))
 			reportLast(startingState.lastVisit,'Visit');
-			reportLast(startingState.lastUpload,'Upload');
 		}
 
 		initTrackedUser({pageOwner,startingState}){
@@ -1638,25 +1695,23 @@
 				userRepo.remove(pageOwner);
 				console.log('Stopped tracking:',ctx.old);
 			}
-			ctx.score = (score) => userRepo.update(pageOwner,x=>x.score=score);
 		}
 
 		initUntrackedUser({pageOwner}){
 			const {userRepo,ctx} = this;
 			ctx.stop = function(){ console.log('Tracking was previously stopped.'); }
-			ctx.score = function(score){ userRepo.update(pageOwner,u=>{
-				u.username=pageOwner;
-				u.lastVisit=loadTimeMs;
-				if(score!=null)
-					u.score=score;
-			}); }
+			// ctx.score = function(score){ userRepo.update(pageOwner,u=>{
+			// 	u.username=pageOwner;
+			// 	u.lastVisit=loadTimeMs;
+			// 	if(score!=null)
+			// 		u.score=score;
+			// }); }
 		}
 
-		// Link to periodically visit pages that have been scored
-		oldestScoredLink(reports){ return NextLink.forFirstUser("stale scored", reports.scored.stale()); }
+		oldestDownloadedLink(reports){ return NextLink.forFirstUser("stale downloaded", reports.downloaded.stale()); }
 
 		// used to find un-scored people, that aren't being periodically visited
-		oldestTrackedLink(reports){ return NextLink.forFirstUser("stale unscored", reports.followed.stale()); }
+		oldestTrackedLink(reports){ return NextLink.forFirstUser("stale followed", reports.followed.stale()); }
 
 	}
 
@@ -1685,7 +1740,6 @@
 // * When following or unfollowing someone, update Repo
 
 // == Next ==
-//	Top - Find users missing .lastUpload or .lastVisit
 //	Mid - Find People we want to follow but request-pending
 //	Mid - Find Scored that haven't visited in a while
 //	Mid - Find Tracked (but not scored) that haven't visited in a while
@@ -1699,7 +1753,7 @@
 //			=> Stop Tracking
 //			=> Score
 
-//	For Private: Yellow should be anything newer than ***lastUpload*** and lastVisit
+//	For Private: Yellow should be anything newer than lastVisit
 //	!!! Track Requested - If requested and rejected, don't request again, don't click like
 
 // !!! https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver
