@@ -87,6 +87,60 @@ function makeNewXMLHttpRequest(myWindow,loadHandlers){
 
 }
 
+// Replaces XMLHttpRequest with one that sends Snoop results to the loadHandlers
+function makeNewXMLHttpRequest2(myWindow, loadHandlers) {
+	const OrigXMLHttpRequest = myWindow.XMLHttpRequest;
+
+	myWindow.XMLHttpRequest = function () { // replacement constructor that captures results
+		const xhr = new OrigXMLHttpRequest(); // create the real/original one
+
+		const state = {
+			openArgs: null,
+			sendBody: undefined,
+			headers: undefined,
+			timestamp: undefined
+		};
+
+		xhr.addEventListener("load", () => {
+			const [method, origUrl] = state.openArgs || [];
+			if (!origUrl) return;
+
+			const url = new URL(origUrl, new URL(myWindow.location.href));
+			const {responseType} = xhr;
+			const {sendBody:body,headers,timestamp} = state;
+			const responseText = responseType === "" || responseType === "text" ? xhr.responseText : `[responseType:${responseType}]`;
+
+			const record = new SnoopRequest({method,url,body,responseText,headers,timestamp,func: "XMLHttpRequest"});
+
+			loadHandlers.forEach(function (callback) {
+				try {
+					callback(record);
+				} catch (err) {
+					console.error(err);
+				}
+			});
+		});
+
+		return new Proxy(xhr, {
+			get(target, prop, receiver) {
+				const value = Reflect.get(target, prop, receiver);
+
+				if (typeof value !== "function") return value;
+
+				// return a function that intercepts call data.
+				return function (...args) {
+					switch (prop) {
+						case "open": state.openArgs = args; state.timestamp = Date.now(); break;
+						case "send": state.sendBody = args[0]; break;
+						case "setRequestHeader": { const [key, val] = args; (state.headers ??= {})[key] = val; } break; 
+					}
+					return Reflect.apply(value, target, args);
+				};
+			}
+		});
+	};
+}
+
 // Snooping on Websocket
 function makeNewWebSocket(origConstructor,loadHandlers){
 	return function(){ // replacement constructor that captures results
@@ -96,13 +150,15 @@ function makeNewWebSocket(origConstructor,loadHandlers){
 		const handler = {
 			get(target, prop, receiver) {
 				console.log('socket-get',prop);
+
 				if (typeof target[prop] === 'function') {
 					return function(...args) {
-					  console.log(`Intercepted method call: ${prop}(${args.join(', ')})`);
-					  return target[prop].apply(this, args);
+						console.log(`Intercepted method call: ${prop}(${args.join(', ')})`);
+						return Reflect.apply(target[prop], target, args);
 					};
-				  }
-				  return Reflect.get(target, prop, receiver);
+				}
+
+				return Reflect.get(target, prop, receiver);
 			},
 			set(obj, prop, value) {
 				const knownProps = ['binaryType'];
@@ -121,6 +177,9 @@ function makeNewWebSocket(origConstructor,loadHandlers){
 // Hub that manages snoopers and their handlers.
 class RequestSnooper{
 	constructor(myWindow,config){
+		this._loadHandlers = [];
+		this._loadLog = [];
+
 		const {fetchInterceptor} = config||{};
 		makeNewXMLHttpRequest(myWindow,this._loadHandlers);
 		makeNewFetch(myWindow,this._loadHandlers,fetchInterceptor || (()=>undefined) );
@@ -143,8 +202,8 @@ class RequestSnooper{
 		for(const ex of this._loadLog) 
 			method(ex);
 	}
-	_loadHandlers =[]; // array of: function({method,url,body,responseText}) => {/* doStuff(); */}
-	_loadLog = []; // records every SnoopRequest made.
+	_loadHandlers; // array of: function({method,url,body,responseText}) => {/* doStuff(); */}
+	_loadLog; // records every SnoopRequest made.
 }
 
 queueMicrotask (console.log.bind (console, '%csnoop.js loaded','background-color:#DFD')); // Last line of file
