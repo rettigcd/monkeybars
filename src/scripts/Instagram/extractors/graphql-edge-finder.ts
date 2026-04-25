@@ -1,9 +1,9 @@
 import { EventHostBase } from "~/utils/observable";
-import { RequestSnooper, SnoopHandler, SnoopRequest } from "~/utils/snoop";
+import { RequestSnooper, type SnoopHandler, SnoopRequest } from "~/utils/snoop";
 import { PicGroup } from "./../pic-group";
 import { apiTimesTouch } from "./api-times";
 import type { BatchProducerEvents, HandledRequest } from "./base-pic-extractor";
-import { Edge, InstagramLocationResponse } from "./ig-types";
+import { type Edge, type InstagramLocationResponse } from "./ig-types";
 
 // Searches GraphQL response trees matching the [friendlyName] for [edges] property.
 // matches against:

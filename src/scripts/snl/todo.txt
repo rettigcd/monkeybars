@@ -1,0 +1,36 @@
+https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/choose - SNL
+https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27688 - dress
+https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27689 - live
+
+Find test case by googling "https://bookings-us.qudini.com/booking-widget/events" with the quotes
+https://bookings-us.qudini.com/booking-widget/events/DBY5E5JLLXG#/event/choose  - Hotwheels
+https://bookings-us.qudini.com/booking-widget/events/6CO60SDFVYO#/event/choose  - Thanksgiving Apps and sides
+https://bookings-us.qudini.com/booking-widget/events/UZJLSRJUNZC/event/choose   - cafe classic
+https://bookings-us.qudini.com/booking-widget/events/2HYM77D8NYO/event/choose   - how to design cozy holiday bed
+
+Current time and Computers offset can be found: https://www.time.gov/
+
+==== TODO ====
+
+  CTRL-SHIFT-R would not reload page.   I was over screen recorder.  WAS THAT THE PROBLEM?
+  Log shows we found shows at 
+
+5 Don't have more than 1 or 2 # of show requests running at the same time.  If 1st doesn't return, neither will 2nd.
+When making # of shows requests - log an id/counter before and after. to pair them up
+Figure out why windows wouldn't reload, was it because
+ - they are different windows and I was reloading the wrong one.
+ - the windows was waiting for the outstanding fetches (awaiting) to resolve?
+Show a BIG GD button/Indicator when we hit the timeout period so user knows the reload is broken.
+
+Submit the data directly
+
+====  options  =====
+
+Split Submitter into multiple pieces.
+
+If group size is too big, select fewer people.
+
+see if Waiter can be improved.
+
+Consider if switching to # of log items would be a better strategy than time-based.
+

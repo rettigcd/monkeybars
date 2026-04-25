@@ -1,5 +1,5 @@
-import { UserEntity } from "./repo-types";
-import { loadTimeMs, storageTime } from "./storage-time";
+import { type UserEntity } from "./repo-types";
+import { loadTime, storageTime } from "./storage-time";
 
 const now = new Date();
 const thisYear = now.getFullYear();
@@ -53,5 +53,5 @@ export function lastVisitOlderThanThresholdOrMissing(lastVisit: number | undefin
 }
 
 function lastVisitWithinThreshold(lastVisit: number | undefined, threshold: number): boolean {
-	return loadTimeMs <= (lastVisit || 0) + threshold;
+	return loadTime <= (lastVisit || 0) + threshold;
 }

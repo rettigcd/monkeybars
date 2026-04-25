@@ -1,14 +1,14 @@
-import { EpochTime } from "~/utils/epoch_time";
+import { con } from "~/utils/console";
+import { EpochTime, useJavascriptTime } from "~/utils/epoch-time";
 
-export const storageTime : EpochTime = EpochTime.JavascriptTime;
+export const storageTime : EpochTime = useJavascriptTime();
 
-export const loadTimeMs = storageTime.now();
-
+export const loadTime = storageTime.now();
 
 // Converts an age in milliseconds to a human-readable string and color.
 // Used for displaying recency information in UI or logs.
 export function timestampToAgeString(timestamp:number) : { ageText:string, ageColor:string } {
-	const ageMs = loadTimeMs - timestamp;
+	const ageMs = loadTime - timestamp;
 	const daysOld = ageMs / storageTime.DAYS;
 
 	const { divider, label, color: ageColor } =
@@ -30,6 +30,6 @@ export function reportLast(lastVisit:number|undefined, label:string) {
 		const lvd = storageTime.toDate(lastVisit).toDateString();
 		const { ageText, ageColor } = timestampToAgeString(lastVisit);
 		const ageStyle = `color:white;background-color:${ageColor};`;
-		console.print(`Last ${label}: %c${ageText}%c ago on %c${lvd}`, ageStyle, "color:black;background-color:white;", ageStyle);
+		con.print(`Last ${label}: %c${ageText}%c ago on %c${lvd}`, ageStyle, "color:black;background-color:white;", ageStyle);
 	}
 }

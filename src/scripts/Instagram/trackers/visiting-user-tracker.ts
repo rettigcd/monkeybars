@@ -1,8 +1,8 @@
 import { $, $qAsync } from "~/utils/dom3";
-import { RequestSnooper, SnoopHandler } from "~/utils/snoop";
+import { RequestSnooper, type SnoopHandler } from "~/utils/snoop";
 import type { HandledRequest } from "../extractors/base-pic-extractor";
 import type { UserRepo } from "../repo-types";
-import { loadTimeMs } from "../storage-time";
+import { loadTime } from "../storage-time";
 
 type VisitingUserTrackerConstructionArgs = {
 	snooper: RequestSnooper, 
@@ -26,7 +26,7 @@ export class VisitingUserTracker {
 
 	constructor({ snooper, userRepo } : VisitingUserTrackerConstructionArgs) {
 		this.userRepo = userRepo;
-		this.loadTimeMs = loadTimeMs;
+		this.loadTimeMs = loadTime;
 		snooper.addHandler(this.snoop);
 	}
 

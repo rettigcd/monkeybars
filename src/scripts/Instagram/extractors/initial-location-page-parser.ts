@@ -1,9 +1,9 @@
-import { EventHost, makeEventHost, OnFn, TriggerFn } from "~/utils/observable";
+import { type EventHost, makeEventHost, type OnFn, type TriggerFn } from "~/utils/observable";
 import { dom } from "../dom";
 import { PicGroup } from "../pic-group";
 import { findProp } from "../prune-hay";
-import { BatchProducerEvents } from "./base-pic-extractor";
-import { Edge } from "./ig-types";
+import { type BatchProducerEvents } from "./base-pic-extractor";
+import { type Edge } from "./ig-types";
 
 // sample response: location-initial-script
 export class InitialLocationPageParser implements EventHost<BatchProducerEvents> {

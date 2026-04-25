@@ -1,6 +1,6 @@
-import { SnoopedWindow } from "~/utils/snoop";
 import { SyncedPersistentDict } from "~/utils/storage";
 
+import { type SnlWindow } from "../snl/window";
 import { BatchProducerGroup } from "./batch-producer-group";
 import { LocationContent, LocationContentConnection } from "./extractors/graphql-edge-finder";
 import { InitialLocationPageParser } from "./extractors/initial-location-page-parser";
@@ -8,16 +8,16 @@ import { Location1Posts } from "./extractors/location-1-posts";
 import { Location2Posts } from "./extractors/location-2-posts";
 import { HotkeyManager } from "./key-presses";
 import { ImageLookupByUrl } from "./models";
-import { LocationEntity, UserEntity } from "./repo-types";
+import type { LocationEntity, UserEntity } from "./repo-types";
 import { buildRequestSnooper } from "./snoopBuilder";
-import { loadTimeMs, reportLast } from "./storage-time";
+import { loadTime, reportLast } from "./storage-time";
 import { UserUpdateService } from "./trackers/user-update-service";
 import { Gallery } from "./ui/gallery";
 import { SidePanel } from "./ui/side-panel";
 import { UserReports } from "./user-reports";
 
 type LocationPageConstructor = {
-	unsafeWindow: SnoopedWindow;
+	win: SnlWindow;
 	hotkeys: HotkeyManager;
 };
 
@@ -36,9 +36,9 @@ type LocationPageContext = {
 };
 
 export class LocationPage {
-	constructor({ unsafeWindow, hotkeys }: LocationPageConstructor) {
+	constructor({ win, hotkeys }: LocationPageConstructor) {
 		const userRepo = new SyncedPersistentDict<UserEntity>("users");
-		const snooper = buildRequestSnooper(unsafeWindow);
+		const snooper = buildRequestSnooper(win);
 		const locRepo = new SyncedPersistentDict<LocationEntity>("locations");
 
 		const { id, slug } = this.parseLocationUrl(location.href);
@@ -85,18 +85,18 @@ export class LocationPage {
 		const reports = new UserReports({ userRepo, iiLookup });
 
 		ctx.reports = reports;
-		(unsafeWindow as SnoopedWindow & {cmd:any}).cmd = ctx;
+		win.cmd = ctx;
 
 		if (isTracking) {
 			locRepo.update(locationKey, (x) => {
-				x.lastVisit = loadTimeMs;
+				x.lastVisit = loadTime;
 			});
 		} else {
 			ctx.track = () => {
 				locRepo.update(locationKey, (u) => {
 					u.slug = slug;
 					u.id = id;
-					u.lastVisit = loadTimeMs;
+					u.lastVisit = loadTime;
 				});
 			};
 		}

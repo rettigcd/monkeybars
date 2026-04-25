@@ -1,5 +1,5 @@
-import { RequestSnooper, SnoopHandler, SnoopRequest } from "~/utils/snoop";
-import { HandledRequest } from "../extractors/base-pic-extractor";
+import { RequestSnooper, type SnoopHandler, SnoopRequest } from "~/utils/snoop";
+import { type HandledRequest } from "../extractors/base-pic-extractor";
 
 // Identifies UNHANDLED Snoop Requests
 // Should always be processed LAST

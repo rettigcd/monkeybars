@@ -1,6 +1,6 @@
 import { RequestSnooper } from "~/utils/snoop";
 import { BasePicExtractor } from "./base-pic-extractor";
-import { MediaNode } from "./ig-types";
+import { type MediaNode } from "./ig-types";
 
 // From the Pop-up Details modal you get when you click on an image in either
 // 	- user's Posts page OR 

@@ -1,6 +1,6 @@
-import { EventHost, makeEventHost, OnFn, TriggerFn } from "~/utils/observable";
+import { type EventHost, makeEventHost, type OnFn, type TriggerFn } from "~/utils/observable";
 import { RequestSnooper } from "~/utils/snoop";
-import { BatchProducerEvents } from "./extractors/base-pic-extractor";
+import { type BatchProducerEvents } from "./extractors/base-pic-extractor";
 import { DetailsPopup } from "./extractors/details-popup";
 import { GraphQLExtractor } from "./extractors/graphql-extractor";
 import { SavedPosts } from "./extractors/saved-posts";

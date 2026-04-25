@@ -1,11 +1,11 @@
-import { ObservableListener } from "~/utils/observable";
-import { throwExp } from "~/utils/utils";
+import { type ObservableListener } from "~/utils/observable";
+import { throwExp } from "~/utils/throw";
 import type { BatchProducerGroup } from "../batch-producer-group";
 import { dom } from "../dom";
 import { PicGroup } from "../pic-group";
 import type { UserRepo } from "../repo-types";
 import { SingleImage } from "../single-image";
-import { loadTimeMs } from "../storage-time";
+import { loadTime } from "../storage-time";
 
 type UserUpdateServiceConstructor = {
 	userRepo: UserRepo;
@@ -22,7 +22,7 @@ export class UserUpdateService {
 	constructor({ userRepo, batchProducer }: UserUpdateServiceConstructor) {
 		this.userRepo = userRepo || throwExp("UserService missing userRepo");
 		this.pageOwner = dom.pageOwner;
-		this.loadTimeMs = loadTimeMs;
+		this.loadTimeMs = loadTime;
 
 		this.singlePicDownloadListener = this.singlePicDownloadListener.bind(this);
 

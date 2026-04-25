@@ -26,7 +26,6 @@ export type SnoopedWindow = {
 	XMLHttpRequest: typeof XMLHttpRequest;
 	location: Location;
 };
-// type SnoopedWindow = Window & typeof globalThis;
 
 export type SnoopedXMLHttpRequest = XMLHttpRequest & {
 	_openArgs?: IArguments;
@@ -106,11 +105,10 @@ export class SnoopRequest {
 			}
 		}
 
-console.print({SUE:"SUE",body});
-
 		return `unknown body of type [${typeof body}]`;
 	}
 
+	// Helper: called by JSON.stringify to pre-format values that will be serialized into a JSON string.
 	public toJSON(): {
 		timestamp: number;
 		method?: string;
@@ -118,7 +116,7 @@ console.print({SUE:"SUE",body});
 		responseText: string;
 		duration: number;
 		headers?: Record<string, string> | HeadersInit | unknown;
-		body?: BodyInit | Document | XMLHttpRequestBodyInit | null | unknown;
+		body?: string;
 	} {
 		const { url, responseText, method, timestamp, duration, headers, body } = this;
 		const result: {
@@ -128,17 +126,18 @@ console.print({SUE:"SUE",body});
 			responseText: string;
 			duration: number;
 			headers?: Record<string, string> | HeadersInit | unknown;
-			body?: BodyInit | Document | XMLHttpRequestBodyInit | null | unknown;
+			body?: string;
 		} = { timestamp, method, url: url.toString(), responseText, duration };
 
-		if (headers)
+		if (headers !== undefined)
 			result.headers = headers;
-		if (body)
+		if (body !== undefined)
 			result.body = body;
 
 		return result;
 	}
 
+	// returns JSON object
 	public get data(): unknown {
 		return JSON.parse(this.responseText);
 	}

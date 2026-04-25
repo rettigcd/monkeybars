@@ -1,6 +1,6 @@
-import { RequestSnooper, SnoopHandler, SnoopRequest } from "~/utils/snoop";
+import { RequestSnooper, type SnoopHandler, SnoopRequest } from "~/utils/snoop";
 import { BasePicExtractor } from "./base-pic-extractor";
-import { Edge, InstagramProfileResponse, MediaNode } from "./ig-types";
+import { type Edge, type InstagramProfileResponse, type MediaNode } from "./ig-types";
 
 type GraphQLRequest = SnoopRequest & {
 	handled?: string;

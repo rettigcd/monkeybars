@@ -1,8 +1,8 @@
 import type { RequestSnooper } from "~/utils/snoop";
 import type { LocationRepo } from "../repo-types";
 import { apiTimesTouch } from "./api-times";
-import { MediaNode } from "./ig-types";
-import { LocationBase, LocationSectionParent } from "./location-base";
+import { type MediaNode } from "./ig-types";
+import { LocationBase, type LocationSectionParent } from "./location-base";
 
 type Location1PostsConstructorArgs = {
 	snooper: RequestSnooper;

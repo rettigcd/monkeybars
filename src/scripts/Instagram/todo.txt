@@ -7,7 +7,6 @@ Use import type whenever possible.
 Convert from makeEventHost to EventHostBase
 
 Decide how to handle globals:
-		unsafeWindow / window  ==> any script that we want to run inside or outside tampermonkey needs to be able to pick the window.
 		document
 			document.location
 			document.title

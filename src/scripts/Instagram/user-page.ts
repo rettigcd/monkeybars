@@ -1,21 +1,21 @@
 import { $, $qAsync } from "~/utils/dom3";
-import { SnoopedWindow } from "~/utils/snoop";
 import { SyncedPersistentDict } from "~/utils/storage";
 
+import type { SnlWindow } from "../snl/window";
 import { buildBatchProducerGroup_ForUser } from "./batch-producer-group";
 import { dom } from "./dom";
 import { calcDownloadsInLastYear } from "./download-stats";
 import { HotkeyManager } from "./key-presses";
 import { ImageLookupByUrl } from "./models";
-import { UserEntity, UserRepo } from "./repo-types";
+import type { UserEntity, UserRepo } from "./repo-types";
 import { buildRequestSnooper } from "./snoopBuilder";
-import { loadTimeMs, reportLast } from "./storage-time";
+import { loadTime, reportLast } from "./storage-time";
 import { scheduleSetTabTitle } from "./tab-text";
 import { FollowingScrollerTracker } from "./trackers/following-scroller-tracker";
 import { IdentifyUnhandledRequests } from "./trackers/identify-unhandled-requests";
 import { UnfollowTracker } from "./trackers/unfollow-tracker";
 import { UserUpdateService } from "./trackers/user-update-service";
-import { InstagramUser, setPublicPrivateLabel, VisitingUserTracker } from "./trackers/visiting-user-tracker";
+import { type InstagramUser, setPublicPrivateLabel, VisitingUserTracker } from "./trackers/visiting-user-tracker";
 import { Gallery } from "./ui/gallery";
 import { NextLink } from "./ui/next-link";
 import { SidePanel } from "./ui/side-panel";
@@ -24,7 +24,7 @@ import { UserReports } from "./user-reports";
 
 // TODO: add proper types if you have them
 type ConstructorArgs = {
-	unsafeWindow: SnoopedWindow;
+	win: SnlWindow;
 	hotkeys: HotkeyManager
 };
 
@@ -34,10 +34,10 @@ export class UserPage {
 	private reports: UserReports;
 	private pageOwner: string;
 
-	public constructor({ unsafeWindow, hotkeys }: ConstructorArgs) {
+	public constructor({ win, hotkeys }: ConstructorArgs) {
 
 		const userRepo = this.userRepo = new SyncedPersistentDict("users");
-		const snooper = buildRequestSnooper( unsafeWindow );
+		const snooper = buildRequestSnooper( win );
 
 		const { pageOwner, isTracking, startingState } = this.captureStartingState();
 		this.pageOwner = pageOwner;
@@ -67,7 +67,7 @@ export class UserPage {
 		const reports = this.reports = new UserReports({ userRepo, iiLookup });
 
 		// --- global ctx ---
-		this.ctx = (unsafeWindow as any).cmd = {
+		this.ctx = win.cmd = {
 			snoopLog: snooper._loadLog,
 			userRepo,
 			iiLookup,
@@ -181,7 +181,7 @@ export class UserPage {
 	private initTrackedUser({ pageOwner, startingState }: any) {
 		const { userRepo, ctx } = this;
 
-		userRepo.update(pageOwner, (u: any) => (u.lastVisit = loadTimeMs));
+		userRepo.update(pageOwner, (u: any) => (u.lastVisit = loadTime));
 		setPublicPrivateLabel(startingState.isPrivate);
 
 		ctx.stop = () => {

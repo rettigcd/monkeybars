@@ -1,8 +1,11 @@
-import { GM, GMProgressHandler } from "~/utils/gm";
-import { ListenFn, makeObservable, ObservableHost } from "~/utils/observable";
-import { by, throwExp } from "~/utils/utils";
+import { con } from "~/utils/console";
+import { GM, type GMProgressHandler } from "~/utils/gm";
+import { type ListenFn, makeObservable, type ObservableHost } from "~/utils/observable";
+import { by } from "~/utils/sorting";
+import { throwExp } from "~/utils/throw";
 import { formatDateForFilename } from "./date-formats";
-import { ImageCandidate, TaggedImageMedia, UserTags } from "./extractors/ig-types";
+import type { ImageCandidate, TaggedImageMedia, UserTags } from "./extractors/ig-types";
+
 
 type SingleImageMediaArgs = TaggedImageMedia & {
 	owner: string;
@@ -81,13 +84,13 @@ export class SingleImage implements ObservableHost<SingleImage> {
 		const matching = this.images.filter(({url}) => url.includes(requestedUrl)).reverse();
 		await GM.downloadAsync({url:matching[0]?.url || requestedUrl, name:this.filename, onprogress });
 		this.downloaded=true;
-		console.print(`downloaded: ${this.filename}`);
+		con.print(`downloaded: ${this.filename}`);
 	}
 
 	public async downloadLargestAsync(onprogress?: GMProgressHandler){
 		await GM.downloadAsync({url:this.largestUrl, name:this.filename, onprogress });
 		this.downloaded=true;
-		console.print(`downloaded: ${this.filename}`);
+		con.print(`downloaded: ${this.filename}`);
 	}
 
 }

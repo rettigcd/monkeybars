@@ -1,4 +1,5 @@
-import { RequestSnooper, SnoopedWindow, RequestSnooperConfig  } from "~/utils/snoop";
+import { con } from "~/utils/console";
+import { RequestSnooper, type RequestSnooperConfig, type SnoopedWindow } from "~/utils/snoop";
 import { detectPath } from "./prune-hay";
 
 type SnooperLogEntry = {
@@ -12,7 +13,7 @@ type InstagramSnooper = RequestSnooper & {
 
 // Creates and configures a RequestSnooper that intercepts network requests.
 // Used to monitor Instagram traffic and help debug or locate missing image data.
-export function buildRequestSnooper(unsafeWindow: SnoopedWindow): InstagramSnooper {
+export function buildRequestSnooper(win: SnoopedWindow): InstagramSnooper {
 	let showLogMessage = true;
 
 	function fetchInterceptor(
@@ -23,8 +24,8 @@ export function buildRequestSnooper(unsafeWindow: SnoopedWindow): InstagramSnoop
 
 		if (typeof url === "string" && url.includes("edge-chat.instagram.com")) {
 			if (showLogMessage) {
-				console.print("intercepted:", url);
-				console.print("additional interceptions will not be shown.");
+				con.print("intercepted:", url);
+				con.print("additional interceptions will not be shown.");
 				showLogMessage = false;
 			}
 
@@ -35,7 +36,7 @@ export function buildRequestSnooper(unsafeWindow: SnoopedWindow): InstagramSnoop
 	}
 
 	const config: RequestSnooperConfig = { fetchInterceptor };
-	const snooper = new RequestSnooper( unsafeWindow, config )
+	const snooper = new RequestSnooper( win, config )
 		.logRequests(({ url }: { url: URL }) =>
 			[
 				"https://www.instagram.com/logging/falco",

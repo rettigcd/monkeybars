@@ -119,6 +119,8 @@ export class ElementBuilder<T extends HTMLElement> {
 	}
 }
 
+// sig1:   const div = $('div');
+// sig2:   const wrapped = $(document.createElement("input"));
 export function $<K extends keyof HTMLElementTagNameMap>(tagName: K): ElementBuilder<HTMLElementTagNameMap[K]>;
 export function $<T extends HTMLElement>(element: T): ElementBuilder<T>;
 export function $(value: keyof HTMLElementTagNameMap | HTMLElement) {

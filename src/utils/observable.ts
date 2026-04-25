@@ -21,9 +21,7 @@ export type ListenFn<T extends object> = <K extends ObservableKey<T>>(
 	callback: ObservableListener<T, K>,
 ) => () => void;
 
-export type ObservableHost<T extends object> = T & {
-	listen: ListenFn<T>;
-};
+export type ObservableHost<T extends object> = T & { listen: ListenFn<T>; };
 
 type ListenerMap<T extends object> = {
 	[K in ObservableKey<T>]?: Array<ObservableListener<T, K>>;
@@ -95,6 +93,77 @@ export function makeObservable<T extends object>(
 
 	return observableHost;
 }
+
+// Usage:
+//	class User extends ObservableBase<User> {
+//		public name = "";
+//	}
+export abstract class ObservableBase<T extends object> {
+	private readonly listeners: ListenerMap<T> = Object.create(null);
+	private readonly definedProps = new Set<ObservableKey<T>>();
+
+	public listen<K extends ObservableKey<T>>(
+		prop: K,
+		callback: ObservableListener<T, K>,
+	): () => void {
+		const { definedProps, listeners } = this;
+
+		if (!definedProps.has(prop)) {
+			this.defineObservableProperty(prop);
+			definedProps.add(prop);
+		}
+
+		const callbacks = (listeners[prop] ??= []);
+		callbacks.push(callback);
+
+		return () => {
+			const currentCallbacks = listeners[prop];
+			if (!currentCallbacks) return;
+
+			const remaining = currentCallbacks.filter(x => x !== callback);
+			if (remaining.length > 0)
+				listeners[prop] = remaining;
+			else
+				delete listeners[prop];
+		};
+	}
+
+	private defineObservableProperty<K extends ObservableKey<T>>(prop: K): void {
+		const host = this as unknown as T;
+		const listeners = this.listeners;
+
+		if (!Object.prototype.hasOwnProperty.call(host, prop))
+			throw new Error(`Cannot observe missing property: ${String(prop)}`);
+
+		let value: T[K] = host[prop];
+
+		Object.defineProperty(host, prop, {
+			configurable: true,
+			enumerable: true,
+			get() { return value; },
+			set: (newValue: T[K]) => {
+				const oldValue = value;
+				if (Object.is(oldValue, newValue)) return;
+
+				value = newValue;
+
+				const callbacks = listeners[prop];
+				if (!callbacks?.length) return;
+
+				const params: ObservableChangeParams<T, K> = {
+					prop,
+					host: host as ObservableHost<T>,
+					oldValue,
+					newValue,
+				};
+
+				for (const callback of callbacks)
+					callback(params);
+			},
+		});
+	}
+}
+
 
 // ==============================
 // ==============================

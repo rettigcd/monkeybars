@@ -1,5 +1,5 @@
-import { ListenFn, makeObservable, ObservableHost } from "~/utils/observable";
-import { MediaNode } from "./extractors/ig-types";
+import { type ListenFn, makeObservable, type ObservableHost } from "~/utils/observable";
+import type { MediaNode } from "./extractors/ig-types";
 import { sanitizeImgUrl } from "./models";
 import { SingleImage } from "./single-image";
 import { storageTime } from "./storage-time";

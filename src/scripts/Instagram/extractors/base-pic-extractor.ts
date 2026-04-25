@@ -1,8 +1,8 @@
-import { EventHost, makeEventHost, OnFn, TriggerFn } from "~/utils/observable";
-import { SnoopHandler, SnoopRequest } from "~/utils/snoop";
+import { type EventHost, makeEventHost, type OnFn, type TriggerFn } from "~/utils/observable";
+import { type SnoopHandler, SnoopRequest } from "~/utils/snoop";
 import { PicGroup } from "../pic-group";
 import { apiTimesTouch } from "./api-times";
-import { MediaNode } from "./ig-types";
+import { type MediaNode } from "./ig-types";
 
 export type HandledRequest = SnoopRequest & {
 	handled?: string; // the class that handled it

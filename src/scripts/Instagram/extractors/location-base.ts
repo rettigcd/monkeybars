@@ -1,5 +1,5 @@
 import { BasePicExtractor } from "./base-pic-extractor";
-import { MediaNode } from "./ig-types";
+import { type MediaNode } from "./ig-types";
 
 export type LocationSectionParent = {
 	status: string;

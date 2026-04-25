@@ -1,4 +1,4 @@
-import { throwExp } from "~/utils/utils";
+import { throwExp } from "~/utils/throw";
 
 function pad(x: number): string {
 	return x < 10 ? `0${x}` : String(x);

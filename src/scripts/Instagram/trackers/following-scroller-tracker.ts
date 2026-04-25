@@ -1,6 +1,6 @@
-import { EventHost, makeEventHost, OnFn, TriggerFn } from "~/utils/observable";
-import { RequestSnooper, SnoopHandler } from "~/utils/snoop";
-import { InstagramUser } from "./visiting-user-tracker";
+import { type EventHost, makeEventHost, type OnFn, type TriggerFn } from "~/utils/observable";
+import { RequestSnooper, type SnoopHandler } from "~/utils/snoop";
+import { type InstagramUser } from "./visiting-user-tracker";
 
 export type FollowingScrollerEvents = {
 	foundLeaders: [followerId: string, leaders: InstagramUser[]];

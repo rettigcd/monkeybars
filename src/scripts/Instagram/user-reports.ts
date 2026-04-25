@@ -1,8 +1,8 @@
-import { by, byDesc } from "~/utils/utils";
+import { by, byDesc } from "~/utils/sorting";
 import { calcDownloadsInLastYear, getRefreshTime, lastVisitOlderThanThresholdOrMissing } from "./download-stats";
 import { ImageLookupByUrl } from "./models";
-import { UserEntity, UserRepo } from "./repo-types";
-import { loadTimeMs, storageTime } from "./storage-time";
+import type { UserEntity, UserRepo } from "./repo-types";
+import { loadTime, storageTime } from "./storage-time";
 
 type UserFilter = (x: UserEntity) => boolean;
 type TimedUserFilter = (timeframe: number) => UserFilter;
@@ -19,7 +19,7 @@ export const filters = {
 	},
 	downloaded: {
 		all: (x: UserEntity) => 0 < calcDownloadsInLastYear(x),
-		stale: (x: UserEntity) => 0 < calcDownloadsInLastYear(x) && getRefreshTime(x) < loadTimeMs,
+		stale: (x: UserEntity) => 0 < calcDownloadsInLastYear(x) && getRefreshTime(x) < loadTime,
 	},
 } satisfies {
 	followed: {

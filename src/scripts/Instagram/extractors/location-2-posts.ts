@@ -1,7 +1,7 @@
 import { RequestSnooper } from "~/utils/snoop";
 import { apiTimesTouch } from "./api-times";
-import { MediaNode } from "./ig-types";
-import { LocationBase, LocationSectionParent } from "./location-base";
+import { type MediaNode } from "./ig-types";
+import { LocationBase, type LocationSectionParent } from "./location-base";
 
 
 // https://www.instagram.com/api/v1/locations/web_info/?location_id=1251125&show_nearby=false

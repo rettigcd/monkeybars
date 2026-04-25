@@ -7,10 +7,17 @@ import { SingleImage } from "./single-image";
 export type MousePoint = { clientX: number; clientY: number };
 type SourceUnderPoint = { el: HTMLElement; src: string };
 
+export type MouseMoveSource = {
+	addEventListener(
+		type: "mousemove",
+		listener: (e: MouseEvent) => void
+	): void;
+};
+
 class PointerTracker {
 	private mousePos: MousePoint = { clientX: 0, clientY: 0 };
 
-	constructor(win: Window){
+	constructor(win: MouseMoveSource){
 		win.addEventListener("mousemove", this.onMouseMove);
 	}
 
@@ -27,7 +34,7 @@ export class ScreenImageActions {
 	private missingStandIn = "";
 	private readonly pointerTracker: PointerTracker;
 
-	public constructor(win: Window) {
+	public constructor(win: MouseMoveSource) {
 		this.pointerTracker = new PointerTracker(win);
 	}
 

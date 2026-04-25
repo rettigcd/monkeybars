@@ -19,6 +19,7 @@
 // (b) Allow User Scripts
 // (c) Allow access to file URLs
 
+import { con, silenceConsole } from "~/utils/console";
 import { GM } from "~/utils/gm";
 import { formatDateForFilename } from "./date-formats";
 import { dom } from "./dom";
@@ -26,12 +27,11 @@ import { HotkeyManager } from "./key-presses";
 import { LocationPage } from "./location-page";
 import { ScreenImageActions } from "./screen-image-actions";
 import { UserPage } from "./user-page";
+import { type InstagramWindow } from "./window";
 
-declare const unsafeWindow: Window & typeof globalThis & {
-	cmd?: unknown;
-	console: Console & { print?: (...args: unknown[]) => void; logArgs?: unknown[] };
-};
+declare const unsafeWindow: InstagramWindow;
 
+silenceConsole(unsafeWindow);
 
 function openFocusUserProfilePage() {
 	const focusUser = dom.focusUser;
@@ -76,11 +76,11 @@ export function initInstagram4(): void {
 	hotkeys.start();
 
 	if (window.location.pathname.startsWith("/explore/locations"))
-		new LocationPage({unsafeWindow,hotkeys});
+		new LocationPage({win:unsafeWindow,hotkeys});
 	else if (window.location.pathname != "/")
-		new UserPage({ unsafeWindow, hotkeys });
+		new UserPage({ win:unsafeWindow, hotkeys });
 
-	console.print("%cInstagram4.js loaded", "background-color:#DFD");
+	con.print("%cInstagram4.js loaded", "background-color:#DFD");
 }
 
 initInstagram4();

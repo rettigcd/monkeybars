@@ -4,7 +4,7 @@ import { dom } from "../dom";
 import { calcDownloadsInLastYear, getTotalDownloads } from "../download-stats";
 import { HotkeyManager } from "../key-presses";
 import { PicGroup } from "../pic-group";
-import { UserEntity, UserRepo } from "../repo-types";
+import type { UserEntity, UserRepo } from "../repo-types";
 import { SingleImage } from "../single-image";
 
 type SidePanelConstructorArgs = {
