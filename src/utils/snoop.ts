@@ -138,7 +138,7 @@ export class SnoopRequest {
 	}
 
 	// returns JSON object
-	public get data(): unknown {
+	public get json(): unknown {
 		return JSON.parse(this.responseText);
 	}
 }

@@ -2,10 +2,10 @@ import { SyncedPersistentDict } from "~/utils/storage";
 
 import { type SnlWindow } from "../snl/window";
 import { BatchProducerGroup } from "./batch-producer-group";
-import { LocationContent, LocationContentConnection } from "./extractors/graphql-edge-finder";
 import { InitialLocationPageParser } from "./extractors/initial-location-page-parser";
 import { Location1Posts } from "./extractors/location-1-posts";
 import { Location2Posts } from "./extractors/location-2-posts";
+import { LocationContent } from "./extractors/location-content";
 import { HotkeyManager } from "./key-presses";
 import { ImageLookupByUrl } from "./models";
 import type { LocationEntity, UserEntity } from "./repo-types";
@@ -57,7 +57,6 @@ export class LocationPage {
 			new Location1Posts({ snooper, startingState, locRepo }),
 			new Location2Posts(snooper),
 			new LocationContent(snooper),
-			new LocationContentConnection(snooper),
 			new InitialLocationPageParser(),
 		]);
 

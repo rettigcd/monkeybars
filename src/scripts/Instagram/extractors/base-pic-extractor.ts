@@ -37,23 +37,24 @@ export abstract class BasePicExtractor implements EventHost<BatchProducerEvents>
 
 		const { url, body }  = x;
 		if (this.matches(url, body)) {
-			apiTimesTouch(this.constructor.name);
+			const handledLabel = this.getHandledLabel(x);
+			apiTimesTouch(handledLabel);
 			const handledRequest = x as HandledRequest;
 			this.processResponse(handledRequest);
-			handledRequest.handled = this.constructor["name"];
+			handledRequest.handled = handledLabel;
 		}
 	};
 
+	getHandledLabel(x:SnoopRequest) { void x; return this.constructor.name; }
+
 	processResponse(x:HandledRequest): void {
-		const { responseText } = x;
 		try {
-			const json = JSON.parse(responseText);
-			const batch: PicGroup[] = this.findMediaArray(json).map(PicGroup.fromMediaWithUser);
+			const batch: PicGroup[] = this.findMediaArray(x.json).map(PicGroup.fromMediaWithUser);
 			this.setBatch( x.batch = batch );
 		}
 		catch (err) {
 			if (this.handleError) {
-				this.handleError(err, responseText);
+				this.handleError(err, x.responseText);
 				return;
 			}
 			console.error("Error parsing responseText", err);

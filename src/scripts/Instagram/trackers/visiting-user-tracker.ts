@@ -39,7 +39,7 @@ export class VisitingUserTracker {
 		) {
 			const handledRequest = snoopRequest as HandledRequest;
 			handledRequest.handled = VisitingUserTracker.name;
-			const user = (snoopRequest.data as any).user as InstagramUser;
+			const user = (snoopRequest.json as any).user as InstagramUser;
 			const following = user.friendship_status == "followiwng!!!"; // !!! WRONG
 
 			if (following || this.userRepo.containsKey(user.username)) {
