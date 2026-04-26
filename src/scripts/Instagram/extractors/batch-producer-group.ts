@@ -1,11 +1,11 @@
-import { type EventHost, makeEventHost, type OnFn, type TriggerFn } from "~/utils/observable";
+import { makeEventHost, type EventHost, type OnFn, type TriggerFn } from "~/utils/observable";
 import { RequestSnooper } from "~/utils/snoop";
-import { type BatchProducerEvents } from "./extractors/base-pic-extractor";
-import { DetailsPopup } from "./extractors/details-popup";
-import { GraphQLExtractor } from "./extractors/graphql-extractor";
-import { SavedPosts } from "./extractors/saved-posts";
-import { UserPosts } from "./extractors/user-posts";
+import { type BatchProducerEvents } from "./base-pic-extractor";
+import { DetailsPopup } from "./misc/details-popup";
 import { PicGroup } from "./pic-group";
+import { Profile_Posts, Profile_Tagged } from "./user/profile-extractors";
+import { SavedPosts } from "./user/saved-posts";
+import { UserPosts } from "./user/user-posts";
 
 // Generates batches of PicGroups from multiple sources, and marks them as new or not based on the last visit timestamp. 
 export class BatchProducerGroup 
@@ -37,7 +37,8 @@ export class BatchProducerGroup
 
 export function buildBatchProducerGroup_ForUser(snooper:RequestSnooper, lastVisit:number|undefined) {
 	return new BatchProducerGroup(lastVisit, [
-		new GraphQLExtractor(snooper),
+		new Profile_Posts(snooper),
+		new Profile_Tagged(snooper),
 		new SavedPosts(snooper),
 		new UserPosts(snooper),
 		new DetailsPopup(snooper),

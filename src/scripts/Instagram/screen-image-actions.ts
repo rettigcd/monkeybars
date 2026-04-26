@@ -1,8 +1,8 @@
 import { $ } from "~/utils/dom3";
 import { GM } from "~/utils/gm";
 import { formatDateForFilename } from "./date-formats";
-import { dom } from "./dom";
-import { SingleImage } from "./single-image";
+import { SingleImage } from "./models/single-image";
+import { dom } from "./services/dom";
 
 export type MousePoint = { clientX: number; clientY: number };
 type SourceUnderPoint = { el: HTMLElement; src: string };

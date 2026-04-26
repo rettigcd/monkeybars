@@ -1,11 +1,11 @@
 import { $ } from "~/utils/dom3";
 import { GM } from "~/utils/gm";
-import { dom } from "../dom";
-import { calcDownloadsInLastYear, getTotalDownloads } from "../download-stats";
-import { HotkeyManager } from "../key-presses";
 import { PicGroup } from "../pic-group";
-import type { UserEntity, UserRepo } from "../repo-types";
+import { dom } from "../services/dom";
+import { calcDownloadsInLastYear, getTotalDownloads } from "../services/download-stats";
+import { HotkeyManager } from "../services/key-presses";
 import { SingleImage } from "../single-image";
+import type { UserEntity, UserRepo } from "../types/repo-types";
 
 type SidePanelConstructorArgs = {
 	batchProducer: { on(eventName: "batchReceived", handler: (batch: PicGroup[]) => void): void; };

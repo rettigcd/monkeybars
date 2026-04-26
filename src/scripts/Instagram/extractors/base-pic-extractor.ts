@@ -1,6 +1,6 @@
 import { type EventHost, makeEventHost, type OnFn, type TriggerFn } from "~/utils/observable";
 import { type SnoopHandler, SnoopRequest } from "~/utils/snoop";
-import { PicGroup } from "../pic-group";
+import { PicGroup } from "../models/pic-group";
 import { apiTimesTouch } from "./api-times";
 import { type MediaNode } from "./ig-types";
 

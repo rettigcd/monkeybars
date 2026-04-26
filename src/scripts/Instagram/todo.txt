@@ -1,10 +1,15 @@
-FIX Problems
-	tsconfig.json						1
-	Instagram4.user.ts					40
-
-Use import type whenever possible.
-
 Convert from makeEventHost to EventHostBase
+
+Split saved images into:
+	Missing both visit and downloads
+	Missing visit
+	Missing downloads
+	Have both - stale
+	Have both - fresh
+
+Make entire file use regular Javascript timestamps (ms) - scope storageTime to just inside the userRepo object.
+
+Remove extra fields saved on localStorage.user
 
 Decide how to handle globals:
 		document
@@ -13,9 +18,6 @@ Decide how to handle globals:
 		dom
 		storageTime
 		$, $q, $qAll
-
-Consolidate GraphQL extractors
-Consolidate Instagram Types in 1 file.
 
 UserReports
 	=> regroup to:
@@ -29,13 +31,6 @@ UserReports
 	=> To Prune:
 		No downloads in the last 4 years 
 			&& (Have downloads || Have visited since we started tracking downloads)
-
-Remove downloads that are no-longer use.
-
-Tests:
-	storageDate can detect all the oposing date Types
-
-Convert storage dates to Seconds.
 
 Remove deprecated properties from users in localStorage.
 

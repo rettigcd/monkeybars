@@ -1,6 +1,6 @@
 import { con } from "~/utils/console";
 import { RequestSnooper, type RequestSnooperConfig, type SnoopedWindow } from "~/utils/snoop";
-import { detectPath } from "./prune-hay";
+import { detectPath } from "../prune-hay";
 
 type SnooperLogEntry = {
 	responseText: string;

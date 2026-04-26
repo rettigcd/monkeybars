@@ -1,7 +1,7 @@
 import { type EventHost, EventHostBase } from "~/utils/observable";
-import type { BatchProducerEvents } from "./extractors/base-pic-extractor";
+import type { BatchProducerEvents } from "../extractors/base-pic-extractor";
+import type { UserEntity } from "../types/repo-types";
 import { PicGroup } from "./pic-group";
-import type { UserEntity } from "./repo-types";
 import { SingleImage } from "./single-image";
 
 type ImageLookupEntry = {

@@ -1,8 +1,8 @@
 import { by, byDesc } from "~/utils/sorting";
-import { calcDownloadsInLastYear, getRefreshTime, lastVisitOlderThanThresholdOrMissing } from "./download-stats";
-import { ImageLookupByUrl } from "./models";
-import type { UserEntity, UserRepo } from "./repo-types";
-import { loadTime, storageTime } from "./storage-time";
+import { calcDownloadsInLastYear, getRefreshTime, lastVisitOlderThanThresholdOrMissing } from "./services/download-stats";
+import { ImageLookupByUrl } from "./services/image-lookup-by-url";
+import { loadTime, storageTime } from "./services/storage-time";
+import type { UserEntity, UserRepo } from "./types/repo-types";
 
 type UserFilter = (x: UserEntity) => boolean;
 type TimedUserFilter = (timeframe: number) => UserFilter;

@@ -1,26 +1,26 @@
 import { $, $qAsync } from "~/utils/dom3";
 import { SyncedPersistentDict } from "~/utils/storage";
 
-import type { SnlWindow } from "../snl/window";
-import { buildBatchProducerGroup_ForUser } from "./batch-producer-group";
-import { dom } from "./dom";
-import { calcDownloadsInLastYear } from "./download-stats";
-import { HotkeyManager } from "./key-presses";
-import { ImageLookupByUrl } from "./models";
-import type { UserEntity, UserRepo } from "./repo-types";
-import { buildRequestSnooper } from "./snoopBuilder";
-import { loadTime, reportLast } from "./storage-time";
-import { scheduleSetTabTitle } from "./tab-text";
-import { FollowingScrollerTracker } from "./trackers/following-scroller-tracker";
-import { IdentifyUnhandledRequests } from "./trackers/identify-unhandled-requests";
-import { UnfollowTracker } from "./trackers/unfollow-tracker";
-import { UserUpdateService } from "./trackers/user-update-service";
-import { type InstagramUser, setPublicPrivateLabel, VisitingUserTracker } from "./trackers/visiting-user-tracker";
-import { Gallery } from "./ui/gallery";
-import { NextLink } from "./ui/next-link";
-import { SidePanel } from "./ui/side-panel";
-import { addCopyButton } from "./ui/ui";
-import { UserReports } from "./user-reports";
+import type { SnlWindow } from "../../snl/window";
+import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
+import { dom } from "../services/dom";
+import { calcDownloadsInLastYear } from "../services/download-stats";
+import { ImageLookupByUrl } from "../services/image-lookup-by-url";
+import { HotkeyManager } from "../services/key-presses";
+import { buildRequestSnooper } from "../services/snoopBuilder";
+import { loadTime, reportLast } from "../services/storage-time";
+import { scheduleSetTabTitle } from "../tab-text";
+import { FollowingScrollerTracker } from "../trackers/following-scroller-tracker";
+import { IdentifyUnhandledRequests } from "../trackers/identify-unhandled-requests";
+import { UnfollowTracker } from "../trackers/unfollow-tracker";
+import { UserUpdateService } from "../trackers/user-update-service";
+import { type InstagramUser, setPublicPrivateLabel, VisitingUserTracker } from "../trackers/visiting-user-tracker";
+import type { UserEntity, UserRepo } from "../types/repo-types";
+import { Gallery } from "../ui/gallery";
+import { NextLink } from "../ui/next-link";
+import { SidePanel } from "../ui/side-panel";
+import { addCopyButton } from "../ui/ui";
+import { UserReports } from "../user-reports";
 
 // TODO: add proper types if you have them
 type ConstructorArgs = {

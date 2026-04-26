@@ -1,104 +1,45 @@
-import { RequestSnooper, type SnoopHandler, SnoopRequest } from "~/utils/snoop";
+import { RequestSnooper, SnoopRequest } from "~/utils/snoop";
 import { BasePicExtractor } from "./base-pic-extractor";
-import { type Edge, type InstagramProfileResponse, type MediaNode } from "./ig-types";
+import { type Edge, type MediaNode } from "./ig-types";
 
-type GraphQLRequest = SnoopRequest & {
-	handled?: string;
-	bodyParams?: URLSearchParams;
-	friendlyName?: FriendlyName;
-};
-
-type ProfileRootProp = keyof InstagramProfileResponse["data"];
-
-type FriendlyName =
-	| "PolarisProfilePostsQuery"
-	| "PolarisProfilePostsTabContentQuery_connection"
-	| "PolarisProfileTaggedTabContentQuery"
-	| "PolarisProfileTaggedTabContentQuery_connection";
-
-type FriendlyNameConfig = {
-	simple: string;
-	mainPropName: ProfileRootProp;
-};
-
-const GQL1 = "xdt_api__v1__feed__user_timeline_graphql_connection";
-const GQL2 = "xdt_api__v1__usertags__user_id__feed_connection";
-
-const friendlyNameConfigs: Record<FriendlyName, FriendlyNameConfig> = {
-
-	// These are from a Users Posts/Main/Default/Timeline page
-	PolarisProfilePostsQuery: { simple: "Post-0", mainPropName: GQL1, }, // The initial post
-	PolarisProfilePostsTabContentQuery_connection: { simple: "Post-n", mainPropName: GQL1, }, // subsequent posts
-
-	PolarisProfileTaggedTabContentQuery: { simple: "Tag-0", mainPropName: GQL2, },
-	PolarisProfileTaggedTabContentQuery_connection: { simple: "Tag-N", mainPropName: GQL2, },
-};
-
-export class GraphQLExtractor extends BasePicExtractor {
-
-	private mainPropName!: ProfileRootProp;
+export abstract class GraphQLContentExtractor<TData> extends BasePicExtractor {
+	protected abstract readonly friendlyNames: readonly string[];
+	protected abstract readonly rootProp: keyof TData;
 
 	constructor(snooper: RequestSnooper) {
 		super();
 		snooper.addHandler(this.snoop);
 	}
 
-	snoop: SnoopHandler = (x) => {
-		const { url, body } = x;
+	matches(url: URL, body?: string): boolean {
+		if (url.pathname !== "/api/graphql" && url.pathname !== "/graphql/query") return false;
 
-		if (!this.matches(url)) {
-			return;
-		}
-
-		const bodyParams = new URLSearchParams(body);
-		const friendlyName = bodyParams.get("fb_api_req_friendly_name");
-
-		if (!friendlyName || !this.isFriendlyName(friendlyName)) {
-			return;
-		}
-
-		const config = friendlyNameConfigs[friendlyName];
-
-		const request = x as GraphQLRequest;
-		request.bodyParams = bodyParams;
-		request.friendlyName = friendlyName;
-		request.handled = `${this.constructor.name}-${config.simple}`;
-
-		this.mainPropName = config.mainPropName;
-		this.processResponse(x);
-	};
-
-	matches({ pathname }: URL): boolean {
-		return pathname === "/api/graphql"
-			|| pathname === "/graphql/query";
+		const friendlyName = this.getFriendlyName(body);
+		return !!friendlyName && this.friendlyNames.includes(friendlyName);
 	}
 
-	findMediaArray( json: unknown ): MediaNode[] {
-		try {
-			const response = json as {
-				data?: InstagramProfileResponse["data"];
-				errors?: unknown[];
-			};
-
-			if (Array.isArray(response.errors) && response.errors.length > 0) {
-				console.log("Query error", json);
-				return [];
-			}
-
-			const edges = response.data?.[this.mainPropName]?.edges;
-			if (!Array.isArray(edges)) {
-				return [];
-			}
-
-			return edges.map((edge: Edge) => edge.node);
-		}
-		catch {
-			console.log("Unable to find media array:", this.mainPropName, json);
+	findMediaArray(json: { data?: TData; errors?: unknown[] }): MediaNode[] {
+		if (Array.isArray(json.errors) && json.errors.length > 0) {
+			console.log("Query error", json);
 			return [];
 		}
+
+		const root = json.data?.[this.rootProp] as { edges?: Edge[] } | undefined;
+		const edges = root?.edges;
+
+		return Array.isArray(edges)
+			? edges.map((edge) => edge.node)
+			: [];
 	}
 
-	private isFriendlyName(value: string): value is FriendlyName {
-		return value in friendlyNameConfigs;
+	getHandledLabel(x: SnoopRequest): string {
+		const friendlyName = this.getFriendlyName(x.body);
+		return `${this.constructor.name}( ${friendlyName} )`;
+	}
+
+	private getFriendlyName(body?: string): string | null {
+		return body
+			? new URLSearchParams(body).get("fb_api_req_friendly_name")
+			: null;
 	}
 }

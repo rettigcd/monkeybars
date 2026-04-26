@@ -1,5 +1,5 @@
-// From: new GraphQLEdgeFinder(snooper, "PolarisLocationPageTabContentQuery"),
 
+// On Users profile / tagged page
 export interface InstagramProfileResponse {
 	data: {
 
@@ -11,15 +11,24 @@ export interface InstagramProfileResponse {
 		// PolarisProfileTaggedTabContentQuery_Connection
 		xdt_api__v1__usertags__user_id__feed_connection?: { edges: Edge[]; };
 	};
+	errors?: unknown[]
 }
 
+// On the location page
 export interface InstagramLocationResponse {
 	data: {
 		xdt_location_get_web_info_tab: {
 			edges: Edge[];
 		};
 	};
+	errors?: unknown[]
 }
+
+// When you click on an image and it pops up.
+export type DetailsPopupResponse = {
+	items:MediaNode[]
+}
+
 
 export interface Edge {
 	node: MediaNode;

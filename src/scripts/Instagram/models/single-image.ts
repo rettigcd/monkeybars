@@ -3,8 +3,8 @@ import { GM, type GMProgressHandler } from "~/utils/gm";
 import { type ListenFn, makeObservable, type ObservableHost } from "~/utils/observable";
 import { by } from "~/utils/sorting";
 import { throwExp } from "~/utils/throw";
-import { formatDateForFilename } from "./date-formats";
-import type { ImageCandidate, TaggedImageMedia, UserTags } from "./extractors/ig-types";
+import { formatDateForFilename } from "../date-formats";
+import type { ImageCandidate, TaggedImageMedia, UserTags } from "../extractors/ig-types";
 
 
 type SingleImageMediaArgs = TaggedImageMedia & {

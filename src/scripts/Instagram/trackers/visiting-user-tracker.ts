@@ -1,8 +1,8 @@
 import { $, $qAsync } from "~/utils/dom3";
 import { RequestSnooper, type SnoopHandler } from "~/utils/snoop";
 import type { HandledRequest } from "../extractors/base-pic-extractor";
-import type { UserRepo } from "../repo-types";
-import { loadTime } from "../storage-time";
+import { loadTime } from "../services/storage-time";
+import type { UserRepo } from "../types/repo-types";
 
 type VisitingUserTrackerConstructionArgs = {
 	snooper: RequestSnooper, 

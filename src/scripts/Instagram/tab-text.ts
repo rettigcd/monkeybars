@@ -1,4 +1,4 @@
-import { dom } from "./dom";
+import { dom } from "./services/dom";
 
 export function scheduleSetTabTitle(): void {
 	Promise.all([

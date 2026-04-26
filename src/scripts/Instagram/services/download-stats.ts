@@ -1,4 +1,4 @@
-import { type UserEntity } from "./repo-types";
+import { type UserEntity } from "../types/repo-types";
 import { loadTime, storageTime } from "./storage-time";
 
 const now = new Date();

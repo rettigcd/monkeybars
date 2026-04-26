@@ -1,20 +1,19 @@
 import { SyncedPersistentDict } from "~/utils/storage";
 
-import { type SnlWindow } from "../snl/window";
-import { BatchProducerGroup } from "./batch-producer-group";
-import { InitialLocationPageParser } from "./extractors/initial-location-page-parser";
-import { Location1Posts } from "./extractors/location-1-posts";
-import { Location2Posts } from "./extractors/location-2-posts";
-import { LocationContent } from "./extractors/location-content";
-import { HotkeyManager } from "./key-presses";
-import { ImageLookupByUrl } from "./models";
-import type { LocationEntity, UserEntity } from "./repo-types";
-import { buildRequestSnooper } from "./snoopBuilder";
-import { loadTime, reportLast } from "./storage-time";
-import { UserUpdateService } from "./trackers/user-update-service";
-import { Gallery } from "./ui/gallery";
-import { SidePanel } from "./ui/side-panel";
-import { UserReports } from "./user-reports";
+import { type SnlWindow } from "../../snl/window";
+import { BatchProducerGroup } from "../extractors/batch-producer-group";
+import { InitialLocationPageParser } from "../extractors/location/initial-location-page-parser";
+import { LocationContent } from "../extractors/location/location-content";
+import { DetailsPopup } from "../extractors/misc/details-popup";
+import { ImageLookupByUrl } from "../services/image-lookup-by-url";
+import { HotkeyManager } from "../services/key-presses";
+import { buildRequestSnooper } from "../services/snoopBuilder";
+import { loadTime, reportLast } from "../services/storage-time";
+import { UserUpdateService } from "../trackers/user-update-service";
+import type { LocationEntity, UserEntity } from "../types/repo-types";
+import { Gallery } from "../ui/gallery";
+import { SidePanel } from "../ui/side-panel";
+import { UserReports } from "../user-reports";
 
 type LocationPageConstructor = {
 	win: SnlWindow;
@@ -54,10 +53,9 @@ export class LocationPage {
 		reportLast(startingState.lastVisit, "Visit");
 
 		const batchProducer = new BatchProducerGroup(startingState.lastVisit, [
-			new Location1Posts({ snooper, startingState, locRepo }),
-			new Location2Posts(snooper),
-			new LocationContent(snooper),
 			new InitialLocationPageParser(),
+			new LocationContent(snooper),
+			new DetailsPopup(snooper),
 		]);
 
 		new UserUpdateService({ userRepo, batchProducer });

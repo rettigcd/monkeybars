@@ -1,5 +1,5 @@
 import { RequestSnooper, type SnoopHandler } from "~/utils/snoop";
-import type { UserRepo } from "../repo-types";
+import type { UserRepo } from "../types/repo-types";
 
 // UnfollowTracking
 // Doesn't need to be a class.

@@ -1,6 +1,6 @@
 import { RequestSnooper } from "~/utils/snoop";
-import { BasePicExtractor } from "./base-pic-extractor";
-import { type MediaNode } from "./ig-types";
+import { BasePicExtractor } from "../base-pic-extractor";
+import { type MediaNode } from "../ig-types";
 
 type UserPostsResponse = {
 	items?: MediaNode[];

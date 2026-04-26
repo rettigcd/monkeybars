@@ -1,9 +1,9 @@
 import { $ } from "~/utils/dom3";
-import { BatchProducerGroup } from "../batch-producer-group";
-import { dom } from "../dom";
-import { sanitizeImgUrl } from "../models";
+import { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { PicGroup } from "../pic-group";
-import { timestampToAgeString } from "../storage-time";
+import { dom } from "../services/dom";
+import { sanitizeImgUrl } from "../services/image-lookup-by-url";
+import { timestampToAgeString } from "../services/storage-time";
 
 type GalleryConstructorArgs = {
 	batchProducer: BatchProducerGroup;

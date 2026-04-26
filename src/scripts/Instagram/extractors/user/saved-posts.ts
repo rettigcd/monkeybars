@@ -1,6 +1,6 @@
 import { RequestSnooper } from "~/utils/snoop";
-import { BasePicExtractor } from "./base-pic-extractor";
-import { type MediaNode, type SavedPostsResponse } from "./ig-types";
+import { BasePicExtractor } from "../base-pic-extractor";
+import { type MediaNode, type SavedPostsResponse } from "../ig-types";
 
 // https://www.instagram.com/api/v1/feed/saved/posts/ ...stuff
 // Posts that I saved personally, from my user > Saved page.

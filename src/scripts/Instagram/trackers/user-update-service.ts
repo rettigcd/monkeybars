@@ -1,11 +1,11 @@
 import { type ObservableListener } from "~/utils/observable";
 import { throwExp } from "~/utils/throw";
-import type { BatchProducerGroup } from "../batch-producer-group";
-import { dom } from "../dom";
+import type { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { PicGroup } from "../pic-group";
-import type { UserRepo } from "../repo-types";
+import { dom } from "../services/dom";
+import { loadTime } from "../services/storage-time";
 import { SingleImage } from "../single-image";
-import { loadTime } from "../storage-time";
+import type { UserRepo } from "../types/repo-types";
 
 type UserUpdateServiceConstructor = {
 	userRepo: UserRepo;
