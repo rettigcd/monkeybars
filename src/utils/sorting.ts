@@ -44,3 +44,20 @@ export function by<T, TValue>(proj: Projection<T, TValue>): CompareFunction<T> {
 export function byDesc<T, TValue>(proj: Projection<T, TValue>): CompareFunction<T> {
 	return makeCompareFunction<T>().thenByDesc(proj);
 }
+
+
+export function groupBy<T, K extends PropertyKey>(
+	items: T[],
+	keySelector: (item: T) => K
+): Record<K, T[]> {
+	return items.reduce((acc, item) => {
+		const key = keySelector(item);
+
+		if (!acc[key]) {
+			acc[key] = [];
+		}
+
+		acc[key].push(item);
+		return acc;
+	}, {} as Record<K, T[]>);
+}

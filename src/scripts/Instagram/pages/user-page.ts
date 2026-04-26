@@ -90,7 +90,7 @@ export class UserPage {
 
 		this.logStartingState(startingState);
 		reportLast(startingState.lastVisit, "Visit");
-	
+
 	}
 
 	// -------------------------------------

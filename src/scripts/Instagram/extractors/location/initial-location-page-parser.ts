@@ -1,4 +1,4 @@
-import { type EventHost, makeEventHost, type OnFn, type TriggerFn } from "~/utils/observable";
+import { EventHostBase } from "~/utils/observable";
 import { PicGroup } from "../../models/pic-group";
 import { findProp } from "../../prune-hay";
 import { dom } from "../../services/dom";
@@ -6,15 +6,12 @@ import { type BatchProducerEvents } from "../base-pic-extractor";
 import { type Edge } from "../ig-types";
 
 // sample response: location-initial-script
-export class InitialLocationPageParser implements EventHost<BatchProducerEvents> {
+export class InitialLocationPageParser extends EventHostBase<BatchProducerEvents> {
 
 	id: number;
 
-	public on!: OnFn<BatchProducerEvents>;
-	public trigger!: TriggerFn<BatchProducerEvents>;
-
 	constructor() {
-		makeEventHost(this);
+		super();
 		this.id = setInterval(() => this.scanScriptsForMedia(), 3000);
 	}
 

@@ -1,4 +1,4 @@
-import { type EventHost, makeEventHost, type OnFn, type TriggerFn } from "~/utils/observable";
+import { EventHostBase } from "~/utils/observable";
 import { type SnoopHandler, SnoopRequest } from "~/utils/snoop";
 import { PicGroup } from "../models/pic-group";
 import { apiTimesTouch } from "./api-times";
@@ -14,14 +14,7 @@ export type BatchProducerEvents = {
 	batchReceived: [batch: PicGroup[]];
 };
 
-export abstract class BasePicExtractor implements EventHost<BatchProducerEvents> {
-
-	public on!: OnFn<BatchProducerEvents>;
-	public trigger!: TriggerFn<BatchProducerEvents>;
-
-	constructor() {
-		makeEventHost<BasePicExtractor,BatchProducerEvents>(this);
-	}
+export abstract class BasePicExtractor extends EventHostBase<BatchProducerEvents> {
 
 	setBatch(batch: PicGroup[]): void {
 		this.trigger("batchReceived", batch);

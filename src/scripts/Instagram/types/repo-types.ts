@@ -9,7 +9,7 @@ export type UserEntity = {
 
 	lastVisit?: number;
 	isFollowing?: boolean;
-	dl: {
+	dl?: {
 		[key: string]: number;
 	}
 }

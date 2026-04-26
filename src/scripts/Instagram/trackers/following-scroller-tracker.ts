@@ -1,4 +1,4 @@
-import { type EventHost, makeEventHost, type OnFn, type TriggerFn } from "~/utils/observable";
+import { EventHostBase } from "~/utils/observable";
 import { RequestSnooper, type SnoopHandler } from "~/utils/snoop";
 import { type InstagramUser } from "./visiting-user-tracker";
 
@@ -7,13 +7,10 @@ export type FollowingScrollerEvents = {
 };
 
 // Load followers by scrolling through list
-export class FollowingScrollerTracker implements EventHost<FollowingScrollerEvents> {
+export class FollowingScrollerTracker extends EventHostBase<FollowingScrollerEvents> {
 
-	public on!: OnFn<FollowingScrollerEvents>;
-	public trigger!: TriggerFn<FollowingScrollerEvents>;
-	
 	constructor(snooper:RequestSnooper) {
-		makeEventHost<FollowingScrollerTracker,FollowingScrollerEvents>(this);
+		super();
 		snooper.addHandler(this.snoop);
 	}
 
