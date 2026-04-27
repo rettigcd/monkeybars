@@ -1,6 +1,7 @@
 import { makeStackedBar } from "~/lib/charts";
 import { con } from "~/lib/console";
 import { by, byDesc, groupBy } from "~/lib/sorting";
+import { DAYS } from "~/lib/units";
 import { calcDownloadsInLastYear, getRefreshTime, lastVisitOlderThanThresholdOrMissing } from "./services/download-stats";
 import { ImageLookupByUrl } from "./services/image-lookup-by-url";
 import { loadTime, storageTime } from "./services/storage-time";
