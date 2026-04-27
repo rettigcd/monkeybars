@@ -1,6 +1,6 @@
 import { $ } from "~/utils/dom3";
 import { formatSeconds } from "../time-format";
-import type { Waiter, WaitStatus } from "../waiter";
+import type { Waiter, WaitStatus } from "../waiting/waiter";
 import { css } from "./css";
 
 // Adds UI to status bar and updates it when .delay is changed.

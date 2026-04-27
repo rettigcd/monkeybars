@@ -16,11 +16,12 @@ import { buildSnooper } from "./build-snooper";
 import { ConfigModel, type ConfigRepo, ConfigService } from "./config";
 import { downloadLogsOnUnload } from "./flush-logs";
 import { TimeStampConsoleLogger } from "./logging";
+import { Reloader } from "./reloader";
 import { ShowService } from "./show-service";
 import { Submitter } from "./submitter";
 import { formatSeconds, getNextThursday10Am, SECONDS } from "./time-format";
 import { generateView } from "./views/top-bar";
-import { Waiter } from "./waiter";
+import { Waiter } from "./waiting/waiter";
 import { type SnlWindow } from "./window";
 
 declare const unsafeWindow: SnlWindow;
@@ -36,9 +37,8 @@ async function initPageAsync(): Promise<void> {
 	let waitForShowsTimeout = 2 * SECONDS;
 
 	const match = document.location.href.match(/events\/([^#/]+)(.*\/event\/([^#/]+))?/);
-	if (!match) {
+	if (!match)
 		throw new Error(`Could not parse event URL: ${document.location.href}`);
-	}
 
 	const [, orgId, , eventId] = match;
 	const isSnl = orgId === snlOrgId;
@@ -50,6 +50,7 @@ async function initPageAsync(): Promise<void> {
 	const configRepo: ConfigRepo = new SyncedPersistentDict<ConfigModel>(orgId);
 	const myConfig = new ConfigService(configRepo,["[none]", liveShow, dressRehearsal]);
 	const submitter = new Submitter(myConfig.model, showService, logger);
+	const reloader = new Reloader(logger);
 
 	myConfig.model.configOptions = configRepo.keys();
 	myConfig.model.configName =
@@ -112,9 +113,17 @@ async function initPageAsync(): Promise<void> {
 			submitter.stubSubmit();
 		submitter.monitor();
 	} else if (Date.now() < goTime.valueOf()) {
-		waiter.scheduleNext(goTime, waitForShowsTimeout);
+		void waiter.waitAsync(goTime, waitForShowsTimeout)
+			.then((result) => {
+				if (result.shouldReload)
+					reloader.reload(result.reason);
+			});
 	} else {
-		waiter.reloadWhenShowsAppear(waitForShowsTimeout);
+		void waiter.waitAsync(new Date(), waitForShowsTimeout)
+			.then((result) => {
+				if (result.shouldReload)
+					reloader.reload(result.reason);
+			});
 	}
 
 	unsafeWindow.cmd = {

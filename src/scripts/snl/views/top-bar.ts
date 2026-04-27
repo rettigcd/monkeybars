@@ -1,6 +1,6 @@
 import { $ } from "~/utils/dom3";
 import { ConfigService } from "../config";
-import { Waiter } from "../waiter";
+import { Waiter } from "../waiting/waiter";
 import { configView } from "./config-view";
 import { css } from "./css";
 import { submitterStatusView, type SubmitterStatusViewModel } from "./submitter-status-view";

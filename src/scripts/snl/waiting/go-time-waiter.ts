@@ -1,4 +1,4 @@
-import { MINUTES, SECONDS } from "./time-format";
+import { MINUTES, SECONDS } from "../time-format";
 
 type DelayPhase = "before" | "go" | "after" | "timeout";
 
@@ -11,9 +11,9 @@ type Logger = {
 	log: (msg: unknown) => void;
 };
 
-type GoTimeWaiterOptions = {
-	onBeforeOrTimeout: (phase: "before" | "timeout") => void;
-	onGoOrAfter: (phase: "go" | "after") => void;
+export type GoTimeWaitResult = {
+	delay: number;
+	phase: DelayPhase;
 };
 
 export class GoTimeWaiter {
@@ -34,10 +34,7 @@ export class GoTimeWaiter {
 		this.postRetryPeriod = 2 * MINUTES;
 	}
 
-	public scheduleNext(
-		targetTime: Date,
-		handlers: GoTimeWaiterOptions,
-	): this {
+	public waitUntilNextAsync(targetTime: Date): Promise<GoTimeWaitResult> {
 		this.target = targetTime;
 
 		const { delay, phase } = this.getDelay();
@@ -45,28 +42,18 @@ export class GoTimeWaiter {
 		this.phase = phase;
 
 		this.logger.log({
-			action: "GoTimeWaiter.scheduleNext()",
+			action: "GoTimeWaiter.waitUntilNextAsync()",
 			goTime: this.target.toLocaleString(),
 			delay,
 			phase,
 			refreshTime: new Date(Date.now() + delay).toLocaleTimeString(),
 		});
 
-		setTimeout(() => {
-			switch (phase) {
-				case "timeout":
-				case "before":
-					handlers.onBeforeOrTimeout(phase);
-					break;
-
-				case "go":
-				case "after":
-					handlers.onGoOrAfter(phase);
-					break;
-			}
-		}, delay);
-
-		return this;
+		return new Promise((resolve) => {
+			setTimeout(() => {
+				resolve({ delay, phase });
+			}, delay);
+		});
 	}
 
 	public getDelay(): DelayResult {
@@ -81,9 +68,8 @@ export class GoTimeWaiter {
 			};
 		}
 
-		if (offset !== undefined && offset < this.postRetryPeriod) {
+		if (offset !== undefined && offset < this.postRetryPeriod)
 			return { delay: this.postInterval, phase: "after" };
-		}
 
 		return { delay: 0, phase: "timeout" };
 	}
@@ -92,4 +78,6 @@ export class GoTimeWaiter {
 	public getOffsetFromTarget(): number | undefined {
 		return this.target ? Date.now() - this.target.valueOf() : undefined;
 	}
+
+
 }

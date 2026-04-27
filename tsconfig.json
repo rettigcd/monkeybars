@@ -13,6 +13,7 @@
     "lib": ["DOM", "ES2020"],
     "types": [],
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "~/*": ["src/*"]
     }  
