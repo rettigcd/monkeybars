@@ -1,10 +1,10 @@
+import * as esbuild from "esbuild";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import * as esbuild from "esbuild";
 
 const projectRoot = process.cwd();
-const scriptsDir = path.join(projectRoot, "src", "scripts");
+const scriptsDir = path.join(projectRoot, "src");
 const distDir = path.join(projectRoot, "dist");
 const isWatch = process.argv.includes("--watch");
 const isDev = process.argv.includes("--dev");
