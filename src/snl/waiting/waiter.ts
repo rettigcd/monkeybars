@@ -1,4 +1,5 @@
-import { type ListenFn, makeObservable } from "~/lib/observable";
+import { ObservableBase } from "~/lib/observable";
+import { type TimeStampConsoleLogger } from "../logging";
 import { SECONDS } from "../time-format";
 import { GoTimeWaiter } from "./go-time-waiter";
 import { ShowAppearWaiter, type WaitStatus } from "./show-appear-waiter";
@@ -7,39 +8,31 @@ type ShowService = {
 	fetchShowsAsync: () => Promise<unknown[]>;
 };
 
-type Logger = {
-	log: (msg: unknown) => void;
-};
-
 export type WaitResult = {
 	phase: "before" | "go" | "after" | "timeout";
 	reason: string;
 	shouldReload: boolean;
 };
 
-export class Waiter {
-	public listen!: ListenFn<Waiter>;
+export class Waiter extends ObservableBase<Waiter> {
 
-	public waitStatus: WaitStatus | undefined = undefined;
+	public waitStatus: WaitStatus | undefined = undefined; // observable
 
 	private readonly goTimeWaiter: GoTimeWaiter;
 	private readonly showAppearWaiter: ShowAppearWaiter;
 
 	public constructor(
 		showService: ShowService,
-		logger: Logger,
-		postInterval: number,
+		logger: TimeStampConsoleLogger,
+		waitForShowsTimeout: number,
 	) {
-
-		this.goTimeWaiter = new GoTimeWaiter(logger, postInterval);
-
+		super();
+		this.goTimeWaiter = new GoTimeWaiter(logger, waitForShowsTimeout);
 		this.showAppearWaiter = new ShowAppearWaiter(
 			showService,
 			logger,
 			(status) => { this.waitStatus = status; }
 		);
-
-		makeObservable(this);
 	}
 
 	public async waitAsync(targetTime: Date, showAppearTimeout = 3 * SECONDS): Promise<WaitResult> {
