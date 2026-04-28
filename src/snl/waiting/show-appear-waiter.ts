@@ -1,19 +1,8 @@
-import { SECONDS } from "../time-format";
 
 export type WaitStatus = {
 	attempt: number;
 	count: number | "?";
 };
-
-type ShowService = {
-	fetchShowsAsync: () => Promise<unknown[]>;
-};
-
-type Logger = {
-	log: (msg: unknown) => void;
-};
-
-type StatusChangedHandler = (status: WaitStatus) => void;
 
 export type ShowAppearWaitResult = {
 	reason: string;
@@ -22,76 +11,37 @@ export type ShowAppearWaitResult = {
 	duration: number;
 };
 
-export class ShowAppearWaiter {
-	private readonly showService: ShowService;
-	private readonly logger: Logger;
-	private readonly onStatusChanged: StatusChangedHandler;
+export interface ShowWatcher {
+	watch(signal:AbortSignal): Promise<{ reason: string}>;
+}
 
-	public constructor(
-		showService: ShowService,
-		logger: Logger,
-		onStatusChanged: StatusChangedHandler,
-	) {
-		this.showService = showService;
-		this.logger = logger;
-		this.onStatusChanged = onStatusChanged;
+export class ShowAppearWaiter {
+
+	private readonly watchers: ShowWatcher[];
+
+	public constructor( watchers: ShowWatcher[]) {
+		this.watchers = watchers;
 	}
 
-	public waitForShowsToAppearAsync(timeout = 3 * SECONDS): Promise<ShowAppearWaitResult> {
-		this.logger.log({ action: "ShowAppearWaiter.waitForShowsToAppearAsync()", timeout });
+	public async waitForShowsToAppearAsync(): Promise<ShowAppearWaitResult> {
 
 		const startedAt = Date.now();
-		let attempt = 0;
-		let lastStatus: WaitStatus = { attempt, count: "?" };
+		const controller = new AbortController();
+		const { signal } = controller;
 
-		return new Promise((resolve) => {
-			const finish = (reason: string): void => {
-				clearTimeout(timeoutId);
-				clearInterval(intervalId);
+		const result = await Promise.race( 
+			this.watchers.map( watcher => watcher.watch(signal) ) 
+		);
 
-				const result: ShowAppearWaitResult = { 
-					reason,
-					attempt: lastStatus.attempt,
-					count: lastStatus.count,
-					duration: Date.now() - startedAt,
-				};
+		controller.abort(result.reason);
 
-				this.logger.log({ action: "ShowAppearWaiter.waitForShowsToAppearAsync()-done", ...result });
-				resolve(result);
-			};
-
-			// Check for Shows by using the ShowService to fetch shows
-			const intervalId = setInterval(async () => {
-				try {
-					lastStatus = await this.checkForShowsAsync(++attempt);
-					if (lastStatus.count !== "?" && lastStatus.count > 0)
-						finish("showService found shows");
-				} catch (err) {
-					this.logger.log(err);
-				}
-			}, 500);
-
-			// use the timeout.
-			const timeoutId = setTimeout(() => {
-				finish("timed out waiting for show to appear");
-			}, timeout);
-		});
-	}
-
-	private async checkForShowsAsync(attempt: number): Promise<WaitStatus> {
-		const checkingStatus: WaitStatus = { attempt, count: "?" };
-		this.onStatusChanged(checkingStatus);						// Checking ....
-
-		const shows = await this.showService.fetchShowsAsync();
-
-		const checkedStatus: WaitStatus = { attempt, count: shows.length };
-		this.onStatusChanged(checkedStatus);						// Result ....
-
-		return checkedStatus;
+		// !!! just return whatever the race result was
+		return {
+			reason: result.reason,
+			attempt: 0,
+			count: 0,
+			duration: Date.now() - startedAt,
+		};
 	}
 
 }
-
-
-// https://httpbin.org/delay/5
-// https://slowwly.robertomurray.co.uk/delay/3000/url/http://example.com
