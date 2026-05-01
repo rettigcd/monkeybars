@@ -10,6 +10,16 @@ https://bookings-us.qudini.com/booking-widget/events/2HYM77D8NYO/event/choose   
 
 Current time and Computers offset can be found: https://www.time.gov/
 
+==== Show NOTES! ====
+There are 2 times we need to watch for shows:
+  1) when we first load
+  2) when we are on the waiter state.
+To move forward we MUST find the DIVs.
+
+
+
+
+
 ==== TODO ====
 
   CTRL-SHIFT-R would not reload page.   I was over screen recorder.  WAS THAT THE PROBLEM?

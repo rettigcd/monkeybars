@@ -1,7 +1,7 @@
 import { delayAsync } from "~/lib/async";
 import { TimeStampConsoleLogger } from "../logging";
-import { ShowService } from "../show-service";
-import { ShowWatcher, WaitStatus } from "./show-appear-waiter";
+import { ShowAppearWaitResult, ShowWatcher, WaitStatus } from "./show-appear-waiter";
+import { ShowService } from "./show-service";
 
 type StatusChangedHandler = (status: WaitStatus) => void;
 
@@ -20,7 +20,7 @@ export class ShowServiceChecker implements ShowWatcher{
 		this.showService = showService;
 	}
 
-	async watch(signal:AbortSignal): Promise<{ reason: string }> {
+	async watch(signal:AbortSignal): Promise<ShowAppearWaitResult> {
 		let attempt = 0;
 
 		while (!signal.aborted) {
@@ -33,15 +33,20 @@ export class ShowServiceChecker implements ShowWatcher{
 				const status = await this.checkForShowsAsync(++attempt);
 				this.onStatus(status);
 
-				if (status.count !== "?" && status.count > 0) {
-					return { reason: "showService found shows" };
+				if (status.count !== "?" && 0 < status.count) {
+					return { 
+						reason: "showService found shows",
+						attempts: attempt,
+					};
 				}
 			} catch (err) {
 				this.logger.log(err);
 			}
 		}
 
-		return {reason:"aborted"};
+		return {
+			reason:"aborted"
+		};
 	}
 
 	private async checkForShowsAsync(attempt: number): Promise<WaitStatus> {

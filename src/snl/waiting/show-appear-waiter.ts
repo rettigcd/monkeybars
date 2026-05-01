@@ -5,16 +5,18 @@ export type WaitStatus = {
 };
 
 export type ShowAppearWaitResult = {
-	reason: string;
-	attempt: number;
-	count: number | "?";
-	duration: number;
+	reason: string;     // reason for the result
+	attempts?: number;   // # of attempts to find the show
+	showCount?: number; // # of shows found
+	duration?: number;  // How long it took.
 };
 
+// Watches for shows to appear
 export interface ShowWatcher {
 	watch(signal:AbortSignal): Promise<{ reason: string}>;
 }
 
+// Orchestrates N ShowWatchers
 export class ShowAppearWaiter {
 
 	private readonly watchers: ShowWatcher[];
@@ -38,8 +40,8 @@ export class ShowAppearWaiter {
 		// !!! just return whatever the race result was
 		return {
 			reason: result.reason,
-			attempt: 0,
-			count: 0,
+			attempts: 0,
+			showCount: 0,
 			duration: Date.now() - startedAt,
 		};
 	}

@@ -1,10 +1,12 @@
 import { ObservableBase } from "~/lib/observable";
+import { RequestSnooper } from "~/lib/snoop";
 import { type TimeStampConsoleLogger } from "../logging";
-import { ShowService } from "../show-service";
 import { SECONDS } from "../time-format";
 import { GoTimeWaiter } from "./go-time-waiter";
 import { ShowAppearWaiter, type WaitStatus } from "./show-appear-waiter";
+import { ShowDivWatcher, ShowService } from "./show-service";
 import { ShowServiceChecker } from "./show-service-checker";
+import { ShowSnoopWatcher } from "./show-snoop-watcher";
 import { ShowTimeout } from "./show-timeout";
 
 export type WaitResult = {
@@ -23,6 +25,7 @@ export class Waiter extends ObservableBase<Waiter> {
 
 	public constructor(
 		showService: ShowService,
+		snooper:RequestSnooper,
 		logger: TimeStampConsoleLogger,
 		waitForShowsTimeout: number,
 	) {
@@ -30,8 +33,10 @@ export class Waiter extends ObservableBase<Waiter> {
 		this.logger = logger;
 		this.goTimeWaiter = new GoTimeWaiter(logger, waitForShowsTimeout);
 		this.showAppearWaiter = new ShowAppearWaiter([
-			new ShowTimeout(3*SECONDS),
+			new ShowDivWatcher(),
+			new ShowSnoopWatcher(snooper),
 			new ShowServiceChecker((status) => { this.waitStatus = status; },logger,showService),
+			new ShowTimeout(3*SECONDS)
 		]);
 	}
 

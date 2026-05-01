@@ -17,10 +17,10 @@ import { ConfigModel, type ConfigRepo, ConfigService } from "./config";
 import { downloadLogsOnUnload } from "./flush-logs";
 import { TimeStampConsoleLogger } from "./logging";
 import { Reloader } from "./reloader";
-import { ShowService } from "./show-service";
 import { Submitter } from "./submitter";
 import { formatSeconds, getNextThursday10Am, SECONDS } from "./time-format";
 import { generateView } from "./views/top-bar";
+import { ShowService } from "./waiting/show-service";
 import { Waiter } from "./waiting/waiter";
 import { type SnlWindow } from "./window";
 
@@ -46,50 +46,28 @@ async function initPageAsync(): Promise<void> {
 	const logger = new TimeStampConsoleLogger();
 	const snooper = buildSnooper(unsafeWindow);
 	const showService = new ShowService(orgId, snooper, logger, unsafeWindow);
-	const waiter = new Waiter(showService, logger, waitForShowsTimeout);
+	const waiter = new Waiter(showService, snooper, logger, waitForShowsTimeout);
 	const configRepo: ConfigRepo = new SyncedPersistentDict<ConfigModel>(orgId);
 	const myConfig = new ConfigService(configRepo,["[none]", liveShow, dressRehearsal]);
 	const submitter = new Submitter(myConfig.model, showService, logger);
 	const reloader = new Reloader(logger);
 
 	myConfig.model.configOptions = configRepo.keys();
-	myConfig.model.configName =
-		configRepo
-			.entries()
-			.filter(([, values]) => values.isDefault)
-			.map(([name]) => name)[0] ?? "";
+	myConfig.model.configName = configRepo.entries().filter(([, values]) => values.isDefault).map(([name]) => name)[0] ?? "";
 
 	downloadLogsOnUnload(`snl ${orgId}`, snooper, logger);
 	let goTime = getNextThursday10Am(myConfig.model.msDelay);
 
-	if (localStorage.testUi) {
-		delete localStorage.testUi;
+	unsafeWindow.cmd = {
+		waiter,
+		showService,
+		myConfig,
+		snooper,
+		logger,
+		formatSeconds,
+		snoopLog: snooper._loadLog
+	};
 
-		goTime = new Date(Date.now() + 5 * SECONDS);
-		waitForShowsTimeout = 10 * SECONDS;
-
-		const showShowsAfter = 5 * SECONDS;
-		const showTime = goTime.valueOf() + showShowsAfter;
-
-		Object.assign(showService, {
-			showTime,
-			waitForShowCountAsync() {
-				return Promise.resolve({ showCount: 0, reason: "timeout" as const });
-			},
-			fetchShowsAsync() {
-				const hasShows = Date.now() >= showTime;
-				return Promise.resolve(hasShows ? ["show1", "show2"] : []);
-			},
-		});
-
-		Object.assign(waiter, {
-			reload() {
-				logger.log("RELOAD-STUB called!");
-			},
-		});
-
-		console.log("DUDE - TESTING");
-	}
 
 	// Start...
 	logger.log({
@@ -102,41 +80,28 @@ async function initPageAsync(): Promise<void> {
 	});
 
 	// wait for shows to load
+
+	// WTH does this do?
 	const initial = await showService.waitForShowCountAsync();
+
 	logger.log(`Initial show counts: ${initial.showCount} from ${initial.reason}`);
 
 	// View
 	generateView({ myConfig, waiter, submitterStatus:submitter.status });
 
+	// If we have shows
 	if (initial.showCount) {
-		if (!isSnl)
-			submitter.stubSubmit();
+		// Submit
 		submitter.monitor();
-	} else if (Date.now() < goTime.valueOf()) {
-		void waiter.waitAsync(goTime, waitForShowsTimeout)
-			.then((result) => {
-				if (result.shouldReload)
-					reloader.reload(result.reason);
-			});
-	} else {
-		void waiter.waitAsync(new Date(), waitForShowsTimeout)
-			.then((result) => {
-				if (result.shouldReload)
-					reloader.reload(result.reason);
-			});
+		return;
 	}
-
-	unsafeWindow.cmd = {
-		waiter,
-		showService,
-		myConfig,
-		snooper,
-		logger,
-		initial,
-		formatSeconds,
-	};
-
-	unsafeWindow.snooper = snooper;
+	
+	// Wait
+	const now = Date.now();
+	const reloadTime = now < goTime.valueOf() ? goTime : new Date();
+	const result = await waiter.waitAsync(reloadTime, waitForShowsTimeout);
+	if (result.shouldReload) // !!! When should we NOT reload???
+		reloader.reload(result.reason);
 }
 
 void initPageAsync();

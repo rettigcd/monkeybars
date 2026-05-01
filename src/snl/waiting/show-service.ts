@@ -1,14 +1,15 @@
-import type { RequestSnooper, SnoopedWindow, SnoopRequest } from "~/lib/snoop";
-import { TimeStampConsoleLogger } from "./logging";
-import { SECONDS } from "./time-format";
+import { $qAll } from "~/lib/dom3";
+import { RequestSnooper, SnoopedWindow, SnoopRequest } from "~/lib/snoop";
+import { TimeStampConsoleLogger } from "../logging";
+import { SECONDS } from "../time-format";
 
 type ShowCountResult = {
 	showCount: number;
 	reason: "div" | "timeout" | "snooper";
 };
 
-type ShowDiv = {
-	div: Element;
+export type ShowDiv = {
+	div: HTMLElement;
 	label: string;
 };
 
@@ -17,6 +18,7 @@ type ShowDiv = {
 // It detects shows either by watching DOM elements or intercepting network responses via the snooper.
 // Provides polling via fetch as a fallback to catch transitions from “no shows” to “shows available.”
 // Designed to support both real execution and testing by allowing overrides of snooping and DOM detection logic.
+// Has 3 functinos: (1) get shows by fetching (2) get shows from DIV (3) wait for shows (DIV or snooper)
 export class ShowService {
 	private fetchAttempt = 0;
 
@@ -55,7 +57,7 @@ export class ShowService {
 					responseText,
 				} = request;
 
-				if (this.isSnoopPath(pathname)) {
+				if (pathname.includes("/booking-widget/event/events/")) {
 					const shows = JSON.parse(responseText) as unknown[];
 					stop("snooper", shows.length);
 					(request as SnoopRequest & { handled: string }).handled = "events";
@@ -73,18 +75,12 @@ export class ShowService {
 		const myUrl = `https://bookings-us.qudini.com/booking-widget/event/events/${this.orgId}`;
 		const response = await this.win.fetch(myUrl);
 
-		if (!response.ok) {
+		if (!response.ok)
 			throw new Error("bad response");
-		}
 
 		const shows = (await response.json()) as unknown[];
 		this.logger.log(`found: ${shows.length} shows. (attempt ${attempt})`);
 		return shows;
-	}
-
-	// override to disable snoop - for testing
-	public isSnoopPath(pathname: string): boolean {
-		return pathname.includes("/booking-widget/event/events/");
 	}
 
 	// override to disable div - for testing
@@ -97,3 +93,16 @@ export class ShowService {
 			.filter((item): item is ShowDiv => item.label !== null);
 	}
 }
+
+export function findShowDivs(): ShowDiv[] {
+	return $qAll<HTMLElement>("div[aria-label]")
+		.map((div) => ({
+			div,
+			label: div.getAttribute("aria-label"),
+		}))
+		.filter((item): item is ShowDiv => item.label !== null);
+}
+
+
+
+
