@@ -44,3 +44,12 @@ see if Waiter can be improved.
 
 Consider if switching to # of log items would be a better strategy than time-based.
 
+===========================
+===========================
+Scenarios:
+
+Time:
+  Before Go Time => Waiter
+  Go Time => Shows ?
+    No Shows => Reload and find shows
+    Shows => Submit

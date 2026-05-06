@@ -4,7 +4,7 @@ import { type TimeStampConsoleLogger } from "../logging";
 import { SECONDS } from "../time-format";
 import { GoTimeWaiter } from "./go-time-waiter";
 import { ShowAppearWaiter, type WaitStatus } from "./show-appear-waiter";
-import { ShowDivWatcher, ShowService } from "./show-service";
+import { ShowService } from "./show-service";
 import { ShowServiceChecker } from "./show-service-checker";
 import { ShowSnoopWatcher } from "./show-snoop-watcher";
 import { ShowTimeout } from "./show-timeout";
