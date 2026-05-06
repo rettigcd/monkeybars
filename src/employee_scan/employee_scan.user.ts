@@ -16,7 +16,7 @@
 
 import { $, $qAll, ElementBuilder } from "~/lib/dom3";
 import { CachedPersistentArray } from "~/lib/storage";
-import { registerIds } from "./ids";
+import { activeIvyIds, registerIds } from "./ids";
 
 // ====================================
 // Snippet for showing employees photos
@@ -155,11 +155,10 @@ function buildEmployeeCard(id: number): {
 } {
 	const img = $("img")
 		.css({ width: "120px" })
-		.on("click", async (e) => {
-			const clickedImg = e.currentTarget as HTMLImageElement;
+		.on("click", async () => {
 			store.saveGoodId(id);
-			await downloadImageAsync(clickedImg);
-			clickedImg.style.opacity = "0.4";
+			await downloadImageAsync(img.el);
+			img.css({opacity:"0.4"});
 		});
 
 	const divCss: Partial<CSSStyleDeclaration> = {
@@ -252,6 +251,3 @@ void (async function (): Promise<void> {
 
 	queueMicrotask(console.log.bind(console, "%cemployee_scan.ts initialized", "background-color:#DFD")); // Last line of file
 })();
-
-export { };
-
