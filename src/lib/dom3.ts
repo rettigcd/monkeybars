@@ -152,3 +152,15 @@ export function $qAsync<T extends Element = HTMLElement>(cssSelector: string, ti
 		}, step);
 	});
 }
+
+// Assigns a src to an img element and waits for the image to load.
+export async function loadImageAsync( img: HTMLImageElement, src: string, timeoutMs = 500 ): Promise<HTMLImageElement> {
+	return new Promise((resolve, reject) => {
+		// Setup resolve/reject handlers
+		img.onload = () => { clearTimeout(timerId); resolve(img); };
+		img.onerror = (err) => { clearTimeout(timerId); reject(err); };
+		const timerId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
+		// trigger load
+		img.src = src;
+	});
+}
