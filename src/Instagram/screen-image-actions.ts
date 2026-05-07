@@ -131,7 +131,7 @@ export class ScreenImageActions {
 		return document
 			.elementsFromPoint(clientX, clientY)
 			.map((el) => {
-				const src = el instanceof HTMLImageElement ? el.src : getBackgroundImage(el);
+				const src = (el instanceof HTMLImageElement || el instanceof HTMLVideoElement) ? el.src : getBackgroundImage(el);
 				return { el: el as HTMLElement, src };
 			})
 			.filter((item): item is SourceUnderPoint => item.src != null);
