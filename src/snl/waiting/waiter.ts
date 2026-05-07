@@ -4,6 +4,7 @@ import { type TimeStampConsoleLogger } from "../logging";
 import { SECONDS } from "../time-format";
 import { GoTimeWaiter } from "./go-time-waiter";
 import { ShowAppearWaiter, type WaitStatus } from "./show-appear-waiter";
+import { ShowDivWatcher } from "./show-div-watcher";
 import { ShowService } from "./show-service";
 import { ShowServiceChecker } from "./show-service-checker";
 import { ShowSnoopWatcher } from "./show-snoop-watcher";
@@ -79,5 +80,10 @@ export class Waiter extends ObservableBase<Waiter> {
 	public get phase(): string | undefined {
 		return this.goTimeWaiter.phase;
 	}
+
+	// !!! STUBS to make errors go away
+	getDelay(): { delay:number } { return { delay: 1000 }; } // !!! WRONG
+	getOffsetFromTarget(): number { return 1000; } // !!! WRONG
+	reload(_:string):void { }
 
 }

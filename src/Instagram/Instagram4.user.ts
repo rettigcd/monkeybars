@@ -21,12 +21,12 @@
 
 import { con, silenceConsole } from "~/lib/console";
 import { GM } from "~/lib/gm";
+import { HotkeyManager } from "~/lib/hotkey-manager";
 import { formatDateForFilename } from "./date-formats";
 import { LocationPage } from "./pages/location-page";
 import { UserPage } from "./pages/user-page";
 import { ScreenImageActions } from "./screen-image-actions";
 import { instaDom } from "./services/instaDom";
-import { HotkeyManager } from "./services/key-presses";
 import { type InstagramWindow } from "./types/window";
 
 declare const unsafeWindow: InstagramWindow;

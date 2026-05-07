@@ -153,14 +153,26 @@ export function $qAsync<T extends Element = HTMLElement>(cssSelector: string, ti
 	});
 }
 
-// Assigns a src to an img element and waits for the image to load.
-export async function loadImageAsync( img: HTMLImageElement, src: string, timeoutMs = 500 ): Promise<HTMLImageElement> {
-	return new Promise((resolve, reject) => {
-		// Setup resolve/reject handlers
-		img.onload = () => { clearTimeout(timerId); resolve(img); };
-		img.onerror = (err) => { clearTimeout(timerId); reject(err); };
-		const timerId = window.setTimeout(() => reject(new Error("timeout")), timeoutMs);
-		// trigger load
+// Sets an image's src and waits for it to load
+export function loadImgSrcAsync( img: HTMLImageElement, src: string, timeoutMs: number = 1000 ): Promise<void> {
+	return new Promise<void>((resolve, reject) => {
+		const cleanup = () => { 
+			clearTimeout(timerId); 
+			img.onload = null; 
+			img.onerror = null;
+		};
+		// setup reject/resolve handlers
+		img.onload = () => { cleanup(); resolve(); };
+		img.onerror = (err) => { cleanup(); reject(err);};
+		const timerId = window.setTimeout(() => { cleanup(); reject(new Error("Image load timeout"));}, timeoutMs);
+
 		img.src = src;
 	});
+}
+
+export function addStyleSheet(cssText:string):void {
+	$("style")
+		.attr("type", "text/css")
+		.txt(cssText)
+		.appendTo(document.head);
 }

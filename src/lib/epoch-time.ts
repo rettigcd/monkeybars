@@ -1,7 +1,9 @@
 type NormalizeNum = (value: number) => number;
 
 export class EpochTime {
-	private readonly normalize: NormalizeNum;
+
+	// Converts to whatever # system we are using.
+	public readonly normalize: NormalizeNum;
 
 	public readonly SECONDS: number;
 	public readonly MINUTES: number;
@@ -26,30 +28,20 @@ export class EpochTime {
 
 	// if date => Converts date to number
 	// if number => normalizes number
-	public toNum(value: number | Date): number {
-		return this.normalize(value instanceof Date ? value.valueOf() : value);
+	public toNum(value: Date): number {
+		return this.normalize( value.valueOf() );
 	}
 
-	// Converts minutes / seconds / ms to Date(...)
-	public toDate(num: number): Date {
-		const t = getNumType(num);
-		return new Date( t === "minutes" ? num * 60_000 : t === "seconds" ? num * 1000 : num );
-	}
 }
 
 // milliSeconds since Epoch 
-export function useJavascriptTime(): EpochTime {
-	return new EpochTime(1000, num => {
-		const t = getNumType(num);
-		return t === "seconds" ? num * 1000 : t === "minutes" ? num * 60_000 : num;
-	});
-}
+export function useJavascriptTime(): EpochTime { return new EpochTime(1000, toMs ); }
 
 // seconds since Epoch 
 export function useUnixTime(): EpochTime {
 	// if num is seconds, returns it, otherwise assumes it is mS
 	return new EpochTime(1, num => {
-		const t = getNumType(num);
+		const t = getTimeNumType(num);
 		return t === "seconds" ? num : t === "minutes" ? num * 60 : Math.floor(num / 1000); 
 	});
 }
@@ -57,15 +49,30 @@ export function useUnixTime(): EpochTime {
 // minutes since Epoch
 export function useMinuteTime(): EpochTime {
 	return new EpochTime(1/60, num => {
-		const t = getNumType(num);
+		const t = getTimeNumType(num);
 		return t === "minutes" ? num : t === "seconds" ? Math.floor(num / 60) : Math.floor(num / 60_000);
 	});
 }	
 
+
+// millisecond functions
+
+export function assertMs(ms:number,label:string):number{
+	const type = getTimeNumType(ms);
+	if(type !== "milliseconds" ) throw new Error(`${label} is in ${type}`);
+	return ms;
+}
+
+export function toMs(num: number): number {
+	const t = getTimeNumType(num);
+	return t === "minutes" ? num * 60_000 : t === "seconds" ? num * 1000 : num;
+}
+
+
 // Minutes takes      8 bytes to store
 // Seconds takes  9..10 bytes to store
 // mS      takes 12..13 bytes to store
-function getNumType(ts: number): "minutes" | "seconds" | "milliseconds" {
+export function getTimeNumType(ts: number): "minutes" | "seconds" | "milliseconds" {
 	// Jan 1, 1990 minutes               10_519_200
 	// Jan 1, 2100 minutes               68_374_080
 	// 1e8   ----------------           100_000_000

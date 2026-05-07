@@ -1,4 +1,4 @@
-const mS = 1;
+const mS = 1; // Native to Javascript. Ticks are ms.
 const SECONDS = 1000 * mS;
 const MINUTES = 60 * SECONDS;
 const HOURS = 60 * MINUTES;

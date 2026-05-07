@@ -1,6 +1,6 @@
 import { $ } from "~/lib/dom3";
 import { formatSeconds } from "../time-format";
-import type { Waiter, WaitStatus } from "../waiting/waiter";
+import type { Waiter } from "../waiting/waiter";
 import { css } from "./css";
 
 // Adds UI to status bar and updates it when .delay is changed.
@@ -20,7 +20,7 @@ export function waiterView(waiter: Waiter): HTMLElement {
 	waiter.listen("waitStatus", ({ newValue, oldValue }) => {
 		if (oldValue === undefined)
 			watchEl.style.backgroundColor = "#8F8";
-		const { attempt, count } = newValue as WaitStatus;
+		const { attempt, count } = newValue as { attempt:number, count:number }; // !!! as WaitStatus
 		watchEl.innerText = `Shows: ${count} (${attempt})`;
 		watchEl.style.backgroundColor = count === 0 ? "#F88" : "#8F8";
 	});

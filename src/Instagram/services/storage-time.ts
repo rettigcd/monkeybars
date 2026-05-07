@@ -1,5 +1,5 @@
 import { con } from "~/lib/console";
-import { EpochTime, useJavascriptTime } from "~/lib/epoch-time";
+import { EpochTime, toMs, useJavascriptTime } from "~/lib/epoch-time";
 
 export const storageTime : EpochTime = useJavascriptTime();
 
@@ -27,7 +27,7 @@ export function timestampToAgeString(timestamp:number) : { ageText:string, ageCo
 // Used for debugging or displaying recency information in logs.
 export function reportLast(lastVisit:number|undefined, label:string) {
 	if (lastVisit !== undefined && 0 < lastVisit) {
-		const lvd = storageTime.toDate(lastVisit).toDateString();
+		const lvd = new Date(toMs(lastVisit)).toDateString();
 		const { ageText, ageColor } = timestampToAgeString(lastVisit);
 		const ageStyle = `color:white;background-color:${ageColor};`;
 		con.print(`Last ${label}: %c${ageText}%c ago on %c${lvd}`, ageStyle, "color:black;background-color:white;", ageStyle);

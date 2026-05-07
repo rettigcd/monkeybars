@@ -1,4 +1,4 @@
-import { $, $qAll, ElementBuilder, loadImageAsync } from "~/lib/dom3";
+import { $, $qAll, ElementBuilder, loadImgSrcAsync } from "~/lib/dom3";
 import { Employee } from "./data-source";
 import { downloadImageAsync } from "./download";
 import { store } from "./store";
@@ -14,7 +14,7 @@ export async function appendEmployeeAsync(employeeId:number, employee?: Employee
 	div.appendTo(document.body);
 
 	try {
-		await loadImageAsync(img.el, `https://intranetapps.tql.com/api/photo/photos/${employeeId}`);
+		await loadImgSrcAsync(img.el, `https://intranetapps.tql.com/api/photo/photos/${employeeId}`, 5000);
 	} catch {
 		// Missing employee photos are expected while scanning IDs.
 	}

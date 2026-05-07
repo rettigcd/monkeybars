@@ -4,6 +4,7 @@ type NextLinkConstructorArgs = {
 	label: string;
 	nextUrl?: string;
 	count: number;
+	tooltip: string;
 };
 
 type UserLike = {
@@ -14,11 +15,13 @@ export class NextLink {
 	public readonly label: string;
 	public readonly nextUrl?: string;
 	public readonly count: number;
+	public readonly tooltip: string;
 
-	public constructor({ label, nextUrl, count }: NextLinkConstructorArgs) {
+	public constructor({ label, nextUrl, count, tooltip }: NextLinkConstructorArgs) {
 		this.label = label;
 		this.nextUrl = nextUrl;
 		this.count = count;
+		this.tooltip = tooltip;
 	}
 
 	public goto(): void {
@@ -49,7 +52,7 @@ export class NextLink {
 			.appendTo(host);
 	}
 
-	public static forFirstUser(label: string, users: UserLike[]): NextLink {
+	public static forFirstUser(label: string, users: UserLike[], tooltip:string): NextLink {
 		const firstUsername = users[0]?.username;
 		const nextUrl = firstUsername ? `/${firstUsername}/` : undefined;
 
@@ -57,6 +60,7 @@ export class NextLink {
 			label,
 			count: users.length,
 			nextUrl,
+			tooltip
 		});
 	}
 }

@@ -1,4 +1,5 @@
 import { con } from "~/lib/console";
+import { saveTextToFile } from "~/lib/download";
 import { RequestSnooper } from "~/lib/snoop";
 import { TimeStampConsoleLogger } from "./logging";
 
@@ -87,15 +88,6 @@ export function downloadLogsOnUnload(prefix:string,snooper:RequestSnooper,logger
 			text, 
 			filename: `${prefix} ${dateTimeStr()}.txt`
 		});
-	}
-
-	function saveTextToFile({text,filename} : {text:string,filename:string}){
-		const url = URL.createObjectURL(new Blob([text])); // old way that doesn't handle '#' a.href = "data:text,"+text;
-		const a = document.createElement("a");
-		a.href = url
-		a.download = filename;
-		a.click();
-		URL.revokeObjectURL(url);
 	}
 
 	// Don't try to do this while the we are trying to fill out the form.

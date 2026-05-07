@@ -46,18 +46,21 @@ export function byDesc<T, TValue>(proj: Projection<T, TValue>): CompareFunction<
 }
 
 
+// Uses the keyFinder to group the items
 export function groupBy<T, K extends PropertyKey>(
-	items: T[],
-	keySelector: (item: T) => K
+	items: Iterable<T>,
+	keyFinder: (item: T) => K,
 ): Record<K, T[]> {
-	return items.reduce((acc, item) => {
-		const key = keySelector(item);
-
-		if (!acc[key]) {
-			acc[key] = [];
-		}
-
-		acc[key].push(item);
-		return acc;
-	}, {} as Record<K, T[]>);
+	const groups = {} as Record<K, T[]>;
+	for (const item of items) {
+		const key = keyFinder(item);
+		if (!(key in groups))
+			groups[key] = [];
+		groups[key].push(item);
+	}
+	return groups;
 }
+
+// =====================================
+
+export function onlyUnique<T>(value:T, index:number, self:T[]): boolean { return self.indexOf(value) === index; } // use with [..].fiter(onlyUnique);

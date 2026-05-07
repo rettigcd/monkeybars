@@ -1,3 +1,4 @@
+import { toMs } from "~/lib/epoch-time";
 import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observable";
 import type { MediaNode } from "../extractors/ig-types";
 import { sanitizeImgUrl } from "../services/image-lookup-by-url";
@@ -53,7 +54,7 @@ export class PicGroup implements ObservableHost<PicGroup> {
 
 		const captionText = caption?.text || undefined;
 		const owner = user.username;
-		const date = storageTime.toDate(taken_at * 1000);
+		const date = new Date(toMs(taken_at * 1000));
 
 		const pics = Array.isArray(carousel_media) && 0 < carousel_media.length
 				? carousel_media.map( ({ usertags, image_versions2 }) => SingleImage.fromMedia({ usertags, image_versions2, owner, date }) )

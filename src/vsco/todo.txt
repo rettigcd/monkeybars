@@ -1,0 +1,23 @@
+
+
+DownloadProgress
+	- Is this item immutable or not?
+		- if immutable
+			- then listener should watch entire progress object - easy.
+		- if mutable, 
+			- then listener should watch status and loaded properties - harder.
+	
+	- If we want to use this for generic download
+		- mutable would be better.
+		- we could pass a DownloadProgress object to the download instead of a progress-callback.
+
+
+Moving Image-Downloaded listener to one place
+
+	-- New-Image repo --
+		UserCtx.newImages()
+
+	-- Fetching --
+	Fetcher.fetchGalleryImagesAsync()
+		Fetcher.extractImagesFromPreloadedState()
+

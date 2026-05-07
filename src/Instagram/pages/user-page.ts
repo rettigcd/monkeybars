@@ -1,12 +1,12 @@
 import { $, $qAsync } from "~/lib/dom3";
 import { SyncedPersistentDict } from "~/lib/storage";
 
+import { HotkeyManager } from "../../lib/hotkey-manager";
 import type { SnlWindow } from "../../snl/window";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
 import { calcDownloadsInLastYear } from "../services/download-stats";
 import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { instaDom } from "../services/instaDom";
-import { HotkeyManager } from "../services/key-presses";
 import { buildRequestSnooper } from "../services/snoopBuilder";
 import { loadTime, reportLast } from "../services/storage-time";
 import { scheduleSetTabTitle } from "../tab-text";
@@ -200,10 +200,10 @@ export class UserPage {
 	}
 
 	private oldestDownloadedLink(reports: UserReports) {
-		return NextLink.forFirstUser("stale downloaded", reports.downloaded.stale());
+		return NextLink.forFirstUser("stale downloaded", reports.downloaded.stale(), '');
 	}
 
 	private oldestTrackedLink(reports: UserReports) {
-		return NextLink.forFirstUser("stale followed", reports.followed.stale());
+		return NextLink.forFirstUser("stale followed", reports.followed.stale(), '');
 	}
 }

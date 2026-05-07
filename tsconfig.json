@@ -6,14 +6,16 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
+    "lib": ["ESNext", "DOM"],
+    "types": [],
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "forceConsistentCasingInFileNames": true,
     "allowJs": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "lib": ["DOM", "ES2020"],
-    "types": [],
-    "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": false, // set to true to clamp down on indexes returning undefined
     "paths": {
       "~/*": ["src/*"]
     }  

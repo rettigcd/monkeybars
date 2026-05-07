@@ -80,12 +80,12 @@ export class SingleImage implements ObservableHost<SingleImage> {
 	}
 
 	// Downloads the cleaned-up URL of the requested url
-	async downloadAsync(requestedUrl:string,onprogress?:GMProgressHandler){ // $$$
-		const matching = this.images.filter(({url}) => url.includes(requestedUrl)).reverse();
-		await GM.downloadAsync({url:matching[0]?.url || requestedUrl, name:this.filename, onprogress });
-		this.downloaded=true;
-		con.print(`downloaded: ${this.filename}`);
-	}
+	// async downloadAsync(requestedUrl:string,onprogress?:GMProgressHandler){ // $$$
+	// 	const matching = this.images.filter(({url}) => url.includes(requestedUrl)).reverse();
+	// 	await GM.downloadAsync({url:matching[0]?.url || requestedUrl, name:this.filename, onprogress });
+	// 	this.downloaded=true;
+	// 	con.print(`downloaded: ${this.filename}`);
+	// }
 
 	public async downloadLargestAsync(onprogress?: GMProgressHandler){
 		await GM.downloadAsync({url:this.largestUrl, name:this.filename, onprogress });

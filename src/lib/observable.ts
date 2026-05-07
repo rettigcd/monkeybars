@@ -60,8 +60,9 @@ export function makeObservable<T extends object>(
 
 	// Extracted function
 	function defineObservableProperty<K extends ObservableKey<T>>(prop: K) {
-		if (!Object.prototype.hasOwnProperty.call(host, prop))
-			throw new Error(`Cannot observe missing property: ${String(prop)}`);
+		// Typescript should check this for us.
+		// if (!Object.prototype.hasOwnProperty.call(host, prop))
+		// 	throw new Error(`Cannot observe missing property: ${String(prop)}`);
 	
 		let value = host[prop];
 
@@ -94,6 +95,7 @@ export function makeObservable<T extends object>(
 	return observableHost;
 }
 
+// All properties of classes dirived from this base can be observed. 
 // Usage:
 //	class User extends ObservableBase<User> {
 //		public name = "";
@@ -132,8 +134,9 @@ export abstract class ObservableBase<T extends object> {
 		const host = this as unknown as T;
 		const listeners = this.listeners;
 
-		if (!Object.prototype.hasOwnProperty.call(host, prop))
-			throw new Error(`Cannot observe missing property: ${String(prop)}`);
+		// Typescript should check this for us.
+		// if (!Object.prototype.hasOwnProperty.call(host, prop))
+		// 	throw new Error(`Cannot observe missing property: ${String(prop)}`);
 
 		let value: T[K] = host[prop];
 
@@ -186,13 +189,17 @@ export type TriggerFn<TEvents extends Record<string, unknown[]>> = <
 	...args: TEvents[K]
 ) => void;
 
-export type EventHost<TEvents extends Record<string, unknown[]>> = {
-	on: OnFn<TEvents>;
-	trigger: TriggerFn<TEvents>;
-};
-
 type EventHandlerMap<TEvents extends Record<string, unknown[]>> = {
 	[K in keyof TEvents & string]?: Array<EventHandler<TEvents[K]>>;
+};
+
+export interface MyEventSource<TEvents extends Record<string, unknown[]>> {
+	on: OnFn<TEvents>;
+};
+
+export interface EventHost<TEvents extends Record<string, unknown[]>> extends MyEventSource<TEvents> {
+	on: OnFn<TEvents>;
+	trigger: TriggerFn<TEvents>;
 };
 
 // makeEventHost mix-in

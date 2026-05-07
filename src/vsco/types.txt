@@ -1,0 +1,302 @@
+export interface PreloadedState {
+	braze: BrazeConfig;
+	companionApp: CompanionAppConfig;
+	growthbook: GrowthbookConfig;
+	entities: Entities;			// Full images
+	medias: MediasState;		// Abreviated images/entities
+	users: UsersState;
+}
+
+export interface BrazeConfig {
+	apiKey: string;
+	apiUrl: string;
+	initialized: boolean;
+}
+
+export interface CompanionAppConfig {
+	appName: string;
+	isFramedInCompanionApp: boolean;
+	isFromCompanionApp: boolean;
+	isFromDarkModeApp: boolean;
+	isPWA: boolean;
+	returnTo: string;
+}
+
+export interface GrowthbookConfig {
+	apiKey: string;
+	apiUrl: string;
+	SSRData: GrowthbookSSRData;
+}
+
+export interface GrowthbookSSRData {
+	attributes: Record<string, unknown>;
+	features: Record<string, FeatureFlag>;
+}
+
+export interface FeatureFlag<T = unknown> {
+	defaultValue: T;
+	rules?: FeatureRule<T>[];
+}
+
+export interface FeatureRule<T = unknown> {
+	condition?: Condition;
+	parentConditions?: ParentCondition[];
+	force?: T;
+
+	coverage?: number;
+	hashAttribute?: string;
+	hashVersion?: number;
+	bucketVersion?: number;
+	seed?: string;
+	gate?: boolean;
+}
+
+export interface ParentCondition {
+	id: string;
+	condition: Condition;
+	gate?: boolean;
+}
+
+export type Condition =
+	| PrimitiveCondition
+	| LogicalCondition
+	| ComparisonConditionMap;
+
+export interface PrimitiveCondition {
+	[key: string]: Primitive;
+}
+
+export interface LogicalCondition {
+	$or?: Condition[];
+	$and?: Condition[];
+	$not?: Condition;
+}
+
+export interface ComparisonConditionMap {
+	[key: string]:
+		| Primitive
+		| ComparisonOperators
+		| Condition[]
+		| undefined;
+}
+
+export interface ComparisonOperators {
+	$in?: Primitive[];
+	$nin?: Primitive[];
+
+	$lt?: Primitive;
+	$lte?: Primitive;
+	$gt?: Primitive;
+	$gte?: Primitive;
+
+	$vlt?: string;
+	$vlte?: string;
+	$vgt?: string;
+	$vgte?: string;
+
+	$regex?: string;
+
+	$exists?: boolean;
+}
+
+export type Primitive =
+	| string
+	| number
+	| boolean
+	| null;
+
+//
+// Common strongly-typed feature values
+//
+
+export interface AdConfig {
+	adUnit?: string;
+	adUnitId?: string;
+	adUnitID?: string;
+
+	tagId?: string;
+	crid?: string;
+
+	zoneId?: string;
+	orgId?: string;
+
+	requestVideo?: boolean;
+
+	interval?: number;
+	step?: number;
+	first?: number;
+
+	pageSize?: number;
+	pageDelay?: number;
+
+	enablePersonalizedAds?: boolean;
+	enableCustomTargeting?: boolean;
+
+	lineItemIds?: number[];
+
+	ixZoneId?: {
+		desktop?: string;
+		mobile?: string;
+	};
+
+	[key: string]: unknown;
+}
+
+export interface DatadogMinimumLogLevel {
+	datadogMinimumLogLevel:
+		| "debug"
+		| "info"
+		| "warn"
+		| "error";
+}
+
+export interface ProValueCTA {
+	isEnabled: boolean;
+	newForProCTAURL: string;
+	membershipURL?: string;
+	getStartedURL?: string;
+	visitThreshold?: number;
+}
+
+export interface AppLaunchLoggingConfig {
+	enableLocalLogging: boolean;
+	enableDataDogLogging: boolean;
+}
+
+export interface AIStudioToolConfig {
+	schemaVersion: number;
+	tools: AIStudioTool[];
+}
+
+export interface AIStudioTool {
+	id: string;
+	eventTypeId: string;
+
+	prompt: string;
+
+	toolbarButtonName: string;
+	displayName: string;
+	actionButtonText: string;
+
+	iconUrl: string;
+
+	isEnabled: boolean;
+
+	colorMatchEnabled?: boolean;
+	transparentBackgroundEnabled?: boolean;
+	newToolBadgeEnabled?: boolean;
+
+	gridDescription?: string;
+
+	info?: AIStudioToolInfo;
+}
+
+export interface AIStudioToolInfo {
+	imageUrl: string;
+	title: string;
+	description: string;
+	learnMoreUrl: string;
+	actionButtonText: string;
+}
+
+///  Asked about Entities   ///////////
+
+export interface Entities {
+	images: Record<string, ImageEntity>;
+	videos?: Record<string, VideoEntity>;
+	sites?: Record<string, SiteEntity>;
+	users?: Record<string, UserEntity>;
+}
+
+// 2nd attempt by ChatGPT
+interface ImageEntity {
+	// used
+	captureDate: number;
+	uploadDate: number;
+	responsiveUrl: string;
+	height: number;
+	width: number;
+	videoUrl?: string | null; // not sure this exists.
+
+	// not used
+	id: string;
+	gridName: string;
+	adaptiveBase: string;
+	siteId: number;
+	siteProfileImageUrl: string;
+	captureDateMs: number;
+	description: string;
+	descriptionAnchored: string;
+	copyrightClasses: string[];
+	lastUpdated: number;
+	locationCoords: null;
+	hasLocation: boolean;
+	featureLink: null;
+	isFeatured: boolean;
+	isVideo: boolean;
+	permaDomain: string;
+	permaSubdomain: string;
+	permalink: string;
+	shareLink: string;
+	showLocation: number;
+	imageStatus: { code: number; time: number; };
+	imageMeta: ImageMeta;
+	userId: number;
+}
+
+interface ImageMeta: {
+	aperture?: number;
+	copyright: string;
+	flashMode?: string;
+	iso?: number;
+	make: string;
+	model: string;
+	shutterSpeed?: string;
+	whiteBalance?: string;
+	orientation: number;
+	captureDate?: number;
+	flashValue?: number;
+	software: string;
+	extension: number;
+	fileSize: number;
+	fileHash: string;
+}
+
+export interface VideoEntity {
+	id?: string;
+	responsiveUrl?: string;
+	videoUrl?: string;
+	height?: number;
+	width?: number;
+	[key: string]: unknown;
+}
+
+export interface SiteEntity {
+	id?: string | number;
+	name?: string;
+	description?: string;
+	subdomain?: string;
+	[key: string]: unknown;
+}
+
+export interface UserEntity {
+	id?: string | number;
+	username?: string;
+	tkn?: string;
+	[key: string]: unknown;
+}
+
+export interface MediasState {
+	bySiteId: Record<string, SiteMediaState>;
+}
+
+export interface SiteMediaState {
+	medias: SmallMediaRef[];
+	nextCursor?: string | null;
+}
+
+export interface SmallMediaRef {
+	type: "image" | "video";
+	image?: string;
+	video?: string;
+}

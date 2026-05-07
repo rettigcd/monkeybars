@@ -99,7 +99,7 @@ async function initPageAsync(): Promise<void> {
 	// Wait
 	const now = Date.now();
 	const reloadTime = now < goTime.valueOf() ? goTime : new Date();
-	const result = await waiter.waitAsync(reloadTime, waitForShowsTimeout);
+	const result = await waiter.waitAsync(reloadTime); // !!! how do we pass waitForShowsTimeout ??? 
 	if (result.shouldReload) // !!! When should we NOT reload???
 		reloader.reload(result.reason);
 }

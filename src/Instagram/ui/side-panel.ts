@@ -1,10 +1,10 @@
 import { $ } from "~/lib/dom3";
 import { GM } from "~/lib/gm";
+import { HotkeyManager } from "~/lib/hotkey-manager";
 import { PicGroup } from "../models/pic-group";
 import { SingleImage } from "../models/single-image";
 import { calcDownloadsInLastYear, getTotalDownloads } from "../services/download-stats";
 import { instaDom } from "../services/instaDom";
-import { HotkeyManager } from "../services/key-presses";
 import type { UserEntity, UserRepo } from "../types/repo-types";
 
 type SidePanelConstructorArgs = {
@@ -281,14 +281,14 @@ export class SidePanel {
 				img.style[singleImage.largestDimensionName] = `${this.newImageSize}px`;
 			})
 			.on("click", async (event: Event) => {
-				const img = event.currentTarget;
-				if (!(img instanceof HTMLImageElement))
-					return;
-
-				img.style.cursor = "wait";
+				const {style} = event.currentTarget as HTMLImageElement;
+				// Before
+				style.cursor = "wait";
+				// During
 				await singleImage.downloadLargestAsync();
-				img.style.cursor = "default";
-				img.style.opacity = "0.3";
+				// After
+				style.cursor = "default";
+				style.opacity = "0.3";
 			});
 	}
 

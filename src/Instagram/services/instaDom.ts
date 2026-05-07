@@ -33,6 +33,6 @@ export const instaDom = {
 	get body(): HTMLElement { return document.body; },
 
 	// For USERS, the page owner
-	get pageOwner(): string { return document.location.pathname.split("/")[1]; },
+	get pageOwner(): string { return location.pathname.split("/")[1]; },
 
 };
