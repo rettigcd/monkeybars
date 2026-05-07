@@ -2,29 +2,28 @@ export type EmployeeId = string;
 export type DateTimeString = string; // e.g. "2002-07-15T00:00:00"
 
 export type Employee = {
-
 	employeeId: string;
 
-	fullName: string;
-	lastName: string;
 	firstName: string;
+	lastName: string;
 	nickName: string;
-	fullNickName: string;
 
 	location: string;
 
-	mobilePhone: string | null;	// 8000+ records
-	homePhone: string | null; // 600+ recoreds
-	email: string;
+	mobilePhone?: string | null;	// 8000+ records
 
 	startDate: DateTimeString;
-	lastWorkDate: DateTimeString;
+	lastWorkDate?: DateTimeString;
 
 	dept: string;		// Department descriptions
-	department: string; // Department # as a string.  Example: "262", "86"
 
 	statusCode: "ACT" | "LOA" | "TERM";
 
+	// homePhone: string | null; // 600+ recoreds
+	// department: string; // Department # as a string.  Example: "262", "86"
+	// email: string;
+	//	fullName: string;
+	// fullNickName: string;
 	// firstResponder: 0 | 1;
 	// extension: string;
 	// title: string;

@@ -15,8 +15,9 @@
 // ==/UserScript==
 
 import { delayAsync } from "~/lib/async";
-import { type EmployeeDirectory, getEmployeeDictAsync } from "./data-source";
-import { activeIvyIds, registerIds } from "./ids";
+import { throwExp } from "~/lib/throw";
+import { Employee, type EmployeeDirectory, getEmployeeDictAsync } from "./data-source";
+import { ids } from "./ids";
 import { store } from "./store";
 import { appendEmployeeAsync, clearEmployees } from "./ui";
 
@@ -25,30 +26,55 @@ declare global {
 	var employeeData: EmployeeDirectory | undefined;
 	var scanEmployeesAsync: (start: number, count?: number) => Promise<void>;
 	var showEmployeesByIdAsync: (ids?: number[] | null) => Promise<void>;
+	var saveEmployees: (ids:number[]) => void;
+
+	var ivy2f3_marketing: number[];
+	var ivy2f3_it: number[];
+	var ivy1f4: number[];
+	var miscIds: number[];
+	var activeIvyIds: number[];
+	var ids: any; // I'm to lazy to type these.
 }
 
-registerIds(globalThis);
+globalThis.ids = ids;
 
+// Displays Employees from the DataSource (json)
 async function showEmployeesByIdAsync(ids: number[] | null = null): Promise<void> {
 	ids = ids || activeIvyIds;
 	clearEmployees();
 	for (const id of ids) {
-		await appendEmployeeAsync(id);
+		const emp:Employee|undefined = globalThis.employeeData?.[id];
+		await appendEmployeeAsync(id,emp);
 		await delayAsync(250);
 	}
 }
 
-export async function scanEmployeesAsync(start: number, count = 100): Promise<void> {
+// Displays Employees from the DataSource (json)
+async function scanEmployeesAsync(start: number, count = 100): Promise<void> {
 	clearEmployees();
 	const end = start + count;
 	for (let employeeId = start; employeeId < end; ++employeeId) {
 		if (globalThis.employeeData?.[employeeId] === undefined) continue;
 		if (store.maxEmployeeId < employeeId) store.maxEmployeeId = employeeId;
-		await appendEmployeeAsync(employeeId);
+		const emp:Employee|undefined = employeeDirectory()[employeeId];
+		await appendEmployeeAsync(employeeId,emp);
 		await delayAsync(400);
 		console.debug("employee added");
 	}
 	console.log(`${start} .. ${start + count - 1} complete`);
+}
+
+function employeeDirectory() : EmployeeDirectory {
+	return globalThis.employeeData || throwExp("No employee data available.");
+}
+
+function saveEmployees(ids:number[]){
+	const dir = employeeDirectory();
+	for (const id of ids) {
+		const emp:Employee|undefined = dir[id];
+		if(emp != undefined)
+			store.saveEmployee(emp);
+	}
 }
 
 //=============================
@@ -59,6 +85,7 @@ void (async function (): Promise<void> {
 	globalThis.employeeData = await getEmployeeDictAsync();
 	globalThis.scanEmployeesAsync = scanEmployeesAsync;
 	globalThis.showEmployeesByIdAsync = showEmployeesByIdAsync;
+	globalThis.saveEmployees = saveEmployees;
 
 	function foo(str: string): void {
 		queueMicrotask(console.log.bind(console, `%c${str}`, "color:#00c;font-style:italic;font-weight:800;"));
@@ -68,6 +95,7 @@ void (async function (): Promise<void> {
 	foo("terminatedIds = [...]");
 	foo("scanEmployeesAsync(start,count=100);");
 	foo("showEmployeesByIdAsync(ids=null);");
+	foo("saveEmployees([...])");
 
 	const lastEmployee = Object.values(globalThis.employeeData).pop();
 	foo(`Last employee: ${lastEmployee?.employeeId ?? "?"}, Last scanned:${store.maxEmployeeId}`);

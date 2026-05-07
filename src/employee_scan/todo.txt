@@ -1,0 +1,15 @@
+When we load
+	scan data-source for employees that are missing OR have been marked terminated 
+	mark them terminated
+	??? display their card.
+	??? log in console their info?
+	??? move them to a terminated repo and out of the current repo
+
+Reports
+	Departments & numbers
+	People in department
+	People by Location sections.
+
+Once reports are working better, remove the ids.ts file.
+
+IVY010 / 0 ==> terminated
