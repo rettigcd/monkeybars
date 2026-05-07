@@ -1,11 +1,11 @@
 import { $, $qAsync } from "~/lib/dom3";
 import { SyncedPersistentDict } from "~/lib/storage";
 
-import type { SnlWindow } from "../../../snl/window";
+import type { SnlWindow } from "../../snl/window";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
-import { dom } from "../services/dom";
 import { calcDownloadsInLastYear } from "../services/download-stats";
 import { ImageLookupByUrl } from "../services/image-lookup-by-url";
+import { instaDom } from "../services/instaDom";
 import { HotkeyManager } from "../services/key-presses";
 import { buildRequestSnooper } from "../services/snoopBuilder";
 import { loadTime, reportLast } from "../services/storage-time";
@@ -154,7 +154,7 @@ export class UserPage {
 				background: "#ddf",
 				padding: "5px",
 			})
-			.appendTo(dom.body);
+			.appendTo(instaDom.body);
 
 		this.oldestDownloadedLink(reports).appendTo(host.el);
 		this.oldestTrackedLink(reports).appendTo(host.el);
@@ -165,7 +165,7 @@ export class UserPage {
 		isTracking: boolean;
 		startingState: Partial<UserEntity>;
 	} {
-		const pageOwner = this.pageOwner = dom.pageOwner;
+		const pageOwner = this.pageOwner = instaDom.pageOwner;
 		const isTracking = this.userRepo.containsKey(pageOwner);
 		const startingState: Partial<UserEntity> = isTracking
 			? structuredClone(this.userRepo.get(pageOwner))

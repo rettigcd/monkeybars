@@ -1,8 +1,8 @@
 import { $ } from "~/lib/dom3";
 import { BatchProducerGroup } from "../extractors/batch-producer-group";
-import { PicGroup } from "../pic-group";
-import { dom } from "../services/dom";
+import { PicGroup } from "../models/pic-group";
 import { sanitizeImgUrl } from "../services/image-lookup-by-url";
+import { instaDom } from "../services/instaDom";
 import { timestampToAgeString } from "../services/storage-time";
 
 type GalleryConstructorArgs = {
@@ -45,7 +45,7 @@ export class Gallery {
 	}
 
 	private decorateThumbs(): void {
-		const rows = dom.thumbRows as ThumbRowElement[];
+		const rows = instaDom.thumbRows as ThumbRowElement[];
 		if (rows.length === 0)
 			return;
 

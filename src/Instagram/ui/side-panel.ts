@@ -1,10 +1,10 @@
 import { $ } from "~/lib/dom3";
 import { GM } from "~/lib/gm";
-import { PicGroup } from "../pic-group";
-import { dom } from "../services/dom";
+import { PicGroup } from "../models/pic-group";
+import { SingleImage } from "../models/single-image";
 import { calcDownloadsInLastYear, getTotalDownloads } from "../services/download-stats";
+import { instaDom } from "../services/instaDom";
 import { HotkeyManager } from "../services/key-presses";
-import { SingleImage } from "../single-image";
 import type { UserEntity, UserRepo } from "../types/repo-types";
 
 type SidePanelConstructorArgs = {
@@ -99,7 +99,7 @@ export class SidePanel {
 		userRepo,
 	}: SidePanelConstructorArgs) {
 		this.userRepo = userRepo;
-		this.pageOwner = dom.pageOwner;
+		this.pageOwner = instaDom.pageOwner;
 		this.countUserDownloads = calcDownloadsInLastYear;
 		this.getTotalDownloads = getTotalDownloads;
 		this.openInTab = GM.openInTab;
@@ -303,7 +303,7 @@ export class SidePanel {
 				this.buildHeader(),
 				newImageContainerBuilder,
 			)
-			.appendTo(dom.body);
+			.appendTo(instaDom.body);
 
 		this.outer = outerBuilder.el;
 		this.newImageContainer = newImageContainerBuilder.el;

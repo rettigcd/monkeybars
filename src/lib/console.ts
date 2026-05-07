@@ -1,4 +1,5 @@
-// Extends the conosle
+// Extends and exports the conosle with .print(..) and optionally .image()
+// Silences and restores the console used by the application.
 
 export type PrintConsole = Console & {
 	print(...args: Parameters<Console["log"]>): void;
@@ -8,7 +9,7 @@ export type ExtendedConsole = PrintConsole & {
 	image(url: string, height?: number): void;
 };
 
-// called automatically on globalThis.console
+// Adds the line-less .print(...) to the console.
 export function addPrint( con: Console ) : PrintConsole {
 	// strips the line numbers
 	(con as PrintConsole).print = function(...args: Parameters<Console["log"]>): void {
@@ -17,6 +18,7 @@ export function addPrint( con: Console ) : PrintConsole {
 	return con as PrintConsole;
 }
 
+// Adds both the line-less .print(...) and the .image(url,height) method
 export function extendConsole( con: Console ): ExtendedConsole {
 	const extended = con as ExtendedConsole;
 	addPrint(con);

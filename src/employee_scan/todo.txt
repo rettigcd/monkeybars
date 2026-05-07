@@ -5,6 +5,9 @@ When we load
 	??? log in console their info?
 	??? move them to a terminated repo and out of the current repo
 
+When we load
+	display peopled hired since last time.
+
 Reports
 	Departments & numbers
 	People in department
@@ -13,3 +16,14 @@ Reports
 Once reports are working better, remove the ids.ts file.
 
 IVY010 / 0 ==> terminated
+
+If lastWorkDate == "1900-01-01T00:00:00"
+	then delete .lastWorkDate
+
+Strip the time off of startDate and lastWorkedDate
+
+Remove employeeId from from records saved to localStorage.
+
+Export (as backup)
+	- current employees
+	- terminated employees

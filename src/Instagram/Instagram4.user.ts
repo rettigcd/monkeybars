@@ -25,7 +25,7 @@ import { formatDateForFilename } from "./date-formats";
 import { LocationPage } from "./pages/location-page";
 import { UserPage } from "./pages/user-page";
 import { ScreenImageActions } from "./screen-image-actions";
-import { dom } from "./services/dom";
+import { instaDom } from "./services/instaDom";
 import { HotkeyManager } from "./services/key-presses";
 import { type InstagramWindow } from "./types/window";
 
@@ -34,7 +34,7 @@ declare const unsafeWindow: InstagramWindow;
 silenceConsole(unsafeWindow);
 
 function openFocusUserProfilePage() {
-	const focusUser = dom.focusUser;
+	const focusUser = instaDom.focusUser;
 	if (focusUser)
 		GM.openInTab(`https://instagram.com/${focusUser}`);
 	else
@@ -71,8 +71,8 @@ export function initInstagram4(): void {
 	hotkeys.register("t", () => screenImageActions.showTaggedUsersUnderMouse());
 	hotkeys.register("p", openFocusUserProfilePage);
 	hotkeys.register("Ctrl+Shift+U", saveUsersToFile);
-	hotkeys.register("ArrowDown", () => dom.nextButton?.click() );
-	hotkeys.register("ArrowUp", () => dom.previousButton?.click());
+	hotkeys.register("ArrowDown", () => instaDom.nextButton?.click() );
+	hotkeys.register("ArrowUp", () => instaDom.previousButton?.click());
 	hotkeys.start();
 
 	if (window.location.pathname.startsWith("/explore/locations"))

@@ -2,7 +2,7 @@ import { $ } from "~/lib/dom3";
 import { GM } from "~/lib/gm";
 import { formatDateForFilename } from "./date-formats";
 import { SingleImage } from "./models/single-image";
-import { dom } from "./services/dom";
+import { instaDom } from "./services/instaDom";
 
 export type MousePoint = { clientX: number; clientY: number };
 type SourceUnderPoint = { el: HTMLElement; src: string };
@@ -105,7 +105,7 @@ export class ScreenImageActions {
 	}
 
 	public getCenterOfPresentation(): MousePoint | undefined {
-		const el = dom.presentationCenter;
+		const el = instaDom.presentationCenter;
 		if (el == null) return undefined;
 
 		el.style.border = "thick solid red";
@@ -169,14 +169,14 @@ export class ScreenImageActions {
 				context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
 				const coverImageSrc = canvas.toDataURL("image/jpeg");
-				const extractFilename = (dom.pageOwner || "instagram_img") + " " + formatDateForFilename(new Date()) + ".jpg";
+				const extractFilename = (instaDom.pageOwner || "instagram_img") + " " + formatDateForFilename(new Date()) + ".jpg";
 
 				GM.download({ url: coverImageSrc, name: extractFilename });
 				return;
 			}
 
 			const extension = await this.getExtensionFromBlobType(imgUrl);
-			const filename = (dom.pageOwner || "instagram_img") + " " + formatDateForFilename(new Date()) + "." + extension;
+			const filename = (instaDom.pageOwner || "instagram_img") + " " + formatDateForFilename(new Date()) + "." + extension;
 
 			await GM.downloadAsync({ url: imgUrl, name: filename });
 			console.log(`downloaded: ${filename}`);

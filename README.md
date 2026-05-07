@@ -66,9 +66,9 @@ Example:
 // @grant        none
 // ==/UserScript==
 
-import { log } from "../utils/log";
+import { con } from "../utils/console";
 
-log("my-script", "Hello from Tampermonkey");
+con.print("my-script", "Hello from Tampermonkey");
 ```
 
 ## Notes

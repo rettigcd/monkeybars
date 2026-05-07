@@ -1,4 +1,4 @@
-import { dom } from "./services/dom";
+import { instaDom } from "./services/instaDom";
 
 export function scheduleSetTabTitle(): void {
 	Promise.all([
@@ -36,7 +36,7 @@ function getGoodTitleAsync(timeoutAfter = 10000): Promise<string> {
 				logAndResolve(title);
 			else if (timeoutAt <= Date.now()){
 				console.debug({titleLog});
-				logAndResolve(dom.pageOwner);
+				logAndResolve(instaDom.pageOwner);
 			}
 
 		}, 200);
@@ -50,7 +50,7 @@ function getImageCountAsync( timeoutAfter = 2000 ): Promise<number|undefined> {
 		const timeoutAt = Date.now() + timeoutAfter;
 
 		const intervalId = window.setInterval(() => {
-			const imageCountSpan = dom.imageCountSpan;
+			const imageCountSpan = instaDom.imageCountSpan;
 			if (imageCountSpan != null){
 				resolve(Number(imageCountSpan.innerText));
 				window.clearInterval(intervalId);

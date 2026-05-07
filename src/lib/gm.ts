@@ -1,3 +1,4 @@
+// Declare the GM_ download functions
 declare function GM_download(details: {
 	url: string;
 	name: string;
@@ -11,11 +12,7 @@ declare function GM_openInTab(url: string): void;
 
 export type GMProgressHandler = (event: ProgressEvent<EventTarget>) => void;
 
-export interface GMDownloadAsyncArgs {
-	url: string;
-	name: string;
-	onprogress?: GMProgressHandler;
-}
+export interface GMDownloadAsyncArgs { url: string; name: string; onprogress?: GMProgressHandler; }
 
 export interface GMApi {
 
@@ -41,7 +38,7 @@ export const GM: GMApi = {
 
 	// Downloads a file using GM.download with optional progress tracking.
 	// Used as a wrapper to standardize async download handling.
-	async downloadAsync({ url, name, onprogress }: {url:string,name:string, onprogress?:GMProgressHandler}) {
+	async downloadAsync({ url, name, onprogress }: GMDownloadAsyncArgs) {
 		console.debug("GM.download:", { url, name });
 		await new Promise<void>((resolve, reject) => {
 			const onload = () => resolve();

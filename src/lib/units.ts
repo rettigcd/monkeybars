@@ -5,6 +5,5 @@ const HOURS = 60 * MINUTES;
 const DAYS = 24 * HOURS;
 const [WEEKS, MONTHS, YEARS] = [7 * DAYS, 30 * DAYS, 365 * DAYS] as const;
 
-export {
-	mS, SECONDS, MINUTES, HOURS, DAYS, WEEKS, MONTHS, YEARS,
-};
+export { DAYS, HOURS, MINUTES, MONTHS, mS, SECONDS, WEEKS, YEARS };
+

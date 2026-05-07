@@ -1,7 +1,7 @@
 import { EventHostBase } from "~/lib/observable";
 import { PicGroup } from "../../models/pic-group";
 import { findProp } from "../../prune-hay";
-import { dom } from "../../services/dom";
+import { instaDom } from "../../services/instaDom";
 import { type BatchProducerEvents } from "../base-pic-extractor";
 import { type Edge } from "../ig-types";
 
@@ -16,7 +16,7 @@ export class InitialLocationPageParser extends EventHostBase<BatchProducerEvents
 	}
 
 	scanScriptsForMedia() {
-		const scripts: HTMLScriptElement[] = dom.scripts;
+		const scripts: HTMLScriptElement[] = instaDom.scripts;
 
 		// try to find the 1 edge that contains the media nodes
 		const edgeScripts = scripts
