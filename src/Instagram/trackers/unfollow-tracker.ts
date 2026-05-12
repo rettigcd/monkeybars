@@ -1,14 +1,15 @@
 import { RequestSnooper, type SnoopHandler } from "~/lib/snoop";
-import type { UserRepo } from "../types/repo-types";
+import { SyncedPersistentDict } from "~/lib/storage";
+import type { LocalStorageUserEntity } from "../types/local-storage-types";
 
 // UnfollowTracking
 // Doesn't need to be a class.
 // Could just be a function that takes the snooper and userRepo as arguments and adds the handler to the snooper.
 export class UnfollowTracker {
 
-	_userRepo: UserRepo;
+	_userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 
-	constructor(snooper: RequestSnooper, userRepo:UserRepo) {
+	constructor(snooper: RequestSnooper, userRepo:SyncedPersistentDict<LocalStorageUserEntity>) {
 		this._userRepo = userRepo;
 		snooper.addHandler(this.snoop);
 	}

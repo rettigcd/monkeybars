@@ -27,7 +27,7 @@ export class BatchProducerGroup
 	};
 
 	isNew(picGroup:PicGroup): boolean {
-		return this.lastVisit < picGroup.dateNum;
+		return this.lastVisit < picGroup.dateMs;
 	}
 }
 

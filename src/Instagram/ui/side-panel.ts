@@ -1,15 +1,16 @@
 import { $ } from "~/lib/dom3";
 import { GM } from "~/lib/gm";
 import { HotkeyManager } from "~/lib/hotkey-manager";
+import { SyncedPersistentDict } from "~/lib/storage";
 import { PicGroup } from "../models/pic-group";
 import { SingleImage } from "../models/single-image";
 import { calcDownloadsInLastYear, getTotalDownloads } from "../services/download-stats";
 import { instaDom } from "../services/instaDom";
-import type { UserEntity, UserRepo } from "../types/repo-types";
+import type { LocalStorageUserEntity } from "../types/local-storage-types";
 
 type SidePanelConstructorArgs = {
 	batchProducer: { on(eventName: "batchReceived", handler: (batch: PicGroup[]) => void): void; };
-	userRepo: UserRepo;
+	userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 };
 
 type Css = Partial<CSSStyleDeclaration>;
@@ -83,10 +84,10 @@ export class SidePanel {
 	private readonly containerCollapsedWidth = "350px";
 	private readonly elementId = "sidePanel";
 
-	private readonly userRepo: UserRepo;
+	private readonly userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 	private readonly pageOwner?: string;
 
-	private readonly countUserDownloads: (user: UserEntity) => number;
+	private readonly countUserDownloads: (user: LocalStorageUserEntity) => number;
 	private readonly getTotalDownloads: (downloads?: Record<string, number>) => number;
 	private readonly openInTab: (url: string) => void;
 

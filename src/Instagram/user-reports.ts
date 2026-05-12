@@ -1,28 +1,29 @@
 import { makeStackedBar } from "~/lib/charts";
 import { con } from "~/lib/console";
 import { by, byDesc, groupBy } from "~/lib/sorting";
+import { SyncedPersistentDict } from "~/lib/storage";
 import { DAYS } from "~/lib/units";
 import { calcDownloadsInLastYear, getRefreshTime, lastVisitOlderThanThresholdOrMissing } from "./services/download-stats";
 import { ImageLookupByUrl } from "./services/image-lookup-by-url";
-import { loadTime, storageTime } from "./services/storage-time";
-import type { UserEntity, UserRepo } from "./types/repo-types";
+import { loadTimeMs } from "./services/storage-time";
+import type { LocalStorageUserEntity } from "./types/local-storage-types";
 
-type UserFilter = (x: UserEntity) => boolean;
+type UserFilter = (x: LocalStorageUserEntity) => boolean;
 type TimedUserFilter = (timeframe: number) => UserFilter;
 
 export const filters = {
 	followed: {
-		stale: (timeframe: number) => (x: UserEntity) => !!x.isFollowing && lastVisitOlderThanThresholdOrMissing(x.lastVisit, timeframe),
-		public: (x: UserEntity) => !!x.isFollowing && !x.isPrivate,
+		stale: (timeframe: number) => (x: LocalStorageUserEntity) => !!x.isFollowing && lastVisitOlderThanThresholdOrMissing(x.lastVisit, timeframe),
+		public: (x: LocalStorageUserEntity) => !!x.isFollowing && !x.isPrivate,
 	},
 	tracked: {
-		all: (x: UserEntity) => !x.isFollowing,
-		stale: (timeframe: number) => (x: UserEntity) => !x.isFollowing && !x.isPrivate && lastVisitOlderThanThresholdOrMissing(x.lastVisit, timeframe),
-		private: (x: UserEntity) => !x.isFollowing && !!x.isPrivate,
+		all: (x: LocalStorageUserEntity) => !x.isFollowing,
+		stale: (timeframe: number) => (x: LocalStorageUserEntity) => !x.isFollowing && !x.isPrivate && lastVisitOlderThanThresholdOrMissing(x.lastVisit, timeframe),
+		private: (x: LocalStorageUserEntity) => !x.isFollowing && !!x.isPrivate,
 	},
 	downloaded: {
-		all: (x: UserEntity) => 0 < calcDownloadsInLastYear(x),
-		stale: (x: UserEntity) => 0 < calcDownloadsInLastYear(x) && getRefreshTime(x) < loadTime,
+		all: (x: LocalStorageUserEntity) => 0 < calcDownloadsInLastYear(x),
+		stale: (x: LocalStorageUserEntity) => 0 < calcDownloadsInLastYear(x) && getRefreshTime(x) < loadTimeMs,
 	},
 } satisfies {
 	followed: {
@@ -42,7 +43,7 @@ export const filters = {
 
 
 type UserReportsConstructorArgs = {
-	userRepo: UserRepo
+	userRepo: SyncedPersistentDict<LocalStorageUserEntity>
 	iiLookup: ImageLookupByUrl,
 }
 
@@ -61,8 +62,6 @@ export class UserReports {
 		this.iiLookup = iiLookup;
 
 		function showUsers(filter: UserFilter) { return userRepo.values().filter(filter); }
-
-		const { DAYS } = storageTime;
 
 		this.followed = {
 			stale: (notVisitedDays = 60) => showUsers(filters.followed.stale(notVisitedDays * DAYS)).sort(by((x) => x.lastVisit || 0)),
@@ -115,7 +114,7 @@ const statParts: Array<{ label: UserStatsCategory; color: string }> = [
 	{ label: "complete:fresh", color: "green" },
 ];
 
-export function showStats(userRepo: UserRepo): void {
+export function showStats(userRepo: SyncedPersistentDict<LocalStorageUserEntity>): void {
 	const grouped = groupBy(userRepo.values(), classifyUserStats);
 
 	con.print( statParts.map(({ label }) => [label, grouped[label]?.length ?? 0]) );
@@ -127,7 +126,7 @@ export function showStats(userRepo: UserRepo): void {
 	document.body.appendChild(bar);
 }
 
-function classifyUserStats(user: UserEntity): UserStatsCategory {
+function classifyUserStats(user: LocalStorageUserEntity): UserStatsCategory {
 	const mdl = user.dl == null;
 	const mlv = user.lastVisit == null;
 	if (mdl && mlv) return "missing_both";

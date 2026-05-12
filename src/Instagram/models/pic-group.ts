@@ -2,7 +2,6 @@ import { toMs } from "~/lib/epoch-time";
 import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observable";
 import type { MediaNode } from "../extractors/ig-types";
 import { sanitizeImgUrl } from "../services/image-lookup-by-url";
-import { storageTime } from "../services/storage-time";
 import { SingleImage } from "./single-image";
 
 type PicGroupArgs = {
@@ -36,10 +35,7 @@ export class PicGroup implements ObservableHost<PicGroup> {
 	}
 
 	// for sorting and comparing
-	// uses whatever number schema is currently configured in storageTime, which is currently ms but may change in the future
-	get dateNum(): number {
-		return storageTime.toNum(this.date);
-	}
+	get dateMs(): number { return this.date.valueOf(); }
 
 	static fromMediaWithUser(dto: MediaNode): PicGroup {
 		const {

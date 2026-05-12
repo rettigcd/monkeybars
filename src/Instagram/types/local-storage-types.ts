@@ -1,7 +1,6 @@
-import { SyncedPersistentDict } from "~/lib/storage";
 
 // Users
-export type UserEntity = {
+export type LocalStorageUserEntity = {
 	id?: number,
 	username? : string;
 	fullName? : string;
@@ -14,15 +13,9 @@ export type UserEntity = {
 	}
 }
 
-export type UserRepo = SyncedPersistentDict<UserEntity>;
-
-
-
 // Locations
-export type LocationEntity = {
+export type LocalStorageLocationEntity = {
 	lastVisit?: number;
 	slug: string;
 	id: string;
 }
-
-export type LocationRepo = SyncedPersistentDict<LocationEntity>;

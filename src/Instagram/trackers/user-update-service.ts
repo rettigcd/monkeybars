@@ -1,28 +1,29 @@
 import { type ObservableListener } from "~/lib/observable";
+import { SyncedPersistentDict } from "~/lib/storage";
 import { throwExp } from "~/lib/throw";
 import type { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { PicGroup } from "../models/pic-group";
 import { SingleImage } from "../models/single-image";
 import { instaDom } from "../services/instaDom";
-import { loadTime } from "../services/storage-time";
-import type { UserRepo } from "../types/repo-types";
+import { loadTimeMs } from "../services/storage-time";
+import { LocalStorageUserEntity } from "../types/local-storage-types";
 
 type UserUpdateServiceConstructor = {
-	userRepo: UserRepo;
+	userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 	batchProducer: BatchProducerGroup;
 }
 
 // Monitors Batches as they come in and updates User data
 export class UserUpdateService {
 
-	userRepo: UserRepo;
+	userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 	pageOwner: string;
 	loadTimeMs: number;
 
 	constructor({ userRepo, batchProducer }: UserUpdateServiceConstructor) {
 		this.userRepo = userRepo || throwExp("UserService missing userRepo");
 		this.pageOwner = instaDom.pageOwner;
-		this.loadTimeMs = loadTime;
+		this.loadTimeMs = loadTimeMs;
 
 		this.singlePicDownloadListener = this.singlePicDownloadListener.bind(this);
 

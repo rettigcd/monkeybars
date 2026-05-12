@@ -91,7 +91,7 @@ export class Gallery {
 	}): void {
 		const { imgEl, picGroup } = args;
 		const { following = false, liked = false, pics } = picGroup;
-		const { ageText, ageColor } = timestampToAgeString(picGroup.dateNum);
+		const { ageText, ageColor } = timestampToAgeString(picGroup.dateMs);
 		const isNew = picGroup.isNew ?? false;
 
 		picGroup.thumbUrl = imgEl.src;

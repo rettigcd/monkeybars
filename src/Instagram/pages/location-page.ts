@@ -8,9 +8,9 @@ import { LocationContent } from "../extractors/location/location-content";
 import { DetailsPopup } from "../extractors/misc/details-popup";
 import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { buildRequestSnooper } from "../services/snoopBuilder";
-import { loadTime, reportLast } from "../services/storage-time";
+import { loadTimeMs, reportLast } from "../services/storage-time";
 import { UserUpdateService } from "../trackers/user-update-service";
-import type { LocationEntity, UserEntity } from "../types/repo-types";
+import type { LocalStorageLocationEntity, LocalStorageUserEntity } from "../types/local-storage-types";
 import { Gallery } from "../ui/gallery";
 import { SidePanel } from "../ui/side-panel";
 import { UserReports } from "../user-reports";
@@ -22,13 +22,13 @@ type LocationPageConstructor = {
 
 type LocationPageContext = {
 	snoopLog: unknown;
-	userRepo: SyncedPersistentDict<UserEntity>;
+	userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 	iiLookup: ImageLookupByUrl;
 	location: string;
-	locRepo: SyncedPersistentDict<LocationEntity>;
+	locRepo: SyncedPersistentDict<LocalStorageLocationEntity>;
 	gallery: Gallery;
 	sidePanel: SidePanel;
-	startingState: LocationEntity;
+	startingState: LocalStorageLocationEntity;
 	reports: UserReports | null;
 	track?: () => void;
 	stop?: () => void;
@@ -36,18 +36,18 @@ type LocationPageContext = {
 
 export class LocationPage {
 	constructor({ win, hotkeys }: LocationPageConstructor) {
-		const userRepo = new SyncedPersistentDict<UserEntity>("users");
+		const userRepo = new SyncedPersistentDict<LocalStorageUserEntity>("users");
 		const snooper = buildRequestSnooper(win);
-		const locRepo = new SyncedPersistentDict<LocationEntity>("locations");
+		const locRepo = new SyncedPersistentDict<LocalStorageLocationEntity>("locations");
 
 		const { id, slug } = this.parseLocationUrl(location.href);
 
 		const locationKey = `${slug} ${id}`;
 		const isTracking = locRepo.containsKey(locationKey);
 
-		const startingState: LocationEntity = isTracking
+		const startingState: LocalStorageLocationEntity = isTracking
 			? structuredClone(locRepo.get(locationKey))
-			: {} as LocationEntity;
+			: {} as LocalStorageLocationEntity;
 
 		console.log(locationKey, JSON.stringify(startingState, null, "\t"));
 		reportLast(startingState.lastVisit, "Visit");
@@ -86,14 +86,14 @@ export class LocationPage {
 
 		if (isTracking) {
 			locRepo.update(locationKey, (x) => {
-				x.lastVisit = loadTime;
+				x.lastVisit = loadTimeMs;
 			});
 		} else {
 			ctx.track = () => {
 				locRepo.update(locationKey, (u) => {
 					u.slug = slug;
 					u.id = id;
-					u.lastVisit = loadTime;
+					u.lastVisit = loadTimeMs;
 				});
 			};
 		}

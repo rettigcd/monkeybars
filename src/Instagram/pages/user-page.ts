@@ -8,14 +8,14 @@ import { calcDownloadsInLastYear } from "../services/download-stats";
 import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { instaDom } from "../services/instaDom";
 import { buildRequestSnooper } from "../services/snoopBuilder";
-import { loadTime, reportLast } from "../services/storage-time";
+import { loadTimeMs, reportLast } from "../services/storage-time";
 import { scheduleSetTabTitle } from "../tab-text";
 import { FollowingScrollerTracker } from "../trackers/following-scroller-tracker";
 import { IdentifyUnhandledRequests } from "../trackers/identify-unhandled-requests";
 import { UnfollowTracker } from "../trackers/unfollow-tracker";
 import { UserUpdateService } from "../trackers/user-update-service";
 import { type InstagramUser, setPublicPrivateLabel, VisitingUserTracker } from "../trackers/visiting-user-tracker";
-import type { UserEntity, UserRepo } from "../types/repo-types";
+import type { LocalStorageUserEntity } from "../types/local-storage-types";
 import { Gallery } from "../ui/gallery";
 import { NextLink } from "../ui/next-link";
 import { SidePanel } from "../ui/side-panel";
@@ -29,7 +29,7 @@ type ConstructorArgs = {
 };
 
 export class UserPage {
-	private userRepo: UserRepo;
+	private userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 	private ctx: any;
 	private reports: UserReports;
 	private pageOwner: string;
@@ -163,25 +163,25 @@ export class UserPage {
 	private captureStartingState() : {
 		pageOwner: string;
 		isTracking: boolean;
-		startingState: Partial<UserEntity>;
+		startingState: Partial<LocalStorageUserEntity>;
 	} {
 		const pageOwner = this.pageOwner = instaDom.pageOwner;
 		const isTracking = this.userRepo.containsKey(pageOwner);
-		const startingState: Partial<UserEntity> = isTracking
+		const startingState: Partial<LocalStorageUserEntity> = isTracking
 			? structuredClone(this.userRepo.get(pageOwner))
 			: {};
 
 		return { pageOwner, isTracking, startingState };
 	}
 
-	private logStartingState(startingState: Partial<UserEntity>) {
+	private logStartingState(startingState: Partial<LocalStorageUserEntity>) {
 		console.log(JSON.stringify(startingState, null, "\t"));
 	}
 
 	private initTrackedUser({ pageOwner, startingState }: any) {
 		const { userRepo, ctx } = this;
 
-		userRepo.update(pageOwner, (u: any) => (u.lastVisit = loadTime));
+		userRepo.update(pageOwner, (u: any) => (u.lastVisit = loadTimeMs));
 		setPublicPrivateLabel(startingState.isPrivate);
 
 		ctx.stop = () => {

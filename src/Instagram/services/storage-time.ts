@@ -1,15 +1,13 @@
 import { con } from "~/lib/console";
-import { EpochTime, toMs, useJavascriptTime } from "~/lib/epoch-time";
+import { DAYS } from "~/lib/units";
 
-export const storageTime : EpochTime = useJavascriptTime();
-
-export const loadTime = storageTime.now();
+export const loadTimeMs = Date.now();
 
 // Converts an age in milliseconds to a human-readable string and color.
 // Used for displaying recency information in UI or logs.
 export function timestampToAgeString(timestamp:number) : { ageText:string, ageColor:string } {
-	const ageMs = loadTime - timestamp;
-	const daysOld = ageMs / storageTime.DAYS;
+	const ageMs = loadTimeMs - timestamp;
+	const daysOld = ageMs / DAYS;
 
 	const { divider, label, color: ageColor } =
 		(daysOld < 3) ? { divider: 1, label: "day", color: "red" }
@@ -25,10 +23,10 @@ export function timestampToAgeString(timestamp:number) : { ageText:string, ageCo
 
 // Logs the last visit time with a formatted age string and color coding.
 // Used for debugging or displaying recency information in logs.
-export function reportLast(lastVisit:number|undefined, label:string) {
-	if (lastVisit !== undefined && 0 < lastVisit) {
-		const lvd = new Date(toMs(lastVisit)).toDateString();
-		const { ageText, ageColor } = timestampToAgeString(lastVisit);
+export function reportLast(lastVisitMs:number|undefined, label:string) {
+	if (lastVisitMs !== undefined && 0 < lastVisitMs) {
+		const lvd = new Date(lastVisitMs).toDateString();
+		const { ageText, ageColor } = timestampToAgeString(lastVisitMs);
 		const ageStyle = `color:white;background-color:${ageColor};`;
 		con.print(`Last ${label}: %c${ageText}%c ago on %c${lvd}`, ageStyle, "color:black;background-color:white;", ageStyle);
 	}

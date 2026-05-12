@@ -2,7 +2,7 @@ import { type EventHost, EventHostBase } from "~/lib/observable";
 import type { BatchProducerEvents } from "../extractors/base-pic-extractor";
 import { PicGroup } from "../models/pic-group";
 import { SingleImage } from "../models/single-image";
-import type { UserEntity } from "../types/repo-types";
+import type { LocalStorageUserEntity } from "../types/local-storage-types";
 
 type ImageLookupEntry = {
 	singleImage?: SingleImage;
@@ -14,7 +14,7 @@ export function sanitizeImgUrl(url: string): string {
 	return len < 0 ? url : url.substring(0, len);
 }
 
-export function isFollowing(fs?: UserEntity): boolean {
+export function isFollowing(fs?: LocalStorageUserEntity): boolean {
 	return !!(fs && fs.isFollowing);
 }
 

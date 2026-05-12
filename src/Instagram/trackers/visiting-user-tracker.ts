@@ -1,12 +1,13 @@
 import { $, $qAsync } from "~/lib/dom3";
 import { RequestSnooper, type SnoopHandler } from "~/lib/snoop";
+import { SyncedPersistentDict } from "~/lib/storage";
 import type { HandledRequest } from "../extractors/base-pic-extractor";
-import { loadTime } from "../services/storage-time";
-import type { UserRepo } from "../types/repo-types";
+import { loadTimeMs } from "../services/storage-time";
+import { LocalStorageUserEntity } from "../types/local-storage-types";
 
 type VisitingUserTrackerConstructionArgs = {
 	snooper: RequestSnooper, 
-	userRepo: UserRepo
+	userRepo: SyncedPersistentDict<LocalStorageUserEntity>
 }
 
 export type InstagramUser = {
@@ -21,12 +22,12 @@ export type InstagramUser = {
 // checks if we are following them and if so, saves following=true status to userRepo
 export class VisitingUserTracker {
 
-	private userRepo: UserRepo;
+	private userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 	private loadTimeMs: number; // !!!
 
 	constructor({ snooper, userRepo } : VisitingUserTrackerConstructionArgs) {
 		this.userRepo = userRepo;
-		this.loadTimeMs = loadTime;
+		this.loadTimeMs = loadTimeMs;
 		snooper.addHandler(this.snoop);
 	}
 
