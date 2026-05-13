@@ -2,8 +2,9 @@ import { $, loadImgSrcAsync } from "~/lib/dom3";
 import { toMs } from "~/lib/epoch-time";
 import { throwNever } from "~/lib/throw";
 import { formatDate } from "../format-date";
-import { DownloadProgress, ImageModel } from "../models/image-model";
+import { ImageModel, TaskStatus } from "../models/image-model";
 import { imgCardBgColor, imgCardCss } from "./css";
+import { ProgressBar } from "./progress-bar";
 
 const {containerCss,imageSizeSpanCss,imgCss,dateSpanCss,checkmarkCss} = imgCardCss;
 
@@ -13,6 +14,7 @@ function makeDateString(x:null|number){ return (x===null) ? 'N/A' : formatDate.Y
 export class ImageThumbControl{ // single image
 
 	private wrapperDiv: HTMLDivElement; // hosts progress-bar and checkmark
+	private _progressBar?: ProgressBar;
 
 	// trigger thumb load asynchronously
 	private img: HTMLImageElement;
@@ -50,31 +52,26 @@ export class ImageThumbControl{ // single image
 		await loadImgSrcAsync(this.img, this.thumbUrl);
 	}
 
-	private update(progress:DownloadProgress){
+	private update(progress:TaskStatus){
 		switch(progress.status){
 			case 'notStarted':
 				break;
-			case 'downloading':
-
-				// displays file-download progress on a ProgressBar
-				// const monitor = new ProgressMonitor( 
-				// 	new ProgressBar(this._wrapperDiv), 
-				// 	({loaded,total})=>Math.floor(loaded/1000+0.5)+' of '+Math.floor(total/1000+0.5)+'KB'
-				// );
-				// monitor.monitorImageModel(this.model);
-
+			case 'inProgress':
+				this._progressBar ??= new ProgressBar(this.wrapperDiv,({loaded,total})=>Math.floor(loaded/1000+0.5)+' of '+Math.floor(total/1000+0.5)+'KB');
+				this._progressBar.track({loaded:progress.loaded,total:progress.total});				
 				this.img.style.cursor = "wait";
 				break;
 			case 'complete':
 				this._showCheckmark();
-				this.img.style.cursor = "default";
 				this.img.style.opacity = "0.3";
-				break;
-			case 'errored':
+				// fall thru
+			case 'error':
 			case 'timeout':
 				this.img.style.cursor = "default";
+				this._progressBar?.close();
+				console.log( `download: ${progress.status}`);
 				break;
-			default: throwNever(progress.status);
+			default: throwNever(progress);
 		}
 	}
 

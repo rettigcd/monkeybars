@@ -3,7 +3,6 @@ import { EventHostBase } from "~/lib/observable";
 import { SyncedPersistentDict } from "~/lib/storage";
 import { DAYS } from "~/lib/units";
 import { Fetcher } from "./fetcher";
-import { Gallery } from "./models/gallery-model";
 import { ImageModel } from "./models/image-model";
 import { ILinkedUser, LocalStorageUserEntity, UserStatusType } from "./types";
 import { UserAccess } from "./user-access";
@@ -22,17 +21,15 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 
 	username: string;
 	_access: UserAccess;
-	gallery:Gallery;
 	track: (x:ImageModel)=>void;
 
 	private readonly _userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 
-	constructor(username: string, userRepo: SyncedPersistentDict<LocalStorageUserEntity>, userAccess: UserAccess, gallery:Gallery, track: (x:ImageModel)=>void){
+	constructor(username: string, userRepo: SyncedPersistentDict<LocalStorageUserEntity>, userAccess: UserAccess, track: (x:ImageModel)=>void){
 		super();
 		this.username = username;
 		this._userRepo = userRepo;
 		this._access = userAccess; // class: UserAccess
-		this.gallery = gallery;
 		this.track = track;
 		this.isPageOwner = UserStore.pageOwnerName == this.username;
 	}
@@ -42,8 +39,8 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 			this.username,
 			this._access,
 			this.fetch,
-			(u:string)=>new UserCtx(u, this._userRepo, this._access, this.gallery, this.track),
-			this.gallery, this.track
+			(u:string)=>new UserCtx(u, this._userRepo, this._access, this.track),
+			this.track
 		);
 	}
 	get data(){ return new UserData(this.username,this._userRepo.get(this.username)); }
@@ -124,6 +121,12 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 		return result;
 	}
 
+	// !!! THIS MIGHT BE WRONG.
+	// People missing viewDate are showing up as 1980
+	// and when we do a scan of them, it goes all the way back to the beginning.
+	// !!! don't scan people without viewDates.
+	// !!! MAYBE the status is wrong.  Maybe the status should show up as "new" or "notFollowing" but are erroneously showing up as following.
+	// !!! TEST - of everyone that .isDueToScanNewImages, show their: status & raw viewDate
 	get isDueToScanNewImages(){ 
 		const data: UserData = this.data;
 		if( data.status != "following" && data.status != "failed") return false;
@@ -133,7 +136,7 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 		return nextScanTime < UserCtx.nowMs;
 	}
 
-	_update(action:(d:UserData)=>void){
+	private _update(action:(d:UserData)=>void){
 		return this._userRepo.update( this.username, 
 			info => action( new UserData(this.username,info) ) 
 		);

@@ -2,16 +2,11 @@ import { con } from "~/lib/console";
 import { assertMs } from "~/lib/epoch-time";
 import { DownloadTimeoutError, GM } from "~/lib/gm";
 import { ObservableBase } from "~/lib/observable";
+import type { TaskStatus } from "~/lib/progress-types";
 import { formatDate } from "../format-date";
 import { LocalStorageImageEntity } from "../types";
 import { boxSize } from "../views/css";
-
-export type DownloadProgress = {
-	status: "notStarted" | "downloading" | "complete" | "errored" | "timeout";
-	loaded?:number;
-	total?:number;
-	error?: string;
-}
+export type { TaskStatus };
 
 // prsents and downloads a single image, tracking download progress
 export class ImageModel extends ObservableBase<ImageModel>{
@@ -33,7 +28,7 @@ export class ImageModel extends ObservableBase<ImageModel>{
 	public readonly captureDateMs: number;
 	public readonly uploadDateMs: number;
 
-	public downloadProgress: DownloadProgress = { status:'notStarted' };
+	public downloadProgress: TaskStatus = { status:'notStarted' };
 
 	private readonly localFileName: string;
 
@@ -69,17 +64,17 @@ export class ImageModel extends ObservableBase<ImageModel>{
 			con.print('Image saved.');
 		} catch(error){
 			if(error instanceof DownloadTimeoutError)
-				this.downloadProgress = {status:'timeout',error:error.message};
+				this.downloadProgress = {status:'timeout'};
 			else if(error instanceof Error)
-				this.downloadProgress = {status:'errored',error:error.message};
+				this.downloadProgress = {status:'error',error:error.message};
 			else
-				this.downloadProgress = {status:'errored',error:String(error)};
+				this.downloadProgress = {status:'error',error:String(error)};
 		}
 	}
 
 	private _onProgress = ({loaded,total}:{loaded:number,total:number}): void => {
 		console.debug( `%cdownloading... ${Math.floor(loaded / total * 100)}%`, 'color:blue;font-size:14px;');
-		this.downloadProgress = { status: 'downloading', loaded, total};
+		this.downloadProgress = { status: 'inProgress', loaded, total};
 	}		
 
 	toJSON(): LocalStorageImageEntity{ return this.constructorArgs; }

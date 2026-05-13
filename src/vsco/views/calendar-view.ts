@@ -1,7 +1,6 @@
 import { $, addStyleSheet, ElementBuilder } from "~/lib/dom3";
 import { YearStr } from "../format-date";
 import { CalendarModel } from "../models/calendar-model";
-import { Gallery } from "../models/gallery-model";
 import { MonthModel } from "../models/month-model";
 import { YearModel } from "../models/year-model";
 import { monthNames } from "../month-names";
@@ -19,7 +18,7 @@ export class CalendarView {
 	private model: CalendarModel;
 	private yearRows: Partial<Record<YearStr, HTMLTableRowElement>> = {};
 
-	constructor( model:CalendarModel, gallery: Gallery ){
+	constructor( model:CalendarModel ){
 
 		// bind model
 		this.model = model;
@@ -28,10 +27,7 @@ export class CalendarView {
 			this._addMonth(month);
 		});
 
-		this.model.listen('selectedMonths',({newValue:selectedMonths}) => {
-			scrollToTop(); setTimeout(scrollToTop, 2000);
-			gallery.rows = selectedMonths.map(mm => mm.toImageRow());
-		})
+		model.listen('selectedMonths',() => { scrollToTop(); setTimeout(scrollToTop, 2000); });
 
 		this.model.listen('isLoading',({newValue:isLoading}) => {
 			if(isLoading){

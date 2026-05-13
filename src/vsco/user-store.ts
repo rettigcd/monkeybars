@@ -1,7 +1,6 @@
 import { by, byDesc } from "~/lib/sorting";
 import { SyncedPersistentDict } from "~/lib/storage";
 import { LastYear } from "./last-year";
-import { Gallery } from "./models/gallery-model";
 import { ImageModel } from "./models/image-model";
 import { NextLink } from "./next-link";
 import { LocalStorageUserEntity } from "./types";
@@ -17,7 +16,6 @@ export class UserStore {
 
 	constructor(
 		private readonly access: UserAccess,
-		private readonly gallery: Gallery,
 		private readonly track: (imgModel:ImageModel) => void
 	) {
 		this._userRepo = new SyncedPersistentDict<LocalStorageUserEntity>('users');
@@ -25,7 +23,7 @@ export class UserStore {
 
 	get(username: string): UserCtx {
 		return this._cache[username]
-			??= new UserCtx(username, this._userRepo, this.access, this.gallery, this.track);
+			??= new UserCtx(username, this._userRepo, this.access, this.track);
 	}
 
 	getMany(usernames: string[]): UserCtx[] {
@@ -37,6 +35,7 @@ export class UserStore {
 			.map(username => this.get(username));
 	}
 
+	// Users with FOUND new Images
 	get newImageUsers(): UserCtx[] {
 		return this.access.newImageRepo.keys()
 			.map(username => this.get(username));

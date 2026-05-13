@@ -1,4 +1,8 @@
 import { $, ElementBuilder } from "~/lib/dom3";
+import { LTProgress } from "~/lib/progress-types";
+
+type FormatterParams = {loaded:number; total:number;};
+export type TextFormatter = ({loaded,total}:FormatterParams) => string;
 
 export class ProgressBar{ 
 
@@ -6,9 +10,12 @@ export class ProgressBar{
 	private finalColor: string;
 	private progressDiv: ElementBuilder<HTMLDivElement>;
 
-	constructor(container: HTMLElement,initialColor='#aaf',finalColor='#ccf'){
+	private _textFormatter: TextFormatter;
+
+	constructor(container: HTMLElement,textFormatter:TextFormatter, initialColor='#aaf',finalColor='#ccf'){
 		const $container = $(container).css({'position':'relative'});
 		this.initialColor = initialColor; this.finalColor=finalColor;
+		this._textFormatter = textFormatter;
 
 		const css = {
 			position:'absolute', top:'0', 
@@ -34,4 +41,16 @@ export class ProgressBar{
 	}
 
 	public close(){ this.progressDiv.el.remove(); }
+
+
+	// Shows progress until we have an error, or is complete
+	// can be passed directly in without using (x)=>track(x)
+	public track = ({loaded,total,error}: LTProgress & {error?:unknown}) => {
+		this.percent = Math.floor((loaded/total*100)+0.5); // 0..100%
+		this.text = this._textFormatter({loaded,total});
+		if(loaded == total || error)
+			this.close();
+	}
+
+
 }

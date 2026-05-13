@@ -26,13 +26,13 @@ import { throwExp } from "~/lib/throw";
 import { formatDate } from "./format-date";
 import { Gallery } from "./models/gallery-model";
 import { ImageModel } from "./models/image-model";
+import { NewImagesModel } from "./models/new-images-model";
 import { UserAccess } from "./user-access";
 import { UserCtx } from "./user-ctx";
 import { initUserPage } from "./user-page";
 import { UserStore } from "./user-store";
 import { scrollToTop } from "./views/calendar-view";
 import { Layout } from "./views/layout";
-import { ScanNewImagesMenu } from "./views/scan-new-images";
 
 type ExtendedWindow = Window & {
 	users: UserAccess; // UserAccess; // ::unsafeWindow
@@ -46,7 +46,6 @@ declare const unsafeWindow: ExtendedWindow;
 	'use strict';
 	
 	const pageLoadTimeMs = Date.now();	
-	ScanNewImagesMenu.nowMs = pageLoadTimeMs;
 	UserCtx.nowMs = pageLoadTimeMs;
 	ImageModel.nowMs = pageLoadTimeMs
 
@@ -61,10 +60,18 @@ declare const unsafeWindow: ExtendedWindow;
 	// Services / repositories / models
 	const gallery = new Gallery();
 	const userAccess = new UserAccess();
-	const userStore = new UserStore(userAccess,gallery,track);
+	const userStore = new UserStore(userAccess,track);
+	const newImagesModel = new NewImagesModel(userStore);
+
+	newImagesModel.listen("scannedNewImages", ({host,newValue:rows})=>{
+		if(rows.length === 0) return;
+		gallery.rows = rows;
+		host.scannedNewImages = [];
+	});
 
 	// UI / Views - general
-	const uiLayout = new Layout( userStore, gallery );
+	const uiLayout = new Layout( gallery, newImagesModel );
+	uiLayout.withActions(...[ userStore.needsReview(), userStore.missingViewDate(), userStore.toPrune() ].map(x=>x.makeDiv()));
 
 	const hotkeys = new HotkeyManager();
 	hotkeys.register("o", () => gallery.openLast());

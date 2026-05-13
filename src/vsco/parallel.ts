@@ -1,14 +1,10 @@
-export type ParallelProgress = {
-	loaded: number; // complete
-	total: number; // total
-}
-
-export type ParallelProgressCallback = (progress:ParallelProgress) => void;
+import { LTProgress, LTProgressHandler } from "~/lib/progress-types";
+export type { LTProgress, LTProgressHandler };
 
 export function executePromisesInParallelAsync(
 	asyncActions: (() => Promise<void>)[],
 	parallelCount: number=8,
-	progressCallback:ParallelProgressCallback=function(_:ParallelProgress){}
+	progressCallback:LTProgressHandler=function(_:LTProgress){}
 ){
 	const status = {loaded:0,total:asyncActions.length};
 	progressCallback(status);

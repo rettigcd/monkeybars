@@ -30,10 +30,11 @@ export function initUserPage(
 
 	// Current User
 	const pageOwnerCtx: UserCtx = userStore.get( pageOwnerName );
-	const calendar = new CalendarModel( pageOwnerCtx );
+	const calendar = new CalendarModel( pageOwnerCtx ).showNewImagesIn(gallery);
 	const startingState: LocalStorageUserEntity = pageOwnerCtx.data.cloneLocalStorageEntity();
 
 	// UI / view - currentUser
+
 	uiLayout.showCurrentUser(pageOwnerCtx, calendar);
 
 	addCopyUsernameUiElement( pageOwnerName );
@@ -77,7 +78,7 @@ export function initUserPage(
 					const lastYearInfo = new LastYear([pageOwnerName,startingState]);
 					const earliestEmptyYear = new Date().getFullYear() - 4;
 					if( lastYearInfo.lastYear<earliestEmptyYear ){
-						uiLayout.appendButton(
+						uiLayout.withActions(
 							$('button').txt('Prune').on('click',function(event){
 								pageOwnerCtx.prune();
 								con.print(`[${pageOwnerName}] pruned`);
@@ -125,6 +126,9 @@ export function initUserPage(
 		},
 		nextToPrune: function(yearsWithoutDownload=4){
 			userStore.toPrune( yearsWithoutDownload ).goto();
+		},
+		showLinks: async function(){
+			gallery.rows = await pageOwnerCtx.links.asGalleryRowsAsync();
 		},
 		downloads: []
 	}

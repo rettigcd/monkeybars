@@ -1,10 +1,10 @@
-type ChildLike =
-	| Node
+export type ChildLike =
 	| string
 	| number
 	| boolean
 	| null
 	| undefined
+	| Node	// includes HTMLElement
 	| ElementBuilder<HTMLElement>;
 
 type SafePropKey<T extends HTMLElement> = Exclude<keyof T, "data">;

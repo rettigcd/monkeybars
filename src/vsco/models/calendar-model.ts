@@ -3,6 +3,7 @@ import { EventHost, makeEventHost, MyEventSource, ObservableBase } from "~/lib/o
 import { groupBy } from "~/lib/sorting";
 import { formatDate, YearStr, YYYYMM } from "../format-date";
 import { UserCtx } from "../user-ctx";
+import { Gallery } from "./gallery-model";
 import { ImageModel } from "./image-model";
 import { MonthModel } from "./month-model";
 import { YearModel } from "./year-model";
@@ -45,6 +46,11 @@ export class CalendarModel
 		hotkeys.register("ArrowLeft", () => this.prev());
 		hotkeys.register("ArrowRight", () => this.next());
 		// ArrowUp & ArrrowDown => calendar: Up/Down
+	}
+
+	showNewImagesIn(gallery:Gallery): this{
+		this.listen('selectedMonths',({newValue:selectedMonths}) => gallery.rows = selectedMonths.map(mm => mm.toImageRow()) );
+		return this;
 	}
 
 	async loadAsync2(){
