@@ -71,7 +71,7 @@ declare const unsafeWindow: ExtendedWindow;
 
 	// UI / Views - general
 	const uiLayout = new Layout( gallery, newImagesModel );
-	uiLayout.withActions(...[ userStore.needsReview(), userStore.missingViewDate(), userStore.toPrune(), userStore.failedUsers() ].map(x=>x.makeDiv()));
+	uiLayout.withActions(...userStore.nextLinks.map(x=>x.makeDiv()));
 
 	const hotkeys = new HotkeyManager();
 	hotkeys.register("o", () => gallery.openLast());
@@ -102,7 +102,7 @@ declare const unsafeWindow: ExtendedWindow;
 				.join("\r\n")
 		},
 		toReview : function(){ console.log(userStore.allUsers.filter(u=>u.data.status=="queued").map(user=>user.username).join("\r\n")); },
-		findLinksTo: function(needle:string){ console.log(userStore.findLinksTo(needle).join("\r\n")); }
+		findLinksTo: function(needle:string){ console.log(userStore.findFriendLinksTo(needle).join("\r\n")); }
 	}
 
 	// Removes Google Ad

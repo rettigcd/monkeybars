@@ -3,7 +3,7 @@ import { SyncedPersistentDict } from "~/lib/storage";
 import { LastYear } from "./last-year";
 import { ImageModel } from "./models/image-model";
 import { NextLink } from "./next-link";
-import { LocalStorageUserEntity } from "./types";
+import { LocalStorageUserEntity, UserStatusType } from "./types";
 import { UserAccess } from "./user-access";
 import { UserCtx } from "./user-ctx";
 
@@ -50,43 +50,47 @@ export class UserStore {
 			delete this._cache[key];
 	}
 
+	get nextLinks(): NextLink[] {
+		return [ 
+			this.newUsers(), 
+			this.queuedUsers(), 
+			this.failedUsers(),
+			this.missingViewDateUsers(), 
+			this.toPrune(), 
+		];
+	} 
+
 	// Scans for anyone marked as "queued" or "should-review"
-	needsReview(): NextLink{
+	newUsers(): NextLink{ return this._getLinkForUserStatus("new users","new"); }
+
+	// Scans for anyone marked as "queued" or "should-review"
+	queuedUsers(): NextLink{ return this._getLinkForUserStatus("queued for review","queued"); }
+
+	// Scans for anyone marked as "queued" or "should-review"
+	failedUsers(): NextLink{ return this._getLinkForUserStatus("failed users","failed"); }
+
+	private _getLinkForUserStatus( label:string, status:UserStatusType ): NextLink {
 		const pageOwner = UserStore.pageOwnerName;
 		const users = this.allUsers
-			.filter(user => user.username!=pageOwner && user.data.status=="queued");
+			.filter(user => user.data.status == status && user.data.username !== pageOwner);
 		function rnd(i:number): number{ return Math.floor(Math.random() * i); }
 		return new NextLink({
-			label:'for review',
+			label,
 			count: users.length,
 			nextUrl: users.length ? users[rnd(users.length)]!.fetch.galleryUrl : undefined,
 			tooltip: ''
 		})
 	}
 
-	// Scans for anyone marked as "queued" or "should-review"
-	failedUsers(): NextLink{
-		const pageOwner = UserStore.pageOwnerName;
-		const users = this.allUsers
-			.filter(user => user.data.status == "failed" && user.data.username !== pageOwner);
-		function rnd(i:number): number{ return Math.floor(Math.random() * i); }
-		return new NextLink({
-			label:'failed',
-			count: users.length,
-			nextUrl: users.length ? users[rnd(users.length)]!.fetch.galleryUrl : undefined,
-			tooltip: ''
-		})
-	}
-
-
-	findLinksTo(needle:string): string[]{ 
+	// Friend links
+	findFriendLinksTo(needle:string): string[]{ 
 		return this.access.linkRepo.entries()
 			.filter(([_,links])=>links.indexOf(needle)!=-1)
 			.map(([username,])=>username);
 	}
 
 	// scans saved users for next person missing viewDate 
-	missingViewDate(sortLongestOutageFirst=false): NextLink{
+	missingViewDateUsers(sortLongestOutageFirst=false): NextLink{
 		const pageOwner = UserStore.pageOwnerName;
 
 		const users = this._userRepo.entries()

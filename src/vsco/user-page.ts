@@ -122,7 +122,6 @@ export async function initUserPageAsync(
 			break;
 
 		default: // !!! replace with throwNever()
-			logStartingState();
 			con.print(`%cUnknown status [${pageOwnerCtx.status}]`,'color:#F88;background-color:black;');
 			break;
 	}
@@ -133,7 +132,7 @@ export async function initUserPageAsync(
 		owner: pageOwnerName,
 		user: pageOwnerCtx,
 		missingViewDate: function(sortLongestOutageFirst=false){
-			userStore.missingViewDate( sortLongestOutageFirst ).goto();
+			userStore.missingViewDateUsers( sortLongestOutageFirst ).goto();
 		},
 		nextToPrune: function(yearsWithoutDownload=4){
 			userStore.toPrune( yearsWithoutDownload ).goto();
