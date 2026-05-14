@@ -64,6 +64,21 @@ export class UserStore {
 		})
 	}
 
+	// Scans for anyone marked as "queued" or "should-review"
+	failedUsers(): NextLink{
+		const pageOwner = UserStore.pageOwnerName;
+		const users = this.allUsers
+			.filter(user => user.data.status == "failed" && user.data.username !== pageOwner);
+		function rnd(i:number): number{ return Math.floor(Math.random() * i); }
+		return new NextLink({
+			label:'failed',
+			count: users.length,
+			nextUrl: users.length ? users[rnd(users.length)]!.fetch.galleryUrl : undefined,
+			tooltip: ''
+		})
+	}
+
+
 	findLinksTo(needle:string): string[]{ 
 		return this.access.linkRepo.entries()
 			.filter(([_,links])=>links.indexOf(needle)!=-1)

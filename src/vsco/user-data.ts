@@ -4,10 +4,8 @@ import { SECONDS, YEARS } from "~/lib/units";
 import { formatDate } from "./format-date";
 import { LocalStorageUserEntity, StarType, UserStatusType } from "./types";
 
-// Storage time is using Seconds-since-epoch / Unix time.
-function secondsSinceEpoch(){
-	return Math.floor(Date.now() / SECONDS +0.5);
-}
+// Storing times in userRepo as Seconds-since-epoch / Unix time.
+const pageLoadSecondsSinceEpoch = Math.floor(Date.now() / SECONDS +0.5);
 
 const convert = {
 	toStars : function(status : UserStatusType): StarType {
@@ -40,7 +38,8 @@ function calcDownloadsInLastYear(byYear:Record<string,number> ={}): number {
 	return (byYear[thisYear] || 0) + Math.round((byYear[thisYear - 1] || 0) * fractionOfPreviousYearToInclude);
 }
 
-// ::UserData - read-only fascade around user info
+// ::UserData - fascade around user info
+// enforce internal data consistency
 export class UserData {
 
 	public readonly username: string;
@@ -61,36 +60,40 @@ export class UserData {
 	set status(value: UserStatusType){ this._info.stars = convert.toStars(value); }
 
 	// -- Downloads --
-	get downloadsInLastYear() { return calcDownloadsInLastYear(this._info.dl); }
+	get downloadsInLastYear(): number { return calcDownloadsInLastYear(this._info.dl); }
 	get byYear(): Record<string,number> { return this._info.dl||{}; }
 	// Increments # of downloaded images for given year
-	trackImage( imageYear: string|number ){
+	trackImageDownloaded( imageYear: string|number ){
 		// !!! BUG - until this.byYear is written back to storage,
 		// this can be called multiple times and will keep using
 		// 0 instead of the incrementing value.
 		this.byYear[imageYear] = (this.byYear[imageYear]||0) + 1;
+
+		delete this._info.failure; // if we download an image, clear the failure
 	}
 
 	// -- view Date --
-	public get viewDateMs(){ 
+	public get viewDateMs(): number { 
 		// don't assume .viewData is in seconds because we might have legacy values.
 		// if all values are converted to seconds, we could replace this with:
 		// return (this._info.viewDate||0) * SECONDS;
 		return toMs(this._info.viewDate||0);
 	} 
-	setViewDateToNow(){
+
+	// also clears failures
+	public setViewDateToNow(): void {
 		// Save the old View Date in case we got logged out and are only scanning 8 images
 		const oldViewDates = JSON.parse(sessionStorage["oldViewDates"]||"{}");
 		oldViewDates[this.username] = this._info.viewDate;
 		sessionStorage["oldViewDates"] = JSON.stringify(oldViewDates,null,'\t');
 		// set it
-		this._info.viewDate = secondsSinceEpoch();
+		this._info.viewDate = pageLoadSecondsSinceEpoch;
 		// cleanup 
-		delete this._info.failure;
+		this.clearFailure();
 	}
 
 
-	// -- Failures --
+	// -- Failures -- (cleared by downloading an image or setViewDateToNow)
 	public get firstFailure(): number | undefined { return this._info.failure?.first; }
 	public toFailureString(): string {
 		const failure = this._info.failure;
@@ -104,13 +107,19 @@ export class UserData {
 	}
 	public loadFailed(){ // logs failure to load user page
 		const failure = this._info.failure;
-		if(failure !== undefined) failure.count++;
-		else this._info.failure = {count:1,first:secondsSinceEpoch()};
+		if(failure !== undefined)
+			failure.count++;
+		else 
+			this._info.failure = {count:1,first:pageLoadSecondsSinceEpoch};
 	}
 
 	// for displaying at startup
 	public cloneLocalStorageEntity(): LocalStorageUserEntity{
 		return structuredClone(this._info);
+	}
+
+	public clearFailure(): void {
+		delete this._info.failure;
 	}
 
 }

@@ -95,7 +95,6 @@ export class CalendarView {
 		const monthCell = yearRow.querySelectorAll("td")[monthIndex];
 		if (monthCell !== undefined)
 			monthCell.replaceWith(makeMonthView(month));
-		console.log('Added: '+month.yearMonth)
 	}
 
 	private _makeEmptyYearRow(yearModel: YearModel) {

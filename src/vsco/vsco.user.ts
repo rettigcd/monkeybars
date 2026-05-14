@@ -29,13 +29,13 @@ import { ImageModel } from "./models/image-model";
 import { NewImagesModel } from "./models/new-images-model";
 import { UserAccess } from "./user-access";
 import { UserCtx } from "./user-ctx";
-import { initUserPage } from "./user-page";
+import { initUserPageAsync } from "./user-page";
 import { UserStore } from "./user-store";
 import { scrollToTop } from "./views/calendar-view";
 import { Layout } from "./views/layout";
 
 type ExtendedWindow = Window & {
-	users: UserAccess; // UserAccess; // ::unsafeWindow
+	users: UserStore; // UserAccess; // ::unsafeWindow
 	report: Record<string,unknown>
 };
 
@@ -71,7 +71,7 @@ declare const unsafeWindow: ExtendedWindow;
 
 	// UI / Views - general
 	const uiLayout = new Layout( gallery, newImagesModel );
-	uiLayout.withActions(...[ userStore.needsReview(), userStore.missingViewDate(), userStore.toPrune() ].map(x=>x.makeDiv()));
+	uiLayout.withActions(...[ userStore.needsReview(), userStore.missingViewDate(), userStore.toPrune(), userStore.failedUsers() ].map(x=>x.makeDiv()));
 
 	const hotkeys = new HotkeyManager();
 	hotkeys.register("o", () => gallery.openLast());
@@ -85,7 +85,7 @@ declare const unsafeWindow: ExtendedWindow;
 	hotkeys.start();
 
 	const win = (typeof unsafeWindow !== "undefined" ? unsafeWindow : window) as ExtendedWindow;
-	win.users = userAccess;
+	win.users = userStore;
 	win.report = {
 		status : function(status=throwExp('must supply status')){
 			return userStore.allUsers
@@ -114,6 +114,6 @@ declare const unsafeWindow: ExtendedWindow;
 	// -----  Init User  -----
 	const matchesUser = location.href.match(/(?<=vsco.com?\/).*(?=\/gallery)/);
 	if(matchesUser)
-		initUserPage( matchesUser[0], userStore, uiLayout, hotkeys, gallery, pageLoadTimeMs, win );
+		initUserPageAsync( matchesUser[0], userStore, uiLayout, hotkeys, gallery, pageLoadTimeMs, win );
 
 })();

@@ -28,7 +28,7 @@ export class ImageModel extends ObservableBase<ImageModel>{
 	public readonly captureDateMs: number;
 	public readonly uploadDateMs: number;
 
-	public downloadProgress: TaskStatus = { status:'notStarted' };
+	public downloadProgress: TaskStatus = { status:'notStarted' }; // observable
 
 	private readonly localFileName: string;
 

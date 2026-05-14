@@ -49,7 +49,7 @@ export class ImageThumbControl{ // single image
 
 	// display the thumbnail image
 	async loadAsync() : Promise<void>{ // load image
-		await loadImgSrcAsync(this.img, this.thumbUrl);
+		await loadImgSrcAsync(this.img, this.thumbUrl, 5000);
 	}
 
 	private update(progress:TaskStatus){

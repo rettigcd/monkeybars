@@ -19,6 +19,7 @@ export type ObservableListener<
 export type ListenFn<T extends object> = <K extends ObservableKey<T>>(
 	prop: K,
 	callback: ObservableListener<T, K>,
+	immediate?: boolean,
 ) => () => void;
 
 export type ObservableHost<T extends object> = T & { listen: ListenFn<T>; };
@@ -38,13 +39,21 @@ export function makeObservable<T extends object>(
 	observableHost.listen = function <K extends ObservableKey<T>>(
 		prop: K,
 		callback: ObservableListener<T, K>,
+		immediate = false
 	): () => void {
+
 		if (!definedProps.has(prop)) {
 			defineObservableProperty(prop);
 			definedProps.add(prop);
 		}
+
 		const callbacks = (listeners[prop] ??= []);
 		callbacks.push(callback);
+
+		if(immediate){ // trigger just this one, not all.
+			const value = observableHost[prop];
+			callback({prop,host:observableHost,oldValue:value,newValue:value});
+		}
 
 		return () => {
 			const currentCallbacks = listeners[prop];
@@ -107,6 +116,7 @@ export abstract class ObservableBase<T extends object> {
 	public listen<K extends ObservableKey<T>>(
 		prop: K,
 		callback: ObservableListener<T, K>,
+		immediate:boolean = false
 	): () => void {
 		const { definedProps, listeners } = this;
 
@@ -117,6 +127,12 @@ export abstract class ObservableBase<T extends object> {
 
 		const callbacks = (listeners[prop] ??= []);
 		callbacks.push(callback);
+
+		if(immediate){
+			const host = this as unknown as ObservableHost<T>;
+			const value = host[prop];
+			callback({prop,host,oldValue:value,newValue:value});
+		}
 
 		return () => {
 			const currentCallbacks = listeners[prop];

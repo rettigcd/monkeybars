@@ -1,5 +1,5 @@
 import { con } from "~/lib/console";
-import { $, $qAll } from "~/lib/dom3";
+import { $, $qAll, $qAsync2 } from "~/lib/dom3";
 import { HotkeyManager } from "~/lib/hotkey-manager";
 import { LastYear } from "./last-year";
 import { CalendarModel } from "./models/calendar-model";
@@ -17,7 +17,24 @@ const consoleCss = {
 	startingState: 'color:blue;'
 }
 
-export function initUserPage(
+function makePruneButton(pageOwnerCtx:UserCtx){
+	return $('button').txt('Prune').on('click',function(event){
+		pageOwnerCtx.prune();
+		con.print(`[${pageOwnerCtx.data.username}] pruned`);
+		(event.currentTarget! as HTMLElement).remove();
+	}).el	
+}
+
+// Init page - assume we have a user
+function logStartingState(startingState:LocalStorageUserEntity){ 
+	con.print('starting state => %c'+JSON.stringify(startingState,null,'\t'),consoleCss.startingState);
+	function condShow(label:string,seconds:number|undefined){ if(seconds) con.log(label+"="+new Date(seconds*1000).toDateString()); }
+	condShow('viewDate',startingState.viewDate);
+	condShow('firstFailure',startingState?.failure?.first);
+}
+
+// Only called if User Page exists (failures should be cleared)
+export async function initUserPageAsync(
 	pageOwnerName:string,
 	userStore: UserStore,
 	uiLayout: Layout,
@@ -27,11 +44,20 @@ export function initUserPage(
 	window: Window
 ){
 	UserStore.pageOwnerName = pageOwnerName;
+	const pageOwnerCtx: UserCtx = userStore.get( pageOwnerName );
+	const startingState: LocalStorageUserEntity = pageOwnerCtx.data.cloneLocalStorageEntity();
+	logStartingState(startingState);
+
+	if(await $qAsync2(".NotFound",1000)){
+		// Give them an option to prune this user.
+		if(pageOwnerCtx.isPersisted)
+			uiLayout.withActions( makePruneButton(pageOwnerCtx) );
+		console.log("Not valid user page.");
+		return;
+	}
 
 	// Current User
-	const pageOwnerCtx: UserCtx = userStore.get( pageOwnerName );
 	const calendar = new CalendarModel( pageOwnerCtx ).showNewImagesIn(gallery);
-	const startingState: LocalStorageUserEntity = pageOwnerCtx.data.cloneLocalStorageEntity();
 
 	// UI / view - currentUser
 
@@ -41,80 +67,65 @@ export function initUserPage(
 
 	calendar.registerHotkeys( hotkeys );
 
-	// Init page - assume we have a user
-	function logStartingState(){ 
-		con.print('starting state => %c'+JSON.stringify(startingState,null,'\t'),consoleCss.startingState);
-	}
+	pageOwnerCtx.clearFailure(); // if we get here, page is valid
 
-	(async function(){
-		switch( pageOwnerCtx.status ){
-			case "new":
-			case "queued":
-				logStartingState();
-				// show First Page
-				const firstPageImages = await pageOwnerCtx.fetch.fetchFirstPageImages();
-				if(0<firstPageImages.length){
-					const imageRow = new GalleryRowModel({ 
-						labelText: 'galley page-1 images',
-						images:firstPageImages
-					});
-					gallery.rows = [imageRow];
-				}
+	switch( pageOwnerCtx.status ){
+		case "new":
+		case "queued":
+			// show First Page
+			const firstPageImages = await pageOwnerCtx.fetch.fetchFirstPageImages();
+			if(0<firstPageImages.length){
+				const imageRow = new GalleryRowModel({ 
+					labelText: 'galley page-1 images',
+					images:firstPageImages
+				});
+				gallery.rows = [imageRow];
+			}
 //				calendar.loadAsync();
-				break;
+			break;
 
-			case "following":
-				logStartingState();
-				// Show New Images !
-				if(startingState.viewDate===undefined){
-					con.print('%cNo View Date found',consoleCss.important);
-					if(startingState.dl !== undefined){
-						const lastYear = Object.keys(startingState.dl).reverse()[0]||new Date(pageLoadTime).getFullYear();
-						con.print(`Downloads for ${lastYear}: %c${startingState.dl[lastYear]}`,consoleCss.downloadCount);
-					}
+		case "following":
+			// Show New Images !
+			if(startingState.viewDate===undefined){
+				con.print('%cNo View Date found',consoleCss.important);
+				if(startingState.dl !== undefined){
+					const lastYear = Object.keys(startingState.dl).reverse()[0]||new Date(pageLoadTime).getFullYear();
+					con.print(`Downloads for ${lastYear}: %c${startingState.dl[lastYear]}`,consoleCss.downloadCount);
+				}
+				con.print("Loading calendar to verify ready-to-prune.");
+				calendar.loadAsync();
+			} else {
+				// Check if user should be pruned
+				const lastYearInfo = new LastYear([pageOwnerName,startingState]);
+				const earliestEmptyYear = new Date().getFullYear() - 4;
+				if( lastYearInfo.lastYear<earliestEmptyYear ){
+					uiLayout.withActions( makePruneButton(pageOwnerCtx) );
 					calendar.loadAsync();
-				} else {
-					// Check if user should be pruned
-					const lastYearInfo = new LastYear([pageOwnerName,startingState]);
-					const earliestEmptyYear = new Date().getFullYear() - 4;
-					if( lastYearInfo.lastYear<earliestEmptyYear ){
-						uiLayout.withActions(
-							$('button').txt('Prune').on('click',function(event){
-								pageOwnerCtx.prune();
-								con.print(`[${pageOwnerName}] pruned`);
-								(event.currentTarget! as HTMLElement).remove();
-							}).el
-						);
-						calendar.loadAsync();
-					}
 				}
+			}
 
-				await pageOwnerCtx.scanForNewImagesAsync(); // Sets the View Date which we NEED
+			await pageOwnerCtx.scanForNewImagesAsync(); // Sets .viewDate which we NEED
 
-				if(pageOwnerCtx.newImages.length>0){
-					const newImagesRow = new GalleryRowModel({ labelText : 'new images', images:pageOwnerCtx.newImages })
-					gallery.rows = [newImagesRow];
-					pageOwnerCtx.clearNewImages();
-				}
-				break;
+			if(pageOwnerCtx.newImages.length>0){
+				const newImagesRow = new GalleryRowModel({ labelText : 'new images', images:pageOwnerCtx.newImages })
+				gallery.rows = [newImagesRow];
+				pageOwnerCtx.clearNewImages();
+			}
+			break;
 
-			case "notFollowing":
-				logStartingState();
-				con.print(`%cstatus=Ignored`,consoleCss.important);
-				break;
+		case "notFollowing":
+			con.print(`%cstatus=Ignored`,consoleCss.important);
+			break;
 
-			case "failed":
-				logStartingState();
-				con.print(`%cstatus=Failed`,consoleCss.important);
-				break;
+		case "failed":
+			con.print(`%cstatus=Failed`,consoleCss.important);
+			break;
 
-			default:
-				logStartingState();
-				con.print(`%cUnknown status [${pageOwnerCtx.status}]`,'color:#F88;background-color:black;');
-				break;
-		}
-
-	})();
+		default: // !!! replace with throwNever()
+			logStartingState();
+			con.print(`%cUnknown status [${pageOwnerCtx.status}]`,'color:#F88;background-color:black;');
+			break;
+	}
 
 	const win = window as Window & { user: UserCtx, cmd: Record<string,unknown>};
 	win.user = pageOwnerCtx;

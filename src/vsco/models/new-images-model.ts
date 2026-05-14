@@ -35,7 +35,7 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
 
 	// converts stale users into new-image users
 	public async scanStaleUsersAsync(){
-		const numToScan = 500;
+		const numToScan = 100; // 500
 		const toScan = this._staleUsers
 			.sort(by(user=>user.data.viewDateMs))
 			.slice(0,numToScan); // only scan 200 oldest

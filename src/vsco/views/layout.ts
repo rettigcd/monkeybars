@@ -24,7 +24,7 @@ export class Layout{
 		// calendar (attached in separate method) => 
 
 		const css = {
-			top			: {position:"fixed",top:"0px",left:'0px',width:'100%',height:"50px",'z-index':'3000',background:'rgba(255,255,255,0.9)',overflow:"auto"},
+			top			: {position:"fixed",top:"0px",left:'0px',width:'100%',height:"80px",'z-index':'3000',background:'rgba(255,255,255,0.9)',overflow:"auto"},
 			leftPanel	: {margin:"0",padding:"0",display:'inline-block'},
 			star		: {display:'inline-block'},
 			userLink	: {display:'inline-block'},
@@ -38,6 +38,7 @@ export class Layout{
 		let top;
 		let thumbDiv;
 		let spacer;
+
 		document.body.prepend(
 			(spacer = $('div').css({height:css.top.height})).el,
 			top = $('div').css(css.top).withChildren(

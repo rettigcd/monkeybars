@@ -136,8 +136,17 @@ export function $qAll<T extends Element = HTMLElement>(css: string): T[] {
 }
 
 // Promise that waits for element to become available, then returns it.
-export function $qAsync<T extends Element = HTMLElement>(cssSelector: string, timeout = 10000): Promise<T> {
-	return new Promise<T>((resolve, reject) => {
+// throws if not found
+export async function $qAsync<T extends Element = HTMLElement>(cssSelector: string, timeout = 10000): Promise<T> {
+	const element = await $qAsync2<T>(cssSelector,timeout);
+	if(element === undefined)
+		throw new Error(`timeout searching for ${cssSelector}`);
+	return element;
+}
+
+// returns undefined instead of throwing.
+export function $qAsync2<T extends Element = HTMLElement>(cssSelector: string, timeout = 10000): Promise<T|undefined> {
+	return new Promise<T|undefined>((resolve) => {
 		const step = 500;
 		const timerId = window.setInterval(() => {
 			const el = document.querySelector<T>(cssSelector);
@@ -145,13 +154,14 @@ export function $qAsync<T extends Element = HTMLElement>(cssSelector: string, ti
 			if (el != null)
 				resolve(el);
 			else if ( timeout<= 0)
-				reject(new Error(`timeout searching for ${cssSelector}`));
+				resolve(undefined);
 			else
 				return;
 			clearInterval(timerId);
 		}, step);
 	});
 }
+
 
 // Sets an image's src and waits for it to load
 export function loadImgSrcAsync( img: HTMLImageElement, src: string, timeoutMs: number = 1000 ): Promise<void> {

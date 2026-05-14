@@ -63,19 +63,21 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 	}
 	mask(){ this._access.commonRepo.add(this.username); console.log(`${this.username} masked!`); }
 
+	get isPersisted(){ return this._userRepo.containsKey(this.username); }
+
 	// status
 	get status(){ return this.data.status; }
 	set status(status: UserStatusType){ 
 		// when we follow someone, assume everything has been viewed.
 		if(status=='following')
-			this._update( data => data.setViewDateToNow() )
+			this.setViewDateToNow();
 		this._update( data => data.status=status);
 	}
 
 	// Counts
 	logDownloadImage(imgModel:ImageModel){
 		const imageYear = imgModel.imgDate.getFullYear();
-		this._update( data=>{ data.trackImage( imageYear ); } );
+		this._update( data=>{ data.trackImageDownloaded( imageYear ); } );
 		this.trigger('imageDownloaded');
 	}
 
@@ -92,7 +94,7 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 
 		try{
 			const newImages = await this._fetchNewImagesAsync();
-			this._update( data=>data.setViewDateToNow() );
+			this.setViewDateToNow();
 			if(0<newImages.length)
 				this._access.newImageRepo.update(this.username,newImageGroup=>{
 					newImages.forEach( img => {
@@ -105,6 +107,14 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 			console.error(error);
 			this._update( data => data.loadFailed() );
 		}
+	}
+
+	public setViewDateToNow() {
+		this._update( data=> data.setViewDateToNow() ); // also clears failures
+	}
+
+	public clearFailure() {
+		this._update( data => data.clearFailure() );
 	}
 
 	async _fetchNewImagesAsync(): Promise<ImageModel[]>{ // move into fetcher?
@@ -129,7 +139,7 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 	// !!! TEST - of everyone that .isDueToScanNewImages, show their: status & raw viewDate
 	get isDueToScanNewImages(){ 
 		const data: UserData = this.data;
-		if( data.status != "following" && data.status != "failed") return false;
+		if( data.status !== "following" ) return false;
 		const effectiveDownloadsInLastYear = data.downloadsInLastYear || 1;
 		const daysBetweenScans = Math.max( 5, 365/effectiveDownloadsInLastYear*0.6); // 60% of wait duration
 		const nextScanTime = Math.floor( daysBetweenScans * DAYS ) + data.viewDateMs;
