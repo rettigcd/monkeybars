@@ -19,6 +19,7 @@
 // @grant        unsafeWindow
 // ==/UserScript==
 
+import { addStyleSheet } from "~/lib/dom3";
 import { saveTextToFile } from "~/lib/download";
 import { HotkeyManager } from "~/lib/hotkey-manager";
 import { by } from "~/lib/sorting";
@@ -106,10 +107,15 @@ declare const unsafeWindow: ExtendedWindow;
 	}
 
 	// Removes Google Ad
-	setInterval(function(){
-		[...document.querySelectorAll("ins[data-google-query-id]")]
-			.forEach(x=>x.remove());
-	},5000);
+	setInterval(function(){ document.querySelectorAll("ins[data-google-query-id]").forEach(x=>x.remove());},5000);
+	addStyleSheet(`div[data-google-query-id]{ 
+		visibility:hidden !important;
+		height:0 !important; min-height:0 !important; overflow:hidden !important;
+		position: fixed; left: -10000px; top: -10000px;
+		pointer-events:none !important;
+	}`)
+	// make Google Ad less obvious
+//	addStyleSheet(`div[data-google-query-id]{ filter: grayscale(1) blur(2px); opacity: 0.15; }`)
 
 	// -----  Init User  -----
 	const matchesUser = location.href.match(/(?<=vsco.com?\/).*(?=\/gallery)/);
