@@ -1,4 +1,3 @@
-import { con } from "~/lib/console";
 import { by, byDesc, onlyUnique } from "~/lib/sorting";
 import { CachedPersistentArray, SyncedPersistentDict } from "~/lib/storage";
 import { Fetcher } from "./fetcher";
@@ -70,7 +69,7 @@ export class UserLinks {
 	}
 
 	private _makeGalleryRow({user,images}:LinkedUserPage){
-		const galleryRow = new GalleryRowModel({
+		return new GalleryRowModel({
 			labelText:user.username,
 			images:images,
 			actions:{
@@ -79,11 +78,6 @@ export class UserLinks {
 				X:    ()=>user.mask(),
 			}
 		});
-		galleryRow.listen('isVisible',({newValue:isVisible}) => {
-			if(!isVisible)
-				con.print(`closing row [${user.username}]`);
-		})
-		return galleryRow;
 	}
 
 	// Scans current linked users, saves them to the cache, returns them.

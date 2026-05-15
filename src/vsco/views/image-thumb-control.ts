@@ -70,7 +70,7 @@ export class ImageThumbControl{ // single image
 			case 'timeout':
 				this.img.style.cursor = "default";
 				this._progressBar?.close();
-				con.print( `download: ${progress.status}`);
+				con.debug( `download: ${progress.status}`);
 				break;
 			default: throwNever(progress);
 		}

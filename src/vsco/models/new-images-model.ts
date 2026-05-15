@@ -97,7 +97,7 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
  			if(isVisible) return; // should we do something if they re-show it?
  			this._userStore.get(user.username).clearNewImages(); // remove globally
 			this.removeNewImageUser(user.username);				// remove from cache
- 			con.print(`closing row [${user.username}]`);
+ 			con.debug(`closing row [${user.username}]`);
  		});
  		return rowModel;
  	}

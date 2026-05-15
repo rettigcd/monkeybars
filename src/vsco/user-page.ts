@@ -29,7 +29,10 @@ function makePruneButton(pageOwnerCtx:UserCtx){
 function logStartingState(startingState:LocalStorageUserEntity,startingStatus:UserStatusType){
 	const json = JSON.stringify(startingState,null,'\t');
 	con.print(`starting state => %c${json} (${startingStatus})`,consoleCss.startingState);
-	function condShow(label:string,seconds:number|undefined){ if(seconds) con.log(label+"="+new Date(seconds*1000).toDateString()); }
+	function condShow(label:string,seconds:number|undefined){ 
+		if(seconds) 
+			con.print(label+": %c"+new Date(seconds*1000).toDateString(),consoleCss.startingState); 
+	}
 	condShow('viewDate',startingState.viewDate);
 	condShow('firstFailure',startingState?.failure?.first);
 }
