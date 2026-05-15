@@ -67,7 +67,7 @@ export class SnoopRequest {
 		// FormData
 		if (body instanceof FormData) {
 			const parts: string[] = [];
-			for (const [key, value] of Object.entries(body)) {
+			for (const [key, value] of body.entries()) {
 				if (typeof value === "string")
 					parts.push(`${key}=${value}`);
 				else
@@ -369,3 +369,11 @@ export class RequestSnooper {
 			method(ex);
 	}
 }
+
+/*
+Possible Enhancements:
+	Log Response HTTP type & text
+	Log response headers
+	Redesign WebSocket
+	Capture failuers ("error","abort","timeout") for fetch and xhr
+*/

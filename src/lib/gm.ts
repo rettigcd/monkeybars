@@ -36,13 +36,17 @@ export interface GMApi {
 	downloadAsync(args: DownloadAsyncArgs): Promise<void>;	
 }
 
+type GMSetClipboardDetails = {
+	type?: "text" | "html";
+	mimetype?: string;
+};
+
 // ==================================
 // Declare the GM_ download functions
 // ==================================
-declare global {
-	function GM_download(details: GMDownloadArgs): void;
-	function GM_openInTab(url: string): void;
-}
+declare function GM_download(details: GMDownloadArgs): void;
+declare function GM_openInTab(url: string): void;
+declare function GM_setClipboard( data: string, info?: string | GMSetClipboardDetails, callback?: () => void ): void;
 
 export const GM: GMApi = {
 	download,
@@ -62,6 +66,10 @@ export const GM: GMApi = {
 		});
 	},
 };
+
+export function setClipboard( data: string, info?: string | GMSetClipboardDetails, callback?: () => void ):void {
+	GM_setClipboard(data, info, callback);
+}
 
 // Error / Timeout Exceptions
 export class DownloadError extends Error {
@@ -86,8 +94,8 @@ export class DownloadTimeoutError extends DownloadError {
 // =======
 // helpers
 // =======
-function hasGMDownload(): boolean { return typeof globalThis.GM_download === "function"; }
-function hasGMOpenInTab(): boolean { return typeof globalThis.GM_openInTab === "function"; }
+function hasGMDownload(): boolean { return typeof GM_download === "function"; }
+function hasGMOpenInTab(): boolean { return typeof GM_openInTab === "function"; }
 
 function browserDownloadViaLink(details: GMDownloadArgs): void {
 	const { url, name, onload } = details;
@@ -106,16 +114,16 @@ function browserDownloadViaLink(details: GMDownloadArgs): void {
 
 function download(details: GMDownloadArgs): void {
 	if (hasGMDownload())
-		globalThis.GM_download(details);
+		GM_download(details);
 	else
 		browserDownloadViaLink(details);
 }
 
 function openInTab(url: string): void {
 	if (hasGMOpenInTab())
-		globalThis.GM_openInTab(url);
+		GM_openInTab(url);
 	else
-		globalThis.open(url, "_blank");
+		open(url, "_blank");
 }
 
 // function browserDownloadViaFetch(details: GMDownloadArgs): void {
