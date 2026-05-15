@@ -21,3 +21,8 @@ Moving Image-Downloaded listener to one place
 	Fetcher.fetchGalleryImagesAsync()
 		Fetcher.extractImagesFromPreloadedState()
 
+
+VSCO output filesize:
+	full dev:		325 KB	100%
+	dev sans map:	 85 KB	 26%
+	prod:			 43 KB	 13%
