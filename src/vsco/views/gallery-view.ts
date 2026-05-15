@@ -43,6 +43,7 @@ export class GalleryView extends EventHostBase<GalleryEvents> {
 		this.rows.forEach(row=>{
 			row.on('loaded',()=>this._adjustCounts(1,0) );
 			row.on('closed',()=>this._adjustCounts(-1,-1) );
+			row.on('opened',()=>this._adjustCounts(1,1) );
 		});
 
 		this._showCloseButton();

@@ -1,3 +1,4 @@
+import { con } from "~/lib/console";
 import { $, loadImgSrcAsync } from "~/lib/dom3";
 import { toMs } from "~/lib/epoch-time";
 import { throwNever } from "~/lib/throw";
@@ -69,7 +70,7 @@ export class ImageThumbControl{ // single image
 			case 'timeout':
 				this.img.style.cursor = "default";
 				this._progressBar?.close();
-				console.log( `download: ${progress.status}`);
+				con.print( `download: ${progress.status}`);
 				break;
 			default: throwNever(progress);
 		}

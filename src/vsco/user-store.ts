@@ -2,10 +2,10 @@ import { by, byDesc } from "~/lib/sorting";
 import { SyncedPersistentDict } from "~/lib/storage";
 import { LastYear } from "./last-year";
 import { ImageModel } from "./models/image-model";
-import { NextLink } from "./next-link";
 import { LocalStorageUserEntity, UserStatusType } from "./types";
 import { UserAccess } from "./user-access";
 import { UserCtx } from "./user-ctx";
+import { NextLink } from "./views/next-link";
 
 export class UserStore {
 
@@ -64,21 +64,18 @@ export class UserStore {
 	newUsers(): NextLink{ return this._getLinkForUserStatus("new users","new"); }
 
 	// Scans for anyone marked as "queued" or "should-review"
-	queuedUsers(): NextLink{ return this._getLinkForUserStatus("queued for review","queued"); }
+	queuedUsers(): NextLink{ return this._getLinkForUserStatus("for review","queued"); }
 
 	// Scans for anyone marked as "queued" or "should-review"
 	failedUsers(): NextLink{ return this._getLinkForUserStatus("failed users","failed"); }
 
 	private _getLinkForUserStatus( label:string, status:UserStatusType ): NextLink {
-		const pageOwner = UserStore.pageOwnerName;
 		const users = this.allUsers
-			.filter(user => user.data.status == status && user.data.username !== pageOwner);
-		function rnd(i:number): number{ return Math.floor(Math.random() * i); }
+			.filter(user => user.data.status == status);
 		return new NextLink({
 			label,
-			count: users.length,
-			nextUrl: users.length ? users[rnd(users.length)]!.fetch.galleryUrl : undefined,
-			tooltip: ''
+			tooltip: '',
+			users
 		})
 	}
 
@@ -93,44 +90,43 @@ export class UserStore {
 	missingViewDateUsers(sortLongestOutageFirst=false): NextLink{
 		const pageOwner = UserStore.pageOwnerName;
 
+		const yearSorter = sortLongestOutageFirst
+			? by<LastYear,number>(x=>x.lastYear)
+			: byDesc<LastYear,number>(x=>x.lastYear);
+
 		const users = this._userRepo.entries()
 			.filter(([u,v]) => typeof v.stars === "number" && 2<=v.stars && v.stars<=5 // 1 is 'ignored'
 					&& v.viewDate==undefined
 					&& u != pageOwner // this may be called before current .viewDate is set.
 				)
 			.map(x=>new LastYear(x))
-			.sort(sortLongestOutageFirst
-				? by<LastYear,number>(x=>x.lastYear).thenBy(x=>x.lastCount)
-				: byDesc<LastYear,number>(x=>x.lastYear).thenByDesc(x=>x.lastCount)
-			);
-		const firstUser = users[0];
-		return new NextLink({
-			label: 'missing view-date',
-			count: users.length,
-			tooltip: 'No view-date recorded.',
-			nextUrl: firstUser && `/${firstUser.username}/gallery` || undefined,
-		});
+			.sort(yearSorter.thenBy(x=>x.lastCount).thenBy(x=>x.username))
+			.map(ly=>this.get(ly.username));
+		return new NextLink({ label: 'missing view-date', tooltip: 'No view-date recorded.', users });
 	}
 
 	// Scans users for next person to prune 
 	toPrune(yearsWithoutDownload=4): NextLink{
-		const pageOwner = UserStore.pageOwnerName;
+		const toPrune = this.toPruneUsers(yearsWithoutDownload);
+		return new NextLink({
+			label:'to prune',
+			tooltip:`No downloads in last ${yearsWithoutDownload} years.`,
+			users:toPrune,
+		});
+	}
+
+	// Helper - exposes users for pruning so we can do them in batch
+	toPruneUsers(yearsWithoutDownload=4): UserCtx[]{
 		const earliestEmptyYear = new Date().getFullYear() - yearsWithoutDownload;
-		const toPrune = this._userRepo.entries()
-			.filter(([u,v]) => typeof v.stars === "number" && 2<=v.stars&&v.stars<=5 // 1 is 'ignored'
+
+		return this._userRepo.entries()
+			.filter(([,v]) => typeof v.stars === "number" && 2<=v.stars&&v.stars<=5 // 1 is 'ignored'
 				&& v.viewDate !== undefined // was viewed
-				&& u != pageOwner // this may be called before current .viewDate is set.
 			)
 			.map(x=>new LastYear(x))
 			.filter( ({lastYear}) => lastYear<earliestEmptyYear )
-			.sort(by<LastYear,number>(x=>x.lastYear).thenBy(x=>x.lastCount).thenBy(x=>x.username));
-		const first = toPrune[0];
-		return new NextLink({
-			label:'to prune',
-			count:toPrune.length,
-			tooltip:`No downloads in last ${yearsWithoutDownload} years.`,
-			nextUrl:first && `/${first.username}/gallery` || undefined
-		});
+			.sort(by<LastYear,number>(x=>x.lastYear).thenBy(x=>x.lastCount).thenBy(x=>x.username))
+			.map(ly => this.get(ly.username));
 	}
 
 }

@@ -17,7 +17,9 @@ export function executePromisesInParallelAsync(
 		while(action !== undefined){
 			try{
 				await action();
-			} catch (error) { console.log(error); }
+			} catch (error) { 
+				console.log(error);
+			}
 			++status.loaded;
 			progressCallback(status);
 			action = asyncActions.shift(); // next

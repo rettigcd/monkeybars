@@ -5,7 +5,7 @@ import { LastYear } from "./last-year";
 import { CalendarModel } from "./models/calendar-model";
 import { Gallery } from "./models/gallery-model";
 import { GalleryRowModel } from "./models/gallery-row-model";
-import { LocalStorageUserEntity } from "./types";
+import { LocalStorageUserEntity, UserStatusType } from "./types";
 import { UserCtx } from "./user-ctx";
 import { UserStore } from "./user-store";
 import { Layout } from "./views/layout";
@@ -26,8 +26,9 @@ function makePruneButton(pageOwnerCtx:UserCtx){
 }
 
 // Init page - assume we have a user
-function logStartingState(startingState:LocalStorageUserEntity){ 
-	con.print('starting state => %c'+JSON.stringify(startingState,null,'\t'),consoleCss.startingState);
+function logStartingState(startingState:LocalStorageUserEntity,startingStatus:UserStatusType){
+	const json = JSON.stringify(startingState,null,'\t');
+	con.print(`starting state => %c${json} (${startingStatus})`,consoleCss.startingState);
 	function condShow(label:string,seconds:number|undefined){ if(seconds) con.log(label+"="+new Date(seconds*1000).toDateString()); }
 	condShow('viewDate',startingState.viewDate);
 	condShow('firstFailure',startingState?.failure?.first);
@@ -35,7 +36,7 @@ function logStartingState(startingState:LocalStorageUserEntity){
 
 // Only called if User Page exists (failures should be cleared)
 export async function initUserPageAsync(
-	pageOwnerName:string,
+	pageOwnerName: string, // passed in so I don't have to assert it is not undefined
 	userStore: UserStore,
 	uiLayout: Layout,
 	hotkeys: HotkeyManager,
@@ -43,18 +44,23 @@ export async function initUserPageAsync(
 	pageLoadTime: number,
 	window: Window
 ){
+
 	UserStore.pageOwnerName = pageOwnerName;
 	const pageOwnerCtx: UserCtx = userStore.get( pageOwnerName );
 	const startingState: LocalStorageUserEntity = pageOwnerCtx.data.cloneLocalStorageEntity();
-	logStartingState(startingState);
+	const startingStatus = pageOwnerCtx.status;
+	logStartingState(startingState,startingStatus);
 
 	if(await $qAsync2(".NotFound",1000)){
+
 		// Give them an option to prune this user.
 		if(pageOwnerCtx.isPersisted)
 			uiLayout.withActions( makePruneButton(pageOwnerCtx) );
 		console.log("Not valid user page.");
 		return;
 	}
+
+	pageOwnerCtx.clearFailure(); // if we get here, page is valid
 
 	// Current User
 	const calendar = new CalendarModel( pageOwnerCtx ).showNewImagesIn(gallery);
@@ -63,11 +69,9 @@ export async function initUserPageAsync(
 
 	uiLayout.showCurrentUser(pageOwnerCtx, calendar);
 
-	addCopyUsernameUiElement( pageOwnerName );
+	addCopyUsernameUiElement( pageOwnerName! );
 
 	calendar.registerHotkeys( hotkeys );
-
-	pageOwnerCtx.clearFailure(); // if we get here, page is valid
 
 	switch( pageOwnerCtx.status ){
 		case "new":
@@ -81,6 +85,7 @@ export async function initUserPageAsync(
 				});
 				gallery.rows = [imageRow];
 			}
+			uiLayout.withActions( makePruneButton(pageOwnerCtx) );
 //				calendar.loadAsync();
 			break;
 
@@ -95,12 +100,12 @@ export async function initUserPageAsync(
 				con.print("Loading calendar to verify ready-to-prune.");
 				calendar.loadAsync();
 			} else {
-				// Check if user should be pruned
+				// Check if user should be pruned - !!! should use same code as is in UserCtx
 				const lastYearInfo = new LastYear([pageOwnerName,startingState]);
 				const earliestEmptyYear = new Date().getFullYear() - 4;
 				if( lastYearInfo.lastYear<earliestEmptyYear ){
 					uiLayout.withActions( makePruneButton(pageOwnerCtx) );
-					calendar.loadAsync();
+//					calendar.loadAsync();
 				}
 			}
 

@@ -15,6 +15,7 @@ type UserLinkRepos = {
 
 type GetLinkedUser = (username: string) => ILinkedUser;	
 
+// Result of fetching 1st page from a friend's (aka linked-user)
 type LinkedUserPage = {
 	user: ILinkedUser; 
 	images:ImageModel[];

@@ -12,6 +12,10 @@ export class YearModel extends ObservableBase<YearModel> {
 		public readonly year:YearStr
 	){
 		super();
+		this.listen("hasFocus",({newValue})=>{
+			for(const mm of this.months)
+				mm.hasFocus = newValue;
+		})
 	}
 
 	public loadMonths(byMonth:Partial<Record<YYYYMM,MonthModel>>){

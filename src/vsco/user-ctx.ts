@@ -8,7 +8,7 @@ import { ILinkedUser, LocalStorageUserEntity, UserStatusType } from "./types";
 import { UserAccess } from "./user-access";
 import { UserData } from "./user-data";
 import { UserLinks } from "./user-links";
-import { UserStore } from "./user-store";
+import { pageOwnerName } from "./vscoDom";
 
 type UserCtxEvents = {
 	imageDownloaded: [];
@@ -17,11 +17,11 @@ type UserCtxEvents = {
 export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser {
 
 	public static nowMs: number; // for detecting what Users are stale
-	public isPageOwner: boolean;
 
-	username: string;
+	public username: string;
+
 	_access: UserAccess;
-	track: (x:ImageModel)=>void;
+	_track: (x:ImageModel)=>void;
 
 	private readonly _userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 
@@ -30,17 +30,18 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 		this.username = username;
 		this._userRepo = userRepo;
 		this._access = userAccess; // class: UserAccess
-		this.track = track;
-		this.isPageOwner = UserStore.pageOwnerName == this.username;
+		this._track = track;
 	}
+
+	get isPageOwner(): boolean{ return this.username === pageOwnerName; }
 
 	get links(){ 
 		return new UserLinks(
 			this.username,
 			this._access,
 			this.fetch,
-			(u:string)=>new UserCtx(u, this._userRepo, this._access, this.track),
-			this.track
+			(u:string)=>new UserCtx(u, this._userRepo, this._access, this._track),
+			this._track
 		);
 	}
 	get data(){ return new UserData(this.username,this._userRepo.get(this.username)); }
@@ -49,7 +50,7 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 		return Object.values( this._access.newImageRepo.get(this.username) )
 			.map(i=>{ 
 				const model = new ImageModel(i);
-				this.track(model);
+				this._track(model);
 				return model;
 			});
 	} 
@@ -86,7 +87,7 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 	// ui items
 	rename(newName:string){ this._userRepo.rename(this.username,newName); this.username=newName; }
 
-	get fetch(){ return new Fetcher(this.username, this.isPageOwner, this.track ); }
+	get fetch(){ return new Fetcher(this.username, this.isPageOwner, this._track ); }
 
 	async scanForNewImagesAsync(){
 
@@ -125,7 +126,7 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 		const lastViewDateMs = this.data.viewDateMs;
 		for await(let img of this.fetch.fetchGalleryImagesAsync()){
 			if(img.uploadDateMs<lastViewDateMs) break;
-			this.track(img);
+			this._track(img);
 			result.push(img);
 		}
 		return result;

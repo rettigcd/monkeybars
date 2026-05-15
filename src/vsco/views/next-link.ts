@@ -1,5 +1,10 @@
 import { con } from "~/lib/console";
 import { $ } from "~/lib/dom3";
+import { UserCtx } from "../user-ctx";
+import { pageOwnerName } from "../vscoDom";
+
+// since links are generated before we init the user page,
+// we need to grab this early and not wait
 
 export class NextLink{ 
 
@@ -8,7 +13,10 @@ export class NextLink{
 	private tooltip!: string;
 	private nextUrl?: string;
 	
-	constructor({label,nextUrl,count,tooltip}:{label:string,nextUrl?:string,count:number,tooltip:string}){
+	constructor({label,tooltip,users}:{label:string,tooltip:string,users:UserCtx[]}){
+		const otherUsers = users.filter(ctx=>ctx.username != pageOwnerName);
+		const count = otherUsers.length;
+		const nextUrl = count ? otherUsers[0]!.fetch.galleryUrl : undefined;
 		Object.assign(this,{label,nextUrl,count,tooltip});
 	}
 

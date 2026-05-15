@@ -34,6 +34,7 @@ import { initUserPageAsync } from "./user-page";
 import { UserStore } from "./user-store";
 import { scrollToTop } from "./views/calendar-view";
 import { Layout } from "./views/layout";
+import { pageOwnerName } from "./vscoDom";
 
 type ExtendedWindow = Window & {
 	users: UserStore; // UserAccess; // ::unsafeWindow
@@ -41,7 +42,6 @@ type ExtendedWindow = Window & {
 };
 
 declare const unsafeWindow: ExtendedWindow;
-
 
 (function() {
 	'use strict';
@@ -118,8 +118,7 @@ declare const unsafeWindow: ExtendedWindow;
 //	addStyleSheet(`div[data-google-query-id]{ filter: grayscale(1) blur(2px); opacity: 0.15; }`)
 
 	// -----  Init User  -----
-	const matchesUser = location.href.match(/(?<=vsco.com?\/).*(?=\/gallery)/);
-	if(matchesUser)
-		initUserPageAsync( matchesUser[0], userStore, uiLayout, hotkeys, gallery, pageLoadTimeMs, win );
+	if(pageOwnerName)
+		initUserPageAsync( pageOwnerName, userStore, uiLayout, hotkeys, gallery, pageLoadTimeMs, win );
 
 })();

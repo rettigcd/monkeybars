@@ -1,24 +1,17 @@
+import { LocalStorageUserEntity } from "./types";
+
 export class LastYear{
 	username: string;
 	lastYear: number;
 	lastCount: number;
 	viewDate?: number;
 
-	constructor([
-		username,
-		{dl,viewDate}
-	]:[
-		string,
-		{
-			dl?: Record<string,number>,
-			viewDate?: number
-		}
-	]){
+	constructor([ username, {dl,viewDate} ]:[ string, LocalStorageUserEntity ]){
 		this.username = username;
 		this.viewDate = viewDate;
 
 		const defaultLastYear = 1980;
-		if(dl=== undefined){
+		if(dl === undefined){
 			this.lastYear = defaultLastYear;
 			this.lastCount = 0;
 		} else {

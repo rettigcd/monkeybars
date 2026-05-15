@@ -10,6 +10,7 @@ import { ImageThumbControl } from "./image-thumb-control";
 type ImageRowEvents = {
 	closed: [];
 	loaded: [];
+	opened: [];
 };
 
 export class ImageRowView extends EventHostBase<ImageRowEvents> {
@@ -30,9 +31,10 @@ export class ImageRowView extends EventHostBase<ImageRowEvents> {
 		this.imgContainer = $('div').appendTo(subContainer).el;
 
 		this.model.listen('isVisible',({newValue:isVisible})=>{
-			if(isVisible)
+			if(isVisible){
 				rowDiv.style.display=css.imageRow.display;
-			else{
+				this.trigger('opened');
+			} else {
 				rowDiv.style.display="none";
 				this.trigger('closed');
 			}

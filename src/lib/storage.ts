@@ -1,10 +1,8 @@
+import { con } from "./console";
+
 type DictUpdater<T> = (dict: Record<string, T>) => void;
 type ValueUpdater<T> = (value: T) => void;
 type NewValueGenerator<T> = () => T;
-
-function print(...args: unknown[]): void {
-	queueMicrotask(() => console.log(...args));
-}
 
 function hasOwn(obj: object, key: string): boolean {
 	return Object.prototype.hasOwnProperty.call(obj, key);
@@ -45,9 +43,9 @@ export class SyncedPersistentDict<T> {
 			if (hasOwn(d, oldKey)) {
 				d[newKey] = d[oldKey];
 				delete d[oldKey];
-				print(`Renamed [${oldKey}] to [${newKey}]`);
+				con.print(`Renamed [${oldKey}] to [${newKey}]`);
 			} else
-				print(`[${oldKey}] not found.`);
+				con.print(`[${oldKey}] not found.`);
 		});
 	}
 
@@ -74,7 +72,7 @@ export class SyncedPersistentDict<T> {
 		for (const updater of this.updaters)
 			updater(dict);
 
-		print(`${this.updaters.length} updates saved to ${this.storageKey}`);
+		con.print(`${this.updaters.length} updates saved to %clocalStorage.${this.storageKey}`,'color:blue;font-weight:bold;');
 		this.updaters.length = 0;
 		this.save();
 	}

@@ -8,6 +8,9 @@ import { UserStore } from "../user-store";
 import { GalleryRowModel } from "./gallery-row-model";
 import { TaskStatus } from "./image-model";
 
+// # of users we scan in 1 go
+const numToScan = 200; // 500?
+
 // Tracks the current state of: 
 //	1) stale Users to scan and 
 //	2) Users with new images 
@@ -35,7 +38,6 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
 
 	// converts stale users into new-image users
 	public async scanStaleUsersAsync(){
-		const numToScan = 100; // 500
 		const toScan = this._staleUsers
 			.sort(by(user=>user.data.viewDateMs))
 			.slice(0,numToScan); // only scan 200 oldest
