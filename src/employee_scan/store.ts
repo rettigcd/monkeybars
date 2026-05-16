@@ -1,5 +1,5 @@
 import { CachedPersistentArray, SyncedPersistentDict } from "~/lib/storage";
-import { Employee } from "./data-source";
+import { type Employee } from "./data-source";
 
 const maxEmployeeKey = "maxEmployeeId";
 

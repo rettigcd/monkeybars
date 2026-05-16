@@ -1,5 +1,5 @@
 import { $, addStyleSheet, ElementBuilder } from "~/lib/dom3";
-import { YearStr } from "../format-date";
+import { type YearStr } from "../format-date";
 import { CalendarModel } from "../models/calendar-model";
 import { MonthModel } from "../models/month-model";
 import { YearModel } from "../models/year-model";

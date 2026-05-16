@@ -1,4 +1,4 @@
-import { LTProgress, LTProgressHandler } from "~/lib/progress-types";
+import type { LTProgress, LTProgressHandler } from "~/lib/progress-types";
 export type { LTProgress, LTProgressHandler };
 
 export function executePromisesInParallelAsync(

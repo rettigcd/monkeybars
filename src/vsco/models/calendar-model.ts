@@ -1,7 +1,7 @@
 import { HotkeyManager } from "~/lib/hotkey-manager";
-import { EventHost, makeEventHost, MyEventSource, ObservableBase } from "~/lib/observable";
+import { type EventHost, makeEventHost, type MyEventSource, ObservableBase } from "~/lib/observable";
 import { groupBy } from "~/lib/sorting";
-import { formatDate, YearStr, YYYYMM } from "../format-date";
+import { formatDate, type YearStr, type YYYYMM } from "../format-date";
 import { UserCtx } from "../user-ctx";
 import { Gallery } from "./gallery-model";
 import { ImageModel } from "./image-model";

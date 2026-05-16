@@ -1,4 +1,4 @@
-import { Breakout, DW, Mach, MachineType } from "./types";
+import type { Breakout, DW, Mach, MachineType } from "./types";
 
 export class Machine{
 

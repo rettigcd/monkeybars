@@ -1,4 +1,4 @@
-import { LocalStorageUserEntity } from "./types";
+import type { LocalStorageUserEntity } from "./types";
 
 export class LastYear{
 	username: string;

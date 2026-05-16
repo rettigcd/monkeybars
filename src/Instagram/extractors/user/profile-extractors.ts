@@ -1,5 +1,5 @@
 import { GraphQLContentExtractor } from "../graphql-extractor";
-import { InstagramProfileResponse } from "../ig-types";
+import type { InstagramProfileResponse } from "../ig-types";
 
 // User's timeline / front page - "Posts"
 export class Profile_Posts extends GraphQLContentExtractor<InstagramProfileResponse["data"]> {

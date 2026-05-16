@@ -3,7 +3,7 @@ import { $, loadImgSrcAsync } from "~/lib/dom3";
 import { throwNever } from "~/lib/throw";
 import { toMs } from "~/lib/time";
 import { formatDate } from "../format-date";
-import { ImageModel, TaskStatus } from "../models/image-model";
+import { ImageModel, type TaskStatus } from "../models/image-model";
 import { imgCardBgColor, imgCardCss } from "./css";
 import { ProgressBar } from "./progress-bar";
 

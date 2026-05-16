@@ -1,5 +1,5 @@
 import { ObservableBase } from "~/lib/observable";
-import { YearStr, YYYYMM } from "../format-date";
+import type { YearStr, YYYYMM } from "../format-date";
 import { MonthModel } from "./month-model";
 
 // all the images in a users profile for a given year, organized by month

@@ -1,5 +1,5 @@
 import { delayAsync } from "~/lib/async";
-import { ShowAppearWaitResult } from "./show-appear-waiter";
+import type { ShowAppearWaitResult } from "./show-appear-waiter";
 import { findShowDivs } from "./show-service";
 
 export class ShowDivWatcher {

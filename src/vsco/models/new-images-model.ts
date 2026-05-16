@@ -1,12 +1,12 @@
 import { con } from "~/lib/console";
-import { LTProgress, openInTab } from "~/lib/gm";
+import { type LTProgress, openInTab } from "~/lib/gm";
 import { ObservableBase } from "~/lib/observable";
 import { by, byDesc } from "~/lib/sorting";
 import { executePromisesInParallelAsync } from "../parallel";
 import { UserCtx } from "../user-ctx";
 import { UserStore } from "../user-store";
 import { GalleryRowModel } from "./gallery-row-model";
-import { TaskStatus } from "./image-model";
+import type { TaskStatus } from "./image-model";
 
 // # of users we scan in 1 go
 const numToScan = 200; // 500?

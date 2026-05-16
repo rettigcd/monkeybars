@@ -1,5 +1,5 @@
 import { $, ElementBuilder } from "~/lib/dom3";
-import { LTProgress } from "~/lib/progress-types";
+import type { LTProgress } from "~/lib/progress-types";
 
 type FormatterParams = {loaded:number; total:number;};
 export type TextFormatter = ({loaded,total}:FormatterParams) => string;

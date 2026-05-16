@@ -1,5 +1,5 @@
 import { ObservableBase } from "~/lib/observable";
-import { YYYYMM } from "../format-date";
+import { type YYYYMM } from "../format-date";
 import { monthNames } from "../month-names";
 import { GalleryRowModel } from "./gallery-row-model";
 import { ImageModel } from "./image-model";

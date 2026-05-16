@@ -1,5 +1,5 @@
 import { $qAll } from "~/lib/dom3";
-import { RequestSnooper, SnoopedWindow, SnoopRequest } from "~/lib/snoop";
+import { RequestSnooper, type SnoopedWindow, SnoopRequest } from "~/lib/snoop";
 import { TimeStampConsoleLogger } from "../logging";
 import { SECONDS } from "../time-format";
 

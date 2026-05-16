@@ -16,6 +16,7 @@
     "noUnusedParameters": true,
     "noImplicitAny": true,
     "noUncheckedIndexedAccess": false, // set to true to clamp down on indexes returning undefined
+    "verbatimModuleSyntax": true, // preserve import {x} from "y" as-is, instead of converting to import x = require("y")
     "paths": {
       "~/*": ["src/*"]
     }  

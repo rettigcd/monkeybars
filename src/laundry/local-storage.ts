@@ -2,7 +2,7 @@
 
 import { setClipboard } from "~/lib/gm";
 import { codeCss } from "./css";
-import { Row } from "./types";
+import type { Row } from "./types";
 
 // LocalStorage is where we are saving these items.
 export class LocalStorageRepository{

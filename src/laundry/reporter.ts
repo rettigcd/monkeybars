@@ -3,7 +3,7 @@ import { codeCss } from "./css";
 import { LocalStorageRepository } from "./local-storage";
 import { Machine } from "./machine";
 import { Ts } from "./timestamp";
-import { BreakoutKey, Row } from "./types";
+import type { BreakoutKey, Row } from "./types";
 
 // generates machine reports by pulling rows out of the repository.
 export class Reporter{

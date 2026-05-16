@@ -1,5 +1,5 @@
 import { $, $qAll, ElementBuilder, loadImgSrcAsync } from "~/lib/dom3";
-import { Employee } from "./data-source";
+import { type Employee } from "./data-source";
 import { downloadImageAsync } from "./download";
 import { store } from "./store";
 

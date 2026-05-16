@@ -4,7 +4,7 @@ import { ObservableBase } from "~/lib/observable";
 import type { TaskStatus } from "~/lib/progress-types";
 import { assertMs } from "~/lib/time";
 import { formatDate } from "../format-date";
-import { LocalStorageImageEntity } from "../types";
+import { type LocalStorageImageEntity } from "../types";
 import { boxSize } from "../views/css";
 export type { TaskStatus };
 

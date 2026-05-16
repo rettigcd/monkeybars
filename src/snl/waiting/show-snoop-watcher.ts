@@ -1,5 +1,5 @@
 import { RequestSnooper, SnoopRequest } from "~/lib/snoop";
-import { ShowAppearWaitResult } from "./show-appear-waiter";
+import type { ShowAppearWaitResult } from "./show-appear-waiter";
 
 // Monitors the snooper
 export class ShowSnoopWatcher {

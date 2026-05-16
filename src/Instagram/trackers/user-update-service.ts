@@ -6,7 +6,7 @@ import { PicGroup } from "../models/pic-group";
 import { SingleImage } from "../models/single-image";
 import { instaDom } from "../services/instaDom";
 import { loadTimeMs } from "../services/storage-time";
-import { LocalStorageUserEntity } from "../types/local-storage-types";
+import { type LocalStorageUserEntity } from "../types/local-storage-types";
 
 type UserUpdateServiceConstructor = {
 	userRepo: SyncedPersistentDict<LocalStorageUserEntity>;

@@ -1,5 +1,5 @@
 import { delayAsync } from "~/lib/async";
-import { ShowAppearWaitResult, ShowWatcher } from "./show-appear-waiter";
+import type { ShowAppearWaitResult, ShowWatcher } from "./show-appear-waiter";
 
 // Waits a certain amount of time for a show to appear then just times out.
 export class ShowTimeout implements ShowWatcher{

@@ -3,7 +3,7 @@ import { RequestSnooper, type SnoopHandler } from "~/lib/snoop";
 import { SyncedPersistentDict } from "~/lib/storage";
 import type { HandledRequest } from "../extractors/base-pic-extractor";
 import { loadTimeMs } from "../services/storage-time";
-import { LocalStorageUserEntity } from "../types/local-storage-types";
+import type { LocalStorageUserEntity } from "../types/local-storage-types";
 
 type VisitingUserTrackerConstructionArgs = {
 	snooper: RequestSnooper, 

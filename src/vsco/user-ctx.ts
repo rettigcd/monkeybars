@@ -4,7 +4,7 @@ import { SyncedPersistentDict } from "~/lib/storage";
 import { DAYS } from "~/lib/time";
 import { Fetcher } from "./fetcher";
 import { ImageModel } from "./models/image-model";
-import { ILinkedUser, LocalStorageUserEntity, UserStatusType } from "./types";
+import type { ILinkedUser, LocalStorageUserEntity, UserStatusType } from "./types";
 import { UserAccess } from "./user-access";
 import { UserData } from "./user-data";
 import { UserLinks } from "./user-links";

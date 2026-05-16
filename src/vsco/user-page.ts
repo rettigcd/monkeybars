@@ -5,7 +5,7 @@ import { LastYear } from "./last-year";
 import { CalendarModel } from "./models/calendar-model";
 import { Gallery } from "./models/gallery-model";
 import { GalleryRowModel } from "./models/gallery-row-model";
-import { LocalStorageUserEntity, UserStatusType } from "./types";
+import type { LocalStorageUserEntity, UserStatusType } from "./types";
 import { UserCtx } from "./user-ctx";
 import { UserStore } from "./user-store";
 import { Layout } from "./views/layout";

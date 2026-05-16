@@ -13,13 +13,13 @@
 // ==/UserScript==
 
 import { con } from "~/lib/console";
-import { makeNewXMLHttpRequest, SnoopedWindow, SnoopHandler, SnoopRequest } from "~/lib/snoop";
+import { makeNewXMLHttpRequest, type SnoopedWindow, type SnoopHandler, SnoopRequest } from "~/lib/snoop";
 import { LocalStorageRepository } from "./local-storage";
 import { MyLocation } from "./location";
 import { Machine } from "./machine";
 import { Reporter } from "./reporter";
 import { Ts } from "./timestamp";
-import { Mach, Row, StackedMachines } from "./types";
+import type { Mach, Row, StackedMachines } from "./types";
 
 declare const unsafeWindow: SnoopedWindow 
 	& {

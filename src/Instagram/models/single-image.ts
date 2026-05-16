@@ -1,5 +1,5 @@
 import { con } from "~/lib/console";
-import { downloadAsync, LTProgressHandler } from "~/lib/gm";
+import { downloadAsync, type LTProgressHandler } from "~/lib/gm";
 import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observable";
 import { by } from "~/lib/sorting";
 import { throwExp } from "~/lib/throw";

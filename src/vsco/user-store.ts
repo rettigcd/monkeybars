@@ -2,7 +2,7 @@ import { by, byDesc } from "~/lib/sorting";
 import { SyncedPersistentDict } from "~/lib/storage";
 import { LastYear } from "./last-year";
 import { ImageModel } from "./models/image-model";
-import { LocalStorageUserEntity, UserStatusType } from "./types";
+import type { LocalStorageUserEntity, UserStatusType } from "./types";
 import { UserAccess } from "./user-access";
 import { UserCtx } from "./user-ctx";
 import { NextLink } from "./views/next-link";

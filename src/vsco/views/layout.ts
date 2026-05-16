@@ -4,7 +4,7 @@ import { Importer } from "../importer";
 import { CalendarModel } from "../models/calendar-model";
 import { Gallery } from "../models/gallery-model";
 import { NewImagesModel } from "../models/new-images-model";
-import { UserStatusType } from "../types";
+import type { UserStatusType } from "../types";
 import { UserCtx } from "../user-ctx";
 import { CalendarView } from "./calendar-view";
 import { GalleryView } from "./gallery-view";

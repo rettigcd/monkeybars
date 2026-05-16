@@ -1,6 +1,6 @@
 import { delayAsync } from "~/lib/async";
 import { TimeStampConsoleLogger } from "../logging";
-import { ShowAppearWaitResult, ShowWatcher, WaitStatus } from "./show-appear-waiter";
+import type { ShowAppearWaitResult, ShowWatcher, WaitStatus } from "./show-appear-waiter";
 import { ShowService } from "./show-service";
 
 type StatusChangedHandler = (status: WaitStatus) => void;

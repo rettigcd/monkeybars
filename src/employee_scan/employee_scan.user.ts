@@ -16,7 +16,7 @@
 
 import { delayAsync } from "~/lib/async";
 import { throwExp } from "~/lib/throw";
-import { Employee, type EmployeeDirectory, getEmployeeDictAsync } from "./data-source";
+import { type Employee, type EmployeeDirectory, getEmployeeDictAsync } from "./data-source";
 import { ids } from "./ids";
 import { store } from "./store";
 import { appendEmployeeAsync, clearEmployees } from "./ui";
