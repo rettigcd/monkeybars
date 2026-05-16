@@ -1,5 +1,5 @@
-import { toMs } from "~/lib/epoch-time";
 import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observable";
+import { toMs } from "~/lib/time";
 import type { MediaNode } from "../extractors/ig-types";
 import { sanitizeImgUrl } from "../services/image-lookup-by-url";
 import { SingleImage } from "./single-image";

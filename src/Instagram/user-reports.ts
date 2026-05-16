@@ -2,7 +2,7 @@ import { makeStackedBar } from "~/lib/charts";
 import { con } from "~/lib/console";
 import { by, byDesc, groupBy } from "~/lib/sorting";
 import { SyncedPersistentDict } from "~/lib/storage";
-import { DAYS } from "~/lib/units";
+import { DAYS } from "~/lib/time";
 import { calcDownloadsInLastYear, getRefreshTime, lastVisitOlderThanThresholdOrMissing } from "./services/download-stats";
 import { ImageLookupByUrl } from "./services/image-lookup-by-url";
 import { loadTimeMs } from "./services/storage-time";

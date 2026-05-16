@@ -1,6 +1,5 @@
-import { toMs } from "~/lib/epoch-time";
 import { throwNever } from "~/lib/throw";
-import { SECONDS, YEARS } from "~/lib/units";
+import { SECONDS, toMs, YEARS } from "~/lib/time";
 import { formatDate } from "./format-date";
 import { LocalStorageUserEntity, StarType, UserStatusType } from "./types";
 

@@ -1,7 +1,7 @@
 import { con } from "~/lib/console";
 import { $, loadImgSrcAsync } from "~/lib/dom3";
-import { toMs } from "~/lib/epoch-time";
 import { throwNever } from "~/lib/throw";
+import { toMs } from "~/lib/time";
 import { formatDate } from "../format-date";
 import { ImageModel, TaskStatus } from "../models/image-model";
 import { imgCardBgColor, imgCardCss } from "./css";

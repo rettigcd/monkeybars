@@ -1,7 +1,7 @@
 import { openInTab } from "~/lib/gm";
 import { EventHostBase } from "~/lib/observable";
 import { SyncedPersistentDict } from "~/lib/storage";
-import { DAYS } from "~/lib/units";
+import { DAYS } from "~/lib/time";
 import { Fetcher } from "./fetcher";
 import { ImageModel } from "./models/image-model";
 import { ILinkedUser, LocalStorageUserEntity, UserStatusType } from "./types";

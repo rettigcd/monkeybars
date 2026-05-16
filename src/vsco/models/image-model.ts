@@ -1,8 +1,8 @@
 import { con } from "~/lib/console";
-import { assertMs } from "~/lib/epoch-time";
 import { downloadAsync, DownloadTimeoutError } from "~/lib/gm";
 import { ObservableBase } from "~/lib/observable";
 import type { TaskStatus } from "~/lib/progress-types";
+import { assertMs } from "~/lib/time";
 import { formatDate } from "../format-date";
 import { LocalStorageImageEntity } from "../types";
 import { boxSize } from "../views/css";

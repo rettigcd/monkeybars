@@ -1,5 +1,5 @@
 import { con } from "~/lib/console";
-import { DAYS } from "~/lib/units";
+import { DAYS } from "~/lib/time";
 
 export const loadTimeMs = Date.now();
 
