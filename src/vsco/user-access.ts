@@ -1,5 +1,6 @@
 import { CachedPersistentArray, SyncedPersistentDict } from "~/lib/storage";
-import type { LocalStorageImageDict, LocalStorageUserLinks } from "./types";
+import type { LocalStorageImageDict, LocalStorageUserLinks } from "./types/local-storage";
+import type { } from "./types/types";
 
 export class UserAccess {
 

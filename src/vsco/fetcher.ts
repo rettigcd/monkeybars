@@ -1,59 +1,7 @@
 import { $q } from "~/lib/dom3";
 import { byDesc } from "~/lib/sorting";
 import { ImageModel } from "./models/image-model";
-
-type SiteState = {
-	medias: SmallMedia[]; // What are these used for?	
-	nextCursor? : string | null;
-}
-
-type SmallMedia = {
-	type: "image"; // | "video" ???
-	image?: string; // guid
-}
-
-// Entire Preloaded State
-type PreloadedState = {
-	users: {
-		currentUser: {
-			tkn: string; // token
-		}
-	}
-	medias: {
-		bySiteId: Record<string,SiteState>;
-	}
-	entities: {
-		images: Record<string,PreloadImageEntity>;
-		videos?: Record<string,unknown>; // ??? does this exist?  do we use it?
-	}
-	errorMessage: string;
-}
-
-
-type FetchProfileResponse = {
-	next_cursor?: string;
-	media: { image: FetchImageEntity; }[];
-};
-
-type FetchImageEntity = {
-	perma_subdomain: string; // owner
-	height: number;
-	width: number;
-	responsive_url: string;
-	capture_date: number;
-	upload_date: number;
-}
-
-type PreloadImageEntity = {
-	permaSubdomain: string; // owner
-	height: number;
-	width: number;
-	responsiveUrl: string;
-	videoUrl?: string;
-	captureDate: number;
-	uploadDate: number;
-}
-
+import type { FetchProfileResponse, PreloadedState, PreloadImageEntity } from "./types/vsco-json";
 
 export class Fetcher {
 

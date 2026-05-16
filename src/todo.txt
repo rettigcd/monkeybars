@@ -23,7 +23,6 @@
 -- both --
 -----------
 
-5	unsafeWindow - standardize
 5	when clicking an image for download, update ui IMEDIATELY to indicate clicked, like show progress bar immediately
 
 4	put everything on CMD

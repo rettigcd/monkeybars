@@ -5,7 +5,9 @@ import { LastYear } from "./last-year";
 import { CalendarModel } from "./models/calendar-model";
 import { Gallery } from "./models/gallery-model";
 import { GalleryRowModel } from "./models/gallery-row-model";
-import type { LocalStorageUserEntity, UserStatusType } from "./types";
+import type { LocalStorageUserEntity } from "./types/local-storage";
+import type { UserStatusType } from "./types/types";
+import { type VscoWindow } from "./types/window";
 import { UserCtx } from "./user-ctx";
 import { UserStore } from "./user-store";
 import { Layout } from "./views/layout";
@@ -45,7 +47,7 @@ export async function initUserPageAsync(
 	hotkeys: HotkeyManager,
 	gallery: Gallery,
 	pageLoadTime: number,
-	window: Window
+	window: VscoWindow
 ){
 
 	UserStore.pageOwnerName = pageOwnerName;
@@ -134,22 +136,22 @@ export async function initUserPageAsync(
 			break;
 	}
 
-	const win = window as Window & { user: UserCtx, cmd: Record<string,unknown>};
-	win.user = pageOwnerCtx;
-	win.cmd = {
-		owner: pageOwnerName,
-		user: pageOwnerCtx,
-		missingViewDate: function(sortLongestOutageFirst=false){
-			userStore.missingViewDateUsers( sortLongestOutageFirst ).goto();
-		},
-		nextToPrune: function(yearsWithoutDownload=4){
-			userStore.toPrune( yearsWithoutDownload ).goto();
-		},
-		showLinks: async function(){
-			gallery.rows = await pageOwnerCtx.links.asGalleryRowsAsync();
-		},
-		downloads: []
+	const cmd = window.cmd;
+	if(cmd){
+		cmd.pageOwnerName = pageOwnerName;
+		cmd.pageOwnerCtx = pageOwnerCtx;
+		cmd.downloads = [];
 	}
+
+	// missingViewDate: function(sortLongestOutageFirst=false){
+	// 	userStore.missingViewDateUsers( sortLongestOutageFirst ).goto();
+	// },
+	// nextToPrune: function(yearsWithoutDownload=4){
+	// 	userStore.toPrune( yearsWithoutDownload ).goto();
+	// },
+	// showLinks: async function(){
+	// 	gallery.rows = await pageOwnerCtx.links.asGalleryRowsAsync();
+	// },
 
 }
 

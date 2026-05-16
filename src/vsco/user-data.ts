@@ -1,7 +1,8 @@
 import { throwNever } from "~/lib/throw";
 import { SECONDS, toMs, YEARS } from "~/lib/time";
 import { formatDate } from "./format-date";
-import type { LocalStorageUserEntity, StarType, UserStatusType } from "./types";
+import type { LocalStorageUserEntity, StarType } from "./types/local-storage";
+import type { UserStatusType } from "./types/types";
 
 // Storing times in userRepo as Seconds-since-epoch / Unix time.
 const pageLoadSecondsSinceEpoch = Math.floor(Date.now() / SECONDS +0.5);

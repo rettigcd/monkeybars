@@ -28,6 +28,7 @@ import { formatDate } from "./format-date";
 import { Gallery } from "./models/gallery-model";
 import { ImageModel } from "./models/image-model";
 import { NewImagesModel } from "./models/new-images-model";
+import { win } from "./types/window";
 import { UserAccess } from "./user-access";
 import { UserCtx } from "./user-ctx";
 import { initUserPageAsync } from "./user-page";
@@ -36,12 +37,6 @@ import { scrollToTop } from "./views/calendar-view";
 import { Layout } from "./views/layout";
 import { pageOwnerName } from "./vscoDom";
 
-type ExtendedWindow = Window & {
-	users: UserStore; // UserAccess; // ::unsafeWindow
-	report: Record<string,unknown>
-};
-
-declare const unsafeWindow: ExtendedWindow;
 
 (function() {
 	'use strict';
@@ -85,9 +80,7 @@ declare const unsafeWindow: ExtendedWindow;
 	});
 	hotkeys.start();
 
-	const win = (typeof unsafeWindow !== "undefined" ? unsafeWindow : window) as ExtendedWindow;
-	win.users = userStore;
-	win.report = {
+	const reports = {
 		status : function(status=throwExp('must supply status')){
 			return userStore.allUsers
 				.filter(u=>u.data.status==status)
@@ -105,6 +98,11 @@ declare const unsafeWindow: ExtendedWindow;
 		toReview : function(){ console.log(userStore.allUsers.filter(u=>u.data.status=="queued").map(user=>user.username).join("\r\n")); },
 		findLinksTo: function(needle:string){ console.log(userStore.findFriendLinksTo(needle).join("\r\n")); }
 	}
+
+	win.cmd = {
+		userStore,
+		reports 
+	};
 
 	// Removes Google Ad
 	setInterval(function(){ document.querySelectorAll("ins[data-google-query-id]").forEach(x=>x.remove());},5000);

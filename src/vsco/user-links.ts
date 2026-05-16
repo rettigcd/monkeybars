@@ -4,7 +4,8 @@ import { Fetcher } from "./fetcher";
 import { GalleryRowModel } from "./models/gallery-row-model";
 import { ImageModel } from "./models/image-model";
 import { executePromisesInParallelAsync } from "./parallel";
-import type { ILinkedUser, LocalStorageUserLinks } from "./types";
+import type { LocalStorageUserLinks } from "./types/local-storage";
+import type { ILinkedUser } from "./types/types";
 
 type UserLinkRepos = {
 	linkRepo: SyncedPersistentDict<LocalStorageUserLinks>;
