@@ -1,5 +1,5 @@
 import { $ } from "~/lib/dom3";
-import { GM } from "~/lib/gm";
+import { download, downloadAsync } from "~/lib/gm";
 import { formatDateForFilename } from "./date-formats";
 import { SingleImage } from "./models/single-image";
 import { instaDom } from "./services/instaDom";
@@ -171,14 +171,14 @@ export class ScreenImageActions {
 				const coverImageSrc = canvas.toDataURL("image/jpeg");
 				const extractFilename = (instaDom.pageOwner || "instagram_img") + " " + formatDateForFilename(new Date()) + ".jpg";
 
-				GM.download({ url: coverImageSrc, name: extractFilename });
+				download({ url: coverImageSrc, name: extractFilename });
 				return;
 			}
 
 			const extension = await this.getExtensionFromBlobType(imgUrl);
 			const filename = (instaDom.pageOwner || "instagram_img") + " " + formatDateForFilename(new Date()) + "." + extension;
 
-			await GM.downloadAsync({ url: imgUrl, name: filename });
+			await downloadAsync({ url: imgUrl, name: filename });
 			console.log(`downloaded: ${filename}`);
 		} catch (ex) {
 			console.error(ex);

@@ -20,7 +20,7 @@
 // (c) Allow access to file URLs
 
 import { con, silenceConsole } from "~/lib/console";
-import { GM } from "~/lib/gm";
+import { openInTab } from "~/lib/gm";
 import { HotkeyManager } from "~/lib/hotkey-manager";
 import { formatDateForFilename } from "./date-formats";
 import { LocationPage } from "./pages/location-page";
@@ -36,7 +36,7 @@ silenceConsole(unsafeWindow);
 function openFocusUserProfilePage() {
 	const focusUser = instaDom.focusUser;
 	if (focusUser)
-		GM.openInTab(`https://instagram.com/${focusUser}`);
+		openInTab(`https://instagram.com/${focusUser}`);
 	else
 		console.log("No focusUser found.");
 }

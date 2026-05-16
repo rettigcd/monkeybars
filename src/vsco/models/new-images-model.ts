@@ -1,5 +1,5 @@
 import { con } from "~/lib/console";
-import { GM, LTProgress } from "~/lib/gm";
+import { LTProgress, openInTab } from "~/lib/gm";
 import { ObservableBase } from "~/lib/observable";
 import { by, byDesc } from "~/lib/sorting";
 import { executePromisesInParallelAsync } from "../parallel";
@@ -90,7 +90,7 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
  			labelText : user.username + ' ' + user.data.downloadsInLastYear,
  			images : user.newImages,
  			actions : { 
- 				open: function(){GM.openInTab(user.fetch.galleryUrl);}, // !!! ??? should this move to the UI
+ 				open: function(){openInTab(user.fetch.galleryUrl);}, // !!! ??? should this move to the UI
  			}
  		});
  		rowModel.listen('isVisible',({newValue:isVisible})=>{

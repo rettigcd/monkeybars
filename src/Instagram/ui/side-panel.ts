@@ -1,5 +1,5 @@
 import { $ } from "~/lib/dom3";
-import { GM } from "~/lib/gm";
+import { openInTab } from "~/lib/gm";
 import { HotkeyManager } from "~/lib/hotkey-manager";
 import { SyncedPersistentDict } from "~/lib/storage";
 import { PicGroup } from "../models/pic-group";
@@ -103,7 +103,7 @@ export class SidePanel {
 		this.pageOwner = instaDom.pageOwner;
 		this.countUserDownloads = calcDownloadsInLastYear;
 		this.getTotalDownloads = getTotalDownloads;
-		this.openInTab = GM.openInTab;
+		this.openInTab = openInTab;
 
 		batchProducer.on("batchReceived", (batch) => this.showNewBatches(batch));
 	}

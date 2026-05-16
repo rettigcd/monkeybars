@@ -1,5 +1,5 @@
 import { con } from "~/lib/console";
-import { GM, LTProgressHandler } from "~/lib/gm";
+import { downloadAsync, LTProgressHandler } from "~/lib/gm";
 import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observable";
 import { by } from "~/lib/sorting";
 import { throwExp } from "~/lib/throw";
@@ -88,7 +88,7 @@ export class SingleImage implements ObservableHost<SingleImage> {
 	// }
 
 	public async downloadLargestAsync(onprogress?: LTProgressHandler){
-		await GM.downloadAsync({url:this.largestUrl, name:this.filename, onprogress });
+		await downloadAsync({url:this.largestUrl, name:this.filename, onprogress });
 		this.downloaded=true;
 		con.print(`downloaded: ${this.filename}`);
 	}

@@ -1,4 +1,4 @@
-import { GM } from "~/lib/gm";
+import { openInTab } from "~/lib/gm";
 import { EventHostBase } from "~/lib/observable";
 import { SyncedPersistentDict } from "~/lib/storage";
 import { DAYS } from "~/lib/units";
@@ -60,7 +60,7 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 	open(){ 
 		this.save();
 		this._userRepo.sync(); // flush 'save' before we open the next page.
-		GM.openInTab(this.fetch.galleryUrl); // window.open(this.fetch.galleryUrl, '_blank');
+		openInTab(this.fetch.galleryUrl); // window.open(this.fetch.galleryUrl, '_blank');
 	}
 	mask(){ this._access.commonRepo.add(this.username); console.log(`${this.username} masked!`); }
 

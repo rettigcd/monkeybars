@@ -1,6 +1,6 @@
 import { con } from "~/lib/console";
 import { assertMs } from "~/lib/epoch-time";
-import { DownloadTimeoutError, GM } from "~/lib/gm";
+import { downloadAsync, DownloadTimeoutError } from "~/lib/gm";
 import { ObservableBase } from "~/lib/observable";
 import type { TaskStatus } from "~/lib/progress-types";
 import { formatDate } from "../format-date";
@@ -59,7 +59,7 @@ export class ImageModel extends ObservableBase<ImageModel>{
 	// Downloads image to "Downloads" folder
 	public async downloadAsync(): Promise<void>{
 		try{
-			await GM.downloadAsync({ url: this.downloadUrl, name: this.localFileName, onprogress: this._onProgress });
+			await downloadAsync({ url: this.downloadUrl, name: this.localFileName, onprogress: this._onProgress });
 			this.downloadProgress = {status:'complete'};
 			con.print('Image saved.');
 		} catch(error){
