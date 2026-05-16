@@ -27,11 +27,9 @@ import { LocationPage } from "./pages/location-page";
 import { UserPage } from "./pages/user-page";
 import { ScreenImageActions } from "./screen-image-actions";
 import { instaDom } from "./services/instaDom";
-import { type InstagramWindow } from "./types/window";
+import { win } from "./types/window";
 
-declare const unsafeWindow: InstagramWindow;
-
-silenceConsole(unsafeWindow);
+silenceConsole(win);
 
 function openFocusUserProfilePage() {
 	const focusUser = instaDom.focusUser;
@@ -65,7 +63,7 @@ export function initInstagram4(): void {
 	// };
 
 	const hotkeys = new HotkeyManager();
-	const screenImageActions = new ScreenImageActions(unsafeWindow);
+	const screenImageActions = new ScreenImageActions(win);
 	hotkeys.register(" ", () => screenImageActions.downloadImageInCenter());
 	hotkeys.register("d", () => screenImageActions.downloadImageUnderMouse());
 	hotkeys.register("t", () => screenImageActions.showTaggedUsersUnderMouse());
@@ -76,9 +74,9 @@ export function initInstagram4(): void {
 	hotkeys.start();
 
 	if (window.location.pathname.startsWith("/explore/locations"))
-		new LocationPage({win:unsafeWindow,hotkeys});
+		new LocationPage({win,hotkeys});
 	else if (window.location.pathname != "/")
-		new UserPage({ win:unsafeWindow, hotkeys });
+		new UserPage({ win, hotkeys });
 
 	con.print("%cInstagram4.js loaded", "background-color:#DFD");
 }

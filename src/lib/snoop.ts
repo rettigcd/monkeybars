@@ -27,6 +27,12 @@ export type SnoopedWindow = {
 	location: Location;
 };
 
+export interface ISnoopedWindow {
+	fetch: typeof fetch;
+	XMLHttpRequest: typeof XMLHttpRequest;
+	location: Location;
+}
+
 export type SnoopedXMLHttpRequest = XMLHttpRequest & {
 	_openArgs?: IArguments;
 	_sendBody?: unknown;
