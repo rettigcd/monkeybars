@@ -1,28 +1,21 @@
 {
+	// Appearance - easy to identify this Workspace
+	"workbench.colorCustomizations": {
+		// Activty bar (left icons)
+		"activityBar.background": "#008636",
+		"activityBar.foreground": "#ffffff",
+		"activityBar.activeBorder": "#ffffff",
+		"activityBar.inactiveForeground": "#000000",
+	},
+
+	// Tab / indents
 	"editor.insertSpaces": false,
 	"editor.tabSize": 4,
-	"editor.showUnused": true,
+
+	// Typescript
+	"js/ts.tsdk.path": "node_modules\\typescript\\lib", // use project's local TypeScript version
+	"js/ts.tsdk.promptToUseWorkspaceVersion": true,
 	"editor.codeActionsOnSave": {
 		"source.organizeImports": "explicit"
 	},
-
-	"editor.tokenColorCustomizations": {
-		"comments": "#FFFF00"
-	},
-
-	"[javascript]": {
-		"editor.insertSpaces": false,
-		"editor.tabSize": 4
-	},
-
-	"[json]": {
-		"editor.insertSpaces": false,
-		"editor.tabSize": 4
-	},
-
-	"workbench.tree.indent": 20,
-
-	"js/ts.tsdk.path": "node_modules\\typescript\\lib",
-	"js/ts.tsdk.promptToUseWorkspaceVersion": true
-
 }

@@ -3,10 +3,10 @@
 -----------
 -- vsco --
 -----------
-5	what is makeup of 938 new users?
-5	how many people don't have a last view date?
-5	why do brand new users have dl:{} - dl should never be empty.
-4	isStale calculation should use UserData
+5*	what is makeup of 938 new users?
+5*	how many people don't have a last view date?
+5*	why do brand new users have dl:{} - dl should never be empty.
+4*	isStale calculation should use UserData
 3	Change Prune button - observe UserCtx prune status
 3	Move Prune away from links.
 
@@ -14,8 +14,8 @@
 -- insta --
 -----------
 
+4	wrap data access in a facade
 4	full collapse of left pane
-3	wrap data access in a facade
 3	on user page, bind to UserCtx.downloads in last year and update control on page.
 3	on insta:toriiwood, I downloaded an image through the details popup but didn't get a dl:year increment
 
@@ -23,13 +23,11 @@
 -- both --
 -----------
 
-4	Consolidate CSS
+5*	Categorizing Users : Visited HasDownloads
 
-4	Categorizing Users : Visited HasDownloads
+4*	Consolidate CSS
 
 3	show bar graph of downloads by year for a user. (so I don't have to expand F12)
-
-why am I not getting Problems for imports that should be "type"
 
 =======================
 
