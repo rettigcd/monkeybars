@@ -6,7 +6,7 @@
 5	what is makeup of 938 new users?
 5	how many people don't have a last view date?
 5	why do brand new users have dl:{} - dl should never be empty.
-4	stale calc uses UserData
+4	isStale calculation should use UserData
 3	Change Prune button - observe UserCtx prune status
 3	Move Prune away from links.
 
@@ -23,9 +23,6 @@
 -- both --
 -----------
 
-5	when clicking an image for download, update ui IMEDIATELY to indicate clicked, like show progress bar immediately
-
-4	put everything on CMD
 4	Consolidate CSS
 
 4	Categorizing Users : Visited HasDownloads

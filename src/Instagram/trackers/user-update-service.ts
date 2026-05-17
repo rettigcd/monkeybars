@@ -48,11 +48,11 @@ export class UserUpdateService {
 	registerDownloadListeners(batch:PicGroup[]) {
 		for (const { pics } of batch)
 			for (const pic of pics)
-				pic.listen("downloaded", this.singlePicDownloadListener);
+				pic.listen("downloadProgress", this.singlePicDownloadListener);
 	}
 
-	singlePicDownloadListener : ObservableListener<SingleImage, "downloaded"> = ({ host: { owner, date }, newValue:downloaded }) => {
-		if (downloaded && owner) {
+	singlePicDownloadListener : ObservableListener<SingleImage, "downloadProgress"> = ({ host: { owner, date }, newValue:progress }) => {
+		if (progress.status == "complete" && owner) {
 			const year = date.getFullYear();
 			this.userRepo.update(owner, (u) => {
 				u.username ??= owner;

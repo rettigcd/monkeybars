@@ -14,16 +14,17 @@ type PicGroupArgs = {
 };
 
 export class PicGroup implements ObservableHost<PicGroup> {
-	owner!: string;
-	date!: Date;
-	pics!: SingleImage[];
-	following?: boolean;
-	liked?: boolean;
-	captionText?: string;
-	isNew?: boolean;
-	isVisible: boolean = true;;
-	sanitizedImgUrl: string;
-	thumbUrl?: string;
+	public readonly owner!: string;
+	public readonly pics!: SingleImage[];
+	public readonly following?: boolean;
+	public readonly liked?: boolean;
+	public readonly captionText?: string;
+	public readonly sanitizedImgUrl: string;
+	public readonly date!: Date; // used to build separator / row title
+
+	public isVisible: boolean = true; // observable
+	public isNew?: boolean; // this prop is set later after the batch has ben routed to batch-producer-group 
+	public thumbUrl?: string; // the (sanitized?) url that Instagram is using to represent that group - pulled from the DOM
 
 	public listen!: ListenFn<PicGroup>;
 

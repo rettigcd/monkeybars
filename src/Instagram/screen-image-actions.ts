@@ -54,9 +54,8 @@ export class ScreenImageActions {
 		const point = this.getCenterOfPresentation() ?? this.pointerTracker.getCurrentPosition();
 		const found = this.getImageUnderPoint(point);
 
-		if (found == null) {
+		if (found == null)
 			return;
-		}
 
 		const { singleImage: { owner, taggedUsers } } = found;
 

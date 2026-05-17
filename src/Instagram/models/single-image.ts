@@ -1,6 +1,7 @@
 import { con } from "~/lib/console";
-import { downloadAsync, type LTProgressHandler } from "~/lib/gm";
+import { downloadAsync } from "~/lib/gm";
 import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observable";
+import type { TaskStatus } from "~/lib/progress-types";
 import { by } from "~/lib/sorting";
 import { throwExp } from "~/lib/throw";
 import { formatDateForFilename } from "../date-formats";
@@ -12,18 +13,20 @@ type SingleImageMediaArgs = TaggedImageMedia & {
 	date: Date;
 };
 
-type ImageDimension = "width" | "height";
-
 export class SingleImage implements ObservableHost<SingleImage> {
-	taggedUsers: string[];
-	images: ImageCandidate[];
-	largestUrl: string;
-	smallestUrl: string;
-	largestDimensionName: ImageDimension;
-	owner: string;
-	date: Date;
-	filename: string;
-	downloaded = false;
+
+	public readonly owner: string; // so we can mark the download on the user when it finishes
+	public readonly date: Date; // public to mark download in correct year
+	public readonly taggedUsers: string[]; // public so we can display tagged users in the UI
+
+	// Questionable public props
+	public readonly smallestUrl: string; // used by PicGroup as sanitizedImgUrl
+	public readonly images: ImageCandidate[]; // used by iiLookup for unknown reason
+
+	public downloadProgress: TaskStatus = { status:'notStarted' }; // observable
+
+	private readonly filename: string;
+	private readonly largestUrl: string;
 
 	public listen!: ListenFn<SingleImage>;
 
@@ -38,7 +41,6 @@ export class SingleImage implements ObservableHost<SingleImage> {
 		this.images = images.sort(by(({ height }) => height));
 		this.smallestUrl = this.images[0].url;
 		this.largestUrl = this.images[this.images.length - 1].url;
-		this.largestDimensionName = images[0].width < images[0].height ? "height" : "width";
 
 		this.owner = owner;
 		this.date = date;
@@ -87,9 +89,12 @@ export class SingleImage implements ObservableHost<SingleImage> {
 	// 	con.print(`downloaded: ${this.filename}`);
 	// }
 
-	public async downloadLargestAsync(onprogress?: LTProgressHandler){
-		await downloadAsync({url:this.largestUrl, name:this.filename, onprogress });
-		this.downloaded=true;
+	public async downloadLargestAsync(){
+		this.downloadProgress = {status:'inProgress', loaded:0, total:1};
+		await downloadAsync({url:this.largestUrl, name:this.filename, 
+			onprogress: ({loaded,total}) => this.downloadProgress = {status:'inProgress', loaded, total} }
+		);
+		this.downloadProgress = {status:'complete'};
 		con.print(`downloaded: ${this.filename}`);
 	}
 

@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         Instagram 4
+// @name         Instagram
 // @namespace    http://tampermonkey.net/
 // @version      4
 // @description  Make individual Instagram images more accessible.
 // @author       Dean Rettig
 // @run-at       document-start
-// @require      file://C:/[monkeyBarsFolder]/Instagram4.user.js
+// @require      file://C:/[monkeyBarsFolder]/dist/Instagram4.user.js
 // @match        https://www.instagram.com/*
 // @exclude      https://www.instagram.com/p/*/
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=instagram.com

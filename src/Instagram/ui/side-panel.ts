@@ -1,7 +1,9 @@
-import { $ } from "~/lib/dom3";
+import { $, ElementBuilder } from "~/lib/dom3";
 import { openInTab } from "~/lib/gm";
 import { HotkeyManager } from "~/lib/hotkey-manager";
+import type { TaskStatus } from "~/lib/progress-types";
 import { SyncedPersistentDict } from "~/lib/storage";
+import { throwNever } from "~/lib/throw";
 import { PicGroup } from "../models/pic-group";
 import { SingleImage } from "../models/single-image";
 import { calcDownloadsInLastYear, getTotalDownloads } from "../services/download-stats";
@@ -20,6 +22,16 @@ type SeparatorArgs = {
 	owner: string;
 	captionText?: string;
 };
+
+const newImageCss: Css = {
+	border: "thick solid yellow",
+	cursor: "pointer",
+	maxWidth: "300px",
+	maxHeight: "300px",
+	width: "auto",
+	height: "auto"
+};
+
 
 export class SidePanel {
 	private readonly picGroups: PicGroup[] = [];
@@ -50,11 +62,6 @@ export class SidePanel {
 		overflowY: "auto",
 		width: "100%",
 		height: "100%",
-	};
-
-	private readonly newImageCss: Css = {
-		border: "thick solid yellow",
-		cursor: "pointer",
 	};
 
 	private readonly separatorCss: Css = {
@@ -275,22 +282,37 @@ export class SidePanel {
 	}
 
 	private buildThumb(singleImage: SingleImage) {
-		return $("img")
-			.attr("src", singleImage.getThumbUrl(this.newImageSize))
-			.css(this.newImageCss)
-			.do((img) => {
-				img.style[singleImage.largestDimensionName] = `${this.newImageSize}px`;
-			})
-			.on("click", async (event: Event) => {
-				const {style} = event.currentTarget as HTMLImageElement;
-				// Before
-				style.cursor = "wait";
-				// During
-				await singleImage.downloadLargestAsync();
-				// After
-				style.cursor = "default";
-				style.opacity = "0.3";
-			});
+		let $img:ElementBuilder<HTMLImageElement>;
+		const div = $('div')
+			.css({ position: "relative", display: "inline-block"})
+			.withChildren(
+				$img = $("img")
+				.attr("src", singleImage.getThumbUrl(this.newImageSize))
+				.css(newImageCss)
+				.on("click", () => singleImage.downloadLargestAsync())
+			).el;
+		let overlay: ElementBuilder<HTMLElement> | null = null;
+		singleImage.listen('downloadProgress',({newValue:progress}:{newValue:TaskStatus})=>{
+			switch(progress.status){
+				case "notStarted": break;
+				case "inProgress":
+					$img.css({cursor:"wait"});
+					overlay ??= $('div').css({position:"absolute",top:"0",right:"0",background:"white",padding:"2px",fontSize:"10px"}).appendTo(div);
+					overlay.txt(`${Math.round((progress.loaded/progress.total)*100)}%`);
+					break;
+				case "complete":
+					$img.css({cursor:"default",opacity:"0.3"});
+					overlay?.txt("✓");
+					break;
+				case "error":
+				case "timeout":
+					overlay?.txt("❌");
+					break;
+				default:
+					return throwNever(progress);
+			}
+		})
+		return div;
 	}
 
 	private createNewImageContainer(): void {
