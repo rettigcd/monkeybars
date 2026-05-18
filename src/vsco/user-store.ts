@@ -110,16 +110,9 @@ export class UserStore {
 
 	// Helper - exposes users for pruning so we can do them in batch
 	toPruneUsers(): UserCtx[]{
-		const yearsWithoutDownload = 4;
-		const earliestEmptyYear = new Date().getFullYear() - yearsWithoutDownload;
-
 		return this.allUsers
-			.filter((ctx) => ctx.data.status=="following"
-				&& ctx.data.viewDateMs !== undefined // was viewed
-				&& ctx.data.lastYear<earliestEmptyYear
-			)
-			.sort(by<UserCtx,number>(x=>x.data.lastYear).thenBy(x=>x.data.lastCount).thenBy(x=>x.username))
-			.map(ly => this.get(ly.username));
+			.filter(ctx => ctx.data.shouldPrune)
+			.sort(by<UserCtx,number>(x=>x.data.lastYear).thenBy(x=>x.data.lastCount).thenBy(x=>x.username));
 	}
 
 }

@@ -40,6 +40,10 @@ function calcDownloadsInLastYear(byYear:Record<string,number> ={}): number {
 	return (byYear[thisYear] || 0) + Math.round((byYear[thisYear - 1] || 0) * fractionOfPreviousYearToInclude);
 }
 
+// toPrune helpers...
+const yearsWithoutDownload = 4;
+const earliestEmptyYear = new Date().getFullYear() - yearsWithoutDownload;
+
 // ::UserData - fascade around user info
 // enforce internal data consistency
 export class UserData {
@@ -141,6 +145,23 @@ export class UserData {
 
 	public get lastCount(): number {
 		return this._info.dl?.[this.lastYear] || 0;
+	}
+
+	public get shouldPrune(): boolean {
+		return this.status=="following"
+			&& this.viewDateMs !== undefined // was viewed
+			&& this.lastYear<earliestEmptyYear
+	}
+
+	public get group():string {
+		const {dl,viewDate} = this._info;
+		
+		const dlStr = dl!==undefined && Object.keys(dl).length > 0 ? "dl" : "no-dl";
+		const vdStr = viewDate!==undefined ? "vd" : "no-vd";
+		const status = this.status;
+		const staleStr = this.isDueToScanNewImages ? "stale" : "fresh";
+		const pruneStr = this.shouldPrune ? "prune" : "keep";
+		return `${dlStr}-${vdStr}-${status}-${staleStr}-${pruneStr}`;
 	}
 
 }

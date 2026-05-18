@@ -19,6 +19,8 @@ export type VscoWindow = Window
 			pageOwnerCtx?: UserCtx;
 			pageOwnerName?: string;
 			downloads?: unknown[];
+
+			groups?:() => unknown;
 		}
 	};
 

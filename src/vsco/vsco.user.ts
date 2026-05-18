@@ -22,7 +22,7 @@
 import { addStyleSheet } from "~/lib/dom3";
 import { saveTextToFile } from "~/lib/download";
 import { HotkeyManager } from "~/lib/hotkey-manager";
-import { by } from "~/lib/sorting";
+import { by, groupBy } from "~/lib/sorting";
 import { throwExp } from "~/lib/throw";
 import { formatDate } from "./format-date";
 import { Gallery } from "./models/gallery-model";
@@ -99,7 +99,16 @@ import { pageOwnerName } from "./vscoDom";
 
 	win.cmd = {
 		userStore,
-		reports 
+		reports,
+		groups:function(): unknown{
+			const groups = groupBy<UserCtx,string>(userStore.allUsers,x=>x.data.group);
+			const lengths = Object.fromEntries(
+				Object.entries(groups)
+					.map(([key, value]) => [key, value.length])
+			);
+			console.log(lengths);
+			return groups
+		} 
 	};
 
 	// Removes Google Ad
