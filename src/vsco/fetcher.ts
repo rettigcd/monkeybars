@@ -18,7 +18,8 @@ export class Fetcher {
 	get galleryUrl(){ return 'https://vsco.co/'+this.username+'/gallery'; }
 	collectionUrl(page:number):string { return 'https://vsco.co/'+this.username+'/collection/'+page; }
 
-	async fetchCollectionImages(): Promise<ImageModel[]>{
+	// gets all "reposts" so we can harvest them for linked-users / friends
+	public async fetchCollectionImages(): Promise<ImageModel[]>{
 		const maxImagesPerPage=20;
 		const allImages: ImageModel[] = [];
 		let pageNum = 0;
@@ -31,12 +32,15 @@ export class Fetcher {
 		return allImages;
 	}
 
-	async fetchFirstPageImages(): Promise<ImageModel[]>{ // return them as an array
+	// Gets the 1st page of a user for displaying their images in the linked-user friend list.
+	async fetchFirstPageImages(): Promise<ImageModel[]>{
 		const html = await this._fetchGalleryPageHtml();
 		return getPageImages( html );
 	}
 
-	// returns ImageModel objects
+	// Used by:
+	// - calendar to fetch-all of a users images and by
+	// - fetch-new to just get images new since last-view-date (breaks once we've hit the an old image)
 	async * fetchGalleryImagesAsync(): AsyncGenerator<ImageModel,void,unknown> {
 		const startingHtml = await this._fetchGalleryPageHtml();
 		const preloadedState = extractPreloadedStateFromHtml(startingHtml);
@@ -88,18 +92,18 @@ export class Fetcher {
 
 	}
 
-	async _fetchGalleryPageHtml(): Promise<string>{
+	private async _fetchGalleryPageHtml(): Promise<string>{
 		return this._useDocumentBody
 			? $q<HTMLBodyElement>('body')!.outerHTML
 			: await (await fetch( this.galleryUrl )).text();
 	}
 
-	async _fetchCollectionPageHtml(pageNum: number): Promise<string>{
+	private async _fetchCollectionPageHtml(pageNum: number): Promise<string>{
 		const resp = await fetch( this.collectionUrl(pageNum) );
 		return await resp.text();
 	}
 
-	async _fetchCollectionImagesOnPage(pageNum: number): Promise<ImageModel[]>{
+	private async _fetchCollectionImagesOnPage(pageNum: number): Promise<ImageModel[]>{
 		const collectionHtml = await this._fetchCollectionPageHtml(pageNum);
 		return getPageImages( collectionHtml );
 	}

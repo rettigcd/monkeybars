@@ -1,10 +1,10 @@
 import { con } from "~/lib/console";
 import { $, $qAll, $qAsync2 } from "~/lib/dom3";
 import { HotkeyManager } from "~/lib/hotkey-manager";
-import { LastYear } from "./last-year";
 import { CalendarModel } from "./models/calendar-model";
 import { Gallery } from "./models/gallery-model";
 import { GalleryRowModel } from "./models/gallery-row-model";
+import { UserData } from "./models/user/user-data";
 import type { LocalStorageUserEntity } from "./types/local-storage";
 import type { UserStatusType } from "./types/types";
 import { type VscoWindow } from "./types/window";
@@ -106,17 +106,17 @@ export async function initUserPageAsync(
 				calendar.loadAsync();
 			} else {
 				// Check if user should be pruned - !!! should use same code as is in UserCtx
-				const lastYearInfo = new LastYear([pageOwnerName,startingState]);
+				const startingData = new UserData(pageOwnerName, startingState);
 				const earliestEmptyYear = new Date().getFullYear() - 4;
-				if( lastYearInfo.lastYear<earliestEmptyYear ){
+				if( startingData.lastYear<earliestEmptyYear ){
 					uiLayout.withActions( makePruneButton(pageOwnerCtx) );
 //					calendar.loadAsync();
 				}
 			}
 
+			// Scan and show new Images
 			await pageOwnerCtx.scanForNewImagesAsync(); // Sets .viewDate which we NEED
-
-			if(pageOwnerCtx.newImages.length>0){
+			if(0<pageOwnerCtx.newImages.length){
 				const newImagesRow = new GalleryRowModel({ labelText : 'new images', images:pageOwnerCtx.newImages })
 				gallery.rows = [newImagesRow];
 				pageOwnerCtx.clearNewImages();

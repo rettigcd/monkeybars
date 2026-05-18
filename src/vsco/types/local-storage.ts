@@ -3,7 +3,6 @@
 // ======
 export type StarType = 1 | 2 | 3 | 4 | 5 | 'scan' | null | undefined;
 
-// UserRepo
 export type LocalStorageUserEntity = {
 	stars?: StarType;
 	viewDate?: number; // storing seconds since epoch / Unix time

@@ -20,7 +20,7 @@ export function notNull<T>(src:T|null|undefined, label:string = 'object'):NonNul
 	return src;
 }
 
-export function assertNotNull<T>( src: T | null | undefined, label = "object" ): asserts src is NonNullable<T> {
-	if (src == null)
+export function assertNotNull<T>( src: T | null | undefined, label:string = "object" ): asserts src is NonNullable<T> {
+	if (src === null || src === undefined)
 		throw new Error(`${label} was null or undefined.`);
 }

@@ -1,13 +1,14 @@
+import { assertNotNull } from "~/laundry/location";
 import { openInTab } from "~/lib/gm";
 import { EventHostBase } from "~/lib/observable";
 import { SyncedPersistentDict } from "~/lib/storage";
-import { DAYS } from "~/lib/time";
 import { Fetcher } from "./fetcher";
 import { ImageModel } from "./models/image-model";
+import { UserData } from "./models/user/user-data";
+import { NewImageStore } from "./new-image-store";
 import type { LocalStorageUserEntity } from "./types/local-storage";
 import type { ILinkedUser, UserStatusType } from "./types/types";
 import { UserAccess } from "./user-access";
-import { UserData } from "./user-data";
 import { UserLinks } from "./user-links";
 import { pageOwnerName } from "./vscoDom";
 
@@ -90,22 +91,25 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 
 	get fetch(){ return new Fetcher(this.username, this.isPageOwner, this._track ); }
 
-	async scanForNewImagesAsync(){
 
-		await new Promise(resolve => setTimeout(resolve, 300)); // rate-limit - do 100/minute
-
+	// user MUST have .viewDate for this work.
+	public async scanForNewImagesAsync(){
 		try{
-			const newImages = await this._fetchNewImagesAsync();
+			const lastViewDateMs = this.data.viewDateMs;
+			assertNotNull( lastViewDateMs, ".viewDate");
+
+			const newImages:ImageModel[] = [];
+			for await(let img of this.fetch.fetchGalleryImagesAsync()){
+				if(img.uploadDateMs<lastViewDateMs) break;
+				this._track(img);
+				newImages.push(img);
+			}
+
 			this.setViewDateToNow();
-			if(0<newImages.length)
-				this._access.newImageRepo.update(this.username,newImageGroup=>{
-					newImages.forEach( img => {
-							const jsonParams = img.toJSON();
-							newImageGroup[jsonParams.responsiveUrl]=jsonParams;
-						} ); // adds each image to the group
-				});
+
+			new NewImageStore(this._access.newImageRepo).addNewImagesToUser(this.username,newImages);
 		} catch( error ){
-			console.log('Failed to load '+this.username);
+			console.log('Failed to load new images for '+this.username);
 			console.error(error);
 			this._update( data => data.loadFailed() );
 		}
@@ -117,35 +121,6 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 
 	public clearFailure() {
 		this._update( data => data.clearFailure() );
-	}
-
-	async _fetchNewImagesAsync(): Promise<ImageModel[]>{ // move into fetcher?
-		let result:ImageModel[] = [];
-
-		// const info = this.data._info;
-		// const before = JSON.stringify(this.data._info);
-		const lastViewDateMs = this.data.viewDateMs;
-		for await(let img of this.fetch.fetchGalleryImagesAsync()){
-			if(img.uploadDateMs<lastViewDateMs) break;
-			this._track(img);
-			result.push(img);
-		}
-		return result;
-	}
-
-	// !!! THIS MIGHT BE WRONG.
-	// People missing viewDate are showing up as 1980
-	// and when we do a scan of them, it goes all the way back to the beginning.
-	// !!! don't scan people without viewDates.
-	// !!! MAYBE the status is wrong.  Maybe the status should show up as "new" or "notFollowing" but are erroneously showing up as following.
-	// !!! TEST - of everyone that .isDueToScanNewImages, show their: status & raw viewDate
-	get isDueToScanNewImages(){ 
-		const data: UserData = this.data;
-		if( data.status !== "following" ) return false;
-		const effectiveDownloadsInLastYear = data.downloadsInLastYear || 1;
-		const daysBetweenScans = Math.max( 5, 365/effectiveDownloadsInLastYear*0.6); // 60% of wait duration
-		const nextScanTime = Math.floor( daysBetweenScans * DAYS ) + data.viewDateMs;
-		return nextScanTime < UserCtx.nowMs;
 	}
 
 	private _update(action:(d:UserData)=>void){

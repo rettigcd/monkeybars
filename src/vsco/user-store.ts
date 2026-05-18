@@ -1,16 +1,16 @@
 import { by, byDesc } from "~/lib/sorting";
 import { SyncedPersistentDict } from "~/lib/storage";
-import { LastYear } from "./last-year";
 import { ImageModel } from "./models/image-model";
 import type { LocalStorageUserEntity } from "./types/local-storage";
 import type { UserStatusType } from "./types/types";
 import { UserAccess } from "./user-access";
 import { UserCtx } from "./user-ctx";
 import { NextLink } from "./views/next-link";
+import { pageOwnerName } from "./vscoDom";
 
 export class UserStore {
 
-	public static pageOwnerName?: string; // set later IF we are on a pageOwner page
+	public static pageOwnerName: string|undefined = pageOwnerName;
 
 	private readonly _cache: Record<string, UserCtx> = {};
 	private readonly _userRepo: SyncedPersistentDict<LocalStorageUserEntity>; // only used by UserStore and UserCtx, limit access to other classes
@@ -92,41 +92,39 @@ export class UserStore {
 		const pageOwner = UserStore.pageOwnerName;
 
 		const yearSorter = sortLongestOutageFirst
-			? by<LastYear,number>(x=>x.lastYear)
-			: byDesc<LastYear,number>(x=>x.lastYear);
+			? by<UserCtx,number>(x=>x.data.lastYear)
+			: byDesc<UserCtx,number>(x=>x.data.lastYear);
 
-		const users = this._userRepo.entries()
-			.filter(([u,v]) => typeof v.stars === "number" && 2<=v.stars && v.stars<=5 // 1 is 'ignored'
-					&& v.viewDate==undefined
-					&& u != pageOwner // this may be called before current .viewDate is set.
+		const users = this.allUsers
+			.filter(ctx => ctx.data.status === "following"
+					&& ctx.data.viewDateMs === undefined
+					&& ctx.data.username !== pageOwner
 				)
-			.map(x=>new LastYear(x))
-			.sort(yearSorter.thenBy(x=>x.lastCount).thenBy(x=>x.username))
-			.map(ly=>this.get(ly.username));
+			.sort(yearSorter.thenBy(x=>x.data.lastCount).thenBy(x=>x.username));
 		return new NextLink({ label: 'missing view-date', tooltip: 'No view-date recorded.', users });
 	}
 
 	// Scans users for next person to prune 
-	toPrune(yearsWithoutDownload=4): NextLink{
-		const toPrune = this.toPruneUsers(yearsWithoutDownload);
+	toPrune(): NextLink{
+		const toPrune = this.toPruneUsers();
 		return new NextLink({
 			label:'to prune',
-			tooltip:`No downloads in last ${yearsWithoutDownload} years.`,
+			tooltip:"No downloads in last few years.",
 			users:toPrune,
 		});
 	}
 
 	// Helper - exposes users for pruning so we can do them in batch
-	toPruneUsers(yearsWithoutDownload=4): UserCtx[]{
+	toPruneUsers(): UserCtx[]{
+		const yearsWithoutDownload = 4;
 		const earliestEmptyYear = new Date().getFullYear() - yearsWithoutDownload;
 
-		return this._userRepo.entries()
-			.filter(([,v]) => typeof v.stars === "number" && 2<=v.stars&&v.stars<=5 // 1 is 'ignored'
-				&& v.viewDate !== undefined // was viewed
+		return this.allUsers
+			.filter((ctx) => ctx.data.status=="following"
+				&& ctx.data.viewDateMs !== undefined // was viewed
+				&& ctx.data.lastYear<earliestEmptyYear
 			)
-			.map(x=>new LastYear(x))
-			.filter( ({lastYear}) => lastYear<earliestEmptyYear )
-			.sort(by<LastYear,number>(x=>x.lastYear).thenBy(x=>x.lastCount).thenBy(x=>x.username))
+			.sort(by<UserCtx,number>(x=>x.data.lastYear).thenBy(x=>x.data.lastCount).thenBy(x=>x.username))
 			.map(ly => this.get(ly.username));
 	}
 

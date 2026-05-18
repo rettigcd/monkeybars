@@ -1,8 +1,9 @@
 import { throwNever } from "~/lib/throw";
-import { SECONDS, toMs, YEARS } from "~/lib/time";
-import { formatDate } from "./format-date";
-import type { LocalStorageUserEntity, StarType } from "./types/local-storage";
-import type { UserStatusType } from "./types/types";
+import { DAYS, SECONDS, toMs, YEARS } from "~/lib/time";
+import { formatDate } from "../../format-date";
+import type { LocalStorageUserEntity, StarType } from "../../types/local-storage";
+import type { UserStatusType } from "../../types/types";
+import { UserCtx } from "../../user-ctx";
 
 // Storing times in userRepo as Seconds-since-epoch / Unix time.
 const pageLoadSecondsSinceEpoch = Math.floor(Date.now() / SECONDS +0.5);
@@ -27,7 +28,8 @@ const convert = {
 			case null: case undefined: return "new";
 			default: throwNever(stars);
 		}
-	}
+	},
+
 }
 
 // calc some parameters we need to calculate downloads.
@@ -73,11 +75,11 @@ export class UserData {
 	}
 
 	// -- view Date --
-	public get viewDateMs(): number { 
+	public get viewDateMs(): number | undefined { 
 		// don't assume .viewData is in seconds because we might have legacy values.
 		// if all values are converted to seconds, we could replace this with:
 		// return (this._info.viewDate||0) * SECONDS;
-		return toMs(this._info.viewDate||0);
+		return this._info.viewDate ? toMs(this._info.viewDate) : undefined;
 	} 
 
 	// also clears failures
@@ -120,6 +122,25 @@ export class UserData {
 
 	public clearFailure(): void {
 		delete this._info.failure;
+	}
+
+	get isDueToScanNewImages(){
+		const {status,viewDateMs} = this;
+		if( status !== "following" || viewDateMs === undefined ) return false;
+		const effectiveDownloadsInLastYear = this.downloadsInLastYear || 1;
+		const daysBetweenScans = Math.max( 5, 365/effectiveDownloadsInLastYear*0.6); // 60% of wait duration
+		const nextScanTime = Math.floor( daysBetweenScans * DAYS ) + viewDateMs;
+		return nextScanTime < UserCtx.nowMs;
+	}
+
+	public get lastYear(): number {
+		const defaultLastYear = 1980;
+		return (this._info.dl === undefined) ? defaultLastYear 
+			: Math.max(...Object.keys(this._info.dl).map(x=>Number(x))) || defaultLastYear;
+	};
+
+	public get lastCount(): number {
+		return this._info.dl?.[this.lastYear] || 0;
 	}
 
 }

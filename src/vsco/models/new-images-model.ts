@@ -1,3 +1,4 @@
+import { delayAsync } from "~/lib/async";
 import { con } from "~/lib/console";
 import { type LTProgress, openInTab } from "~/lib/gm";
 import { ObservableBase } from "~/lib/observable";
@@ -38,11 +39,14 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
 
 	// converts stale users into new-image users
 	public async scanStaleUsersAsync(){
-		const toScan = this._staleUsers
+		const toScan:UserCtx[] = this._staleUsers
 			.sort(by(user=>user.data.viewDateMs))
 			.slice(0,numToScan); // only scan 200 oldest
 		const unexecutedPromiseGenerators = toScan
-			.map( user => ( ()=>user.scanForNewImagesAsync() ) );
+			.map(user => async () => {
+				await delayAsync(300);
+				return user.scanForNewImagesAsync();
+			});
 
 		try{
 			await executePromisesInParallelAsync( unexecutedPromiseGenerators, 1, this.trackStaleUserProgress );
@@ -81,7 +85,7 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
 	}
 
 	private refreshStaleUsers(){
-		this._staleUsers = this._userStore.allUsers.filter( user=>user.isDueToScanNewImages );
+		this._staleUsers = this._userStore.allUsers.filter( user=>user.data.isDueToScanNewImages );
 		this.staleUserCount = this._staleUsers.length;
 	}
 
