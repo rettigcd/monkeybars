@@ -1,30 +1,24 @@
 import { by, byDesc } from "~/lib/sorting";
-import { SyncedPersistentDict } from "~/lib/storage";
+import { linkRepo, newImageRepo, userRepo } from "./local-storage";
 import { ImageModel } from "./models/image-model";
-import type { LocalStorageUserEntity } from "./types/local-storage";
 import type { UserStatusType } from "./types/types";
-import { UserAccess } from "./user-access";
 import { UserCtx } from "./user-ctx";
 import { NextLink } from "./views/next-link";
 import { pageOwnerName } from "./vscoDom";
 
 export class UserStore {
 
-	public static pageOwnerName: string|undefined = pageOwnerName;
+	public static pageOwnerName: string|undefined = pageOwnerName; // init from vscoDom.ts
 
 	private readonly _cache: Record<string, UserCtx> = {};
-	private readonly _userRepo: SyncedPersistentDict<LocalStorageUserEntity>; // only used by UserStore and UserCtx, limit access to other classes
 
 	constructor(
-		private readonly access: UserAccess,
 		private readonly track: (imgModel:ImageModel) => void
-	) {
-		this._userRepo = new SyncedPersistentDict<LocalStorageUserEntity>('users');
-	}
+	) {}
 
 	get(username: string): UserCtx {
 		return this._cache[username]
-			??= new UserCtx(username, this._userRepo, this.access, this.track);
+			??= new UserCtx(username, this.track);
 	}
 
 	getMany(usernames: string[]): UserCtx[] {
@@ -32,13 +26,13 @@ export class UserStore {
 	}
 
 	get allUsers(): UserCtx[] {
-		return this._userRepo.keys()
+		return userRepo.keys()
 			.map(username => this.get(username));
 	}
 
 	// Users with FOUND new Images
 	get newImageUsers(): UserCtx[] {
-		return this.access.newImageRepo.keys()
+		return newImageRepo.keys()
 			.map(username => this.get(username));
 	}
 
@@ -82,7 +76,7 @@ export class UserStore {
 
 	// Friend links
 	findFriendLinksTo(needle:string): string[]{ 
-		return this.access.linkRepo.entries()
+		return linkRepo.entries()
 			.filter(([_,links])=>links.indexOf(needle)!=-1)
 			.map(([username,])=>username);
 	}

@@ -1,11 +1,11 @@
 import { con } from "~/lib/console";
 import { $, $qAll, $qAsync2 } from "~/lib/dom3";
 import { HotkeyManager } from "~/lib/hotkey-manager";
+import type { LocalStorageUserEntity } from "./local-storage";
 import { CalendarModel } from "./models/calendar-model";
 import { Gallery } from "./models/gallery-model";
 import { GalleryRowModel } from "./models/gallery-row-model";
 import { UserData } from "./models/user/user-data";
-import type { LocalStorageUserEntity } from "./types/local-storage";
 import type { UserStatusType } from "./types/types";
 import { type VscoWindow } from "./types/window";
 import { UserCtx } from "./user-ctx";

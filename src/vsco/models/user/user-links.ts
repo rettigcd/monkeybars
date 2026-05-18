@@ -1,17 +1,12 @@
 import { by, byDesc, onlyUnique } from "~/lib/sorting";
-import { CachedPersistentArray, SyncedPersistentDict } from "~/lib/storage";
-import { Fetcher } from "./fetcher";
-import { GalleryRowModel } from "./models/gallery-row-model";
-import { ImageModel } from "./models/image-model";
-import { executePromisesInParallelAsync } from "./parallel";
-import type { LocalStorageUserLinks } from "./types/local-storage";
-import type { ILinkedUser } from "./types/types";
-
-type UserLinkRepos = {
-	linkRepo: SyncedPersistentDict<LocalStorageUserLinks>;
-	commonRepo:CachedPersistentArray;
-	pageOwner?:string;
-}
+import { linkRepo } from "~/vsco/local-storage";
+import { UserCtx } from "~/vsco/user-ctx";
+import { pageOwnerName } from "~/vsco/vscoDom";
+import { Fetcher } from "../../fetcher";
+import { executePromisesInParallelAsync } from "../../parallel";
+import type { ILinkedUser } from "../../types/types";
+import { GalleryRowModel } from "../gallery-row-model";
+import { ImageModel } from "../image-model";
 
 type GetLinkedUser = (username: string) => ILinkedUser;	
 
@@ -22,33 +17,24 @@ type LinkedUserPage = {
 }
 
 export class UserLinks {
-	private readonly commonRepo: CachedPersistentArray; // Stuff we ignore
-	private readonly linkRepo: SyncedPersistentDict<LocalStorageUserLinks>;					// stores the links
 
 	private readonly username: string;
-	private readonly pageOwner?: string;
-
 	private readonly _fetcher: Fetcher;
 
 	constructor(
 		username:string, 
-		{linkRepo,commonRepo,pageOwner}:UserLinkRepos, 
 		fetcher:Fetcher, 
 		private readonly getLinkedUser:GetLinkedUser,
 		private readonly track: (model:ImageModel) => void
 	){
 		this.username=username;
-
-		this.linkRepo = linkRepo;
-		this.commonRepo = commonRepo;
-		this.pageOwner = pageOwner;
 		this._fetcher = fetcher;
 	}
 
 	// returns array of linked user names, using cache if possible
 	cached(): Promise<string[]>{
-		return this.linkRepo.containsKey(this.username)  // in cache?
-			? Promise.resolve( this.linkRepo.get(this.username) ) // use cache
+		return linkRepo.containsKey(this.username)  // in cache?
+			? Promise.resolve( linkRepo.get(this.username) ) // use cache
 			: this._scanAndSaveToCache();  // else scan
 	}
 	async list(){ this._listUsers( await this.cached() ); }
@@ -62,7 +48,7 @@ export class UserLinks {
 		console.log(`Scanning 1st page of ${newUsers.length} users.`);
 
 		// foreach user, get their 1st page of images
-		const firstPageWithUsernameArray: LinkedUserPage[] = await fetchFirstPageOfEachUserAsync( newUsers, this.pageOwner, this.track ); // array of {user,images}
+		const firstPageWithUsernameArray: LinkedUserPage[] = await fetchFirstPageOfEachUserAsync( newUsers, pageOwnerName, this.track ); // array of {user,images}
 		firstPageWithUsernameArray.sort(byDesc<LinkedUserPage,number>(x=>x.images.length).thenBy(x=>x.user.username));
 		// convert to gallery rows
 		return firstPageWithUsernameArray
@@ -86,10 +72,10 @@ export class UserLinks {
 		const collectionImages = await this._fetcher.fetchCollectionImages();
 		const linkedUsers = collectionImages.map(i=>i.owner)
 			.filter(onlyUnique)
-			.filter(u=>!this.commonRepo.includes(u)); // exclude anything in the commonRepo
+			.filter(u=>!UserCtx.commonRepo.includes(u)); // exclude anything in the commonRepo
 
 		console.log(`Collection scan of [${this.username}] found ${linkedUsers.length} links.`); // log
-		this.linkRepo.update(this.username,arr=>{ arr.length=0; arr.push(...linkedUsers.sort()); });
+		linkRepo.update(this.username,arr=>{ arr.length=0; arr.push(...linkedUsers.sort()); });
 		return linkedUsers;
 	}
 

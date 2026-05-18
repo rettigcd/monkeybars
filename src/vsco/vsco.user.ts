@@ -29,7 +29,6 @@ import { Gallery } from "./models/gallery-model";
 import { ImageModel } from "./models/image-model";
 import { NewImagesModel } from "./models/new-images-model";
 import { win } from "./types/window";
-import { UserAccess } from "./user-access";
 import { UserCtx } from "./user-ctx";
 import { initUserPageAsync } from "./user-page";
 import { UserStore } from "./user-store";
@@ -55,8 +54,7 @@ import { pageOwnerName } from "./vscoDom";
 	
 	// Services / repositories / models
 	const gallery = new Gallery();
-	const userAccess = new UserAccess();
-	const userStore = new UserStore(userAccess,track);
+	const userStore = new UserStore(track);
 	const newImagesModel = new NewImagesModel(userStore);
 
 	newImagesModel.listen("scannedNewImages", ({host,newValue:rows})=>{

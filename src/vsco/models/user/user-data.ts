@@ -1,7 +1,7 @@
 import { throwNever } from "~/lib/throw";
 import { DAYS, SECONDS, toMs, YEARS } from "~/lib/time";
 import { formatDate } from "../../format-date";
-import type { LocalStorageUserEntity, StarType } from "../../types/local-storage";
+import type { LocalStorageUserEntity, StarType } from "../../local-storage";
 import type { UserStatusType } from "../../types/types";
 import { UserCtx } from "../../user-ctx";
 
