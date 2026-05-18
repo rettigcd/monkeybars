@@ -35,9 +35,9 @@ VSCO output filesize:
                                   7011
 
 ":dl:vd:new         :fresh:keep":   9    GOOD
-":  :vd:new         :fresh:keep": 296,   looked, no recent downloads
-":dl:  :new         :fresh:keep": 581,   ??? where is the viewDate?
-":  :  :new         :fresh:keep":  54,   ??? what do we have on these?
+":  :vd:new         :fresh:keep": 296,   add to fresh/stale, review items with no dl
+":dl:  :new         :fresh:keep": 581,   set viewDate to beginning of most recent DL year
+":  :  :new         :fresh:keep":  54,   review, add to PRUNE
 ---------------------------------------
                                   931
 
@@ -51,3 +51,8 @@ VSCO output filesize:
 new:            931
 notFollowing:  2339
 following:     7011
+
+Questions:
+	Should we continue to track notFollowing?  Separate list like commonRepo or in same list.
+		Option => notFollowing => separete list with viewDate like common - reference for links and when loading page.
+		Option => PRUNE, optionally export prune file

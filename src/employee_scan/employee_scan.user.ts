@@ -15,6 +15,7 @@
 // ==/UserScript==
 
 import { delayAsync } from "~/lib/async";
+import { groupBy } from "~/lib/sorting";
 import { throwExp } from "~/lib/throw";
 import { type Employee, type EmployeeDirectory, getEmployeeDictAsync } from "./data-source";
 import { ids } from "./ids";
@@ -27,6 +28,7 @@ declare global {
 	var scanEmployeesAsync: (start: number, count?: number) => Promise<void>;
 	var showEmployeesByIdAsync: (ids?: number[] | null) => Promise<void>;
 	var saveEmployees: (ids:number[]) => void;
+	var groups: any;
 
 	var ivy2f3_marketing: number[];
 	var ivy2f3_it: number[];
@@ -86,6 +88,7 @@ void (async function (): Promise<void> {
 	globalThis.scanEmployeesAsync = scanEmployeesAsync;
 	globalThis.showEmployeesByIdAsync = showEmployeesByIdAsync;
 	globalThis.saveEmployees = saveEmployees;
+	globalThis.groups = groupBy<Employee,string>(Object.values(globalThis.employeeData),x=>x.dept);
 
 	function foo(str: string): void {
 		queueMicrotask(console.log.bind(console, `%c${str}`, "color:#00c;font-style:italic;font-weight:800;"));
