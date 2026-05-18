@@ -1,4 +1,3 @@
-import { delayAsync } from "~/lib/async";
 import { con } from "~/lib/console";
 import { downloadAsync, DownloadTimeoutError } from "~/lib/gm";
 import { ObservableBase } from "~/lib/observable";
@@ -62,7 +61,6 @@ export class ImageModel extends ObservableBase<ImageModel>{
 	public async downloadAsync(): Promise<void>{
 		try{
 			this.downloadProgress = {status:'inProgress', loaded:0, total:1};
-			await delayAsync(1000); // !!! test! remove when not testing
 			await downloadAsync({ url: this.downloadUrl, name: this.localFileName, onprogress: this._onProgress });
 			this.downloadProgress = {status:'complete'};
 			con.print('Image saved.');

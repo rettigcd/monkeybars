@@ -26,3 +26,28 @@ VSCO output filesize:
 	full dev:		325 KB	100%
 	dev sans map:	 85 KB	 26%
 	prod:			 43 KB	 13%
+
+===========  Cleanup Groups  ============
+
+":dl:vd:following   :fresh:keep": 6839,  GOOD
+":dl:vd:following   :stale:keep":  172,  GOOD
+---------------------------------------
+                                  7011
+
+":dl:vd:new         :fresh:keep":   9    GOOD
+":  :vd:new         :fresh:keep": 296,   looked, no recent downloads
+":dl:  :new         :fresh:keep": 581,   ??? where is the viewDate?
+":  :  :new         :fresh:keep":  54,   ??? what do we have on these?
+---------------------------------------
+                                  931
+
+":dl:vd:notFollowing:fresh:keep":  308,  GOOD -> PRUNE
+":  :vd:notFollowing:fresh:keep": 1338,  GOOD -> prune
+":dl:  :notFollowing:fresh:keep":  504,  ???? => prune
+":  :  :notFollowing:fresh:keep":  189,  ???? => prune
+---------------------------------------
+                                  2339
+
+new:            931
+notFollowing:  2339
+following:     7011

@@ -156,12 +156,12 @@ export class UserData {
 	public get group():string {
 		const {dl,viewDate} = this._info;
 		
-		const dlStr = dl!==undefined && Object.keys(dl).length > 0 ? "dl" : "no-dl";
-		const vdStr = viewDate!==undefined ? "vd" : "no-vd";
-		const status = this.status;
+		const vdStr = viewDate!==undefined ? "vd" : "  ";
+		const dlStr = dl!==undefined && Object.keys(dl).length > 0 ? "dl" : "  ";
+		const status = this.status.padEnd(12,' ');
 		const staleStr = this.isDueToScanNewImages ? "stale" : "fresh";
 		const pruneStr = this.shouldPrune ? "prune" : "keep";
-		return `${dlStr}-${vdStr}-${status}-${staleStr}-${pruneStr}`;
+		return `:${vdStr}:${dlStr}:${status}:${staleStr}:${pruneStr}`;
 	}
 
 }

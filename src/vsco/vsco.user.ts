@@ -106,7 +106,7 @@ import { pageOwnerName } from "./vscoDom";
 				Object.entries(groups)
 					.map(([key, value]) => [key, value.length])
 			);
-			console.log(lengths);
+			console.log(JSON.stringify(lengths,null,'\t'));
 			return groups
 		} 
 	};
