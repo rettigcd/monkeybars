@@ -1,7 +1,7 @@
 import { con } from "./console";
 
 type DictUpdater<T> = (dict: Record<string, T>) => void;
-type ValueUpdater<T> = (value: T) => void;
+export type ValueUpdater<T> = (value: T) => void;
 type NewValueGenerator<T> = () => T;
 
 function hasOwn(obj: object, key: string): boolean {

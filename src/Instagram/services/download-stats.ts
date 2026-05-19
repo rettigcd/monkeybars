@@ -1,4 +1,4 @@
-import { DAYS, MONTHS } from "~/lib/time";
+import { DAYS } from "~/lib/time";
 import { type LocalStorageUserEntity } from "../local-storage";
 import { loadTimeMs } from "./storage-time";
 
@@ -18,34 +18,6 @@ export function calcDownloadsInLastYear(user: LocalStorageUserEntity) : number {
 // Sums up all downloads in the users history, regardless of when they were
 export function getTotalDownloads(byYear:Record<string, number> = {}): number {
 	return Object.values(byYear).reduce((sum, count) => sum + count, 0);
-}
-
-function strToFloat(str:string): number {
-	function cc(a:string, i = 0) { return a.charCodeAt(i); }
-	const v = [0, 1, 2].map((i) => {
-		const k = str[i] || "0";
-		const [b, o] =
-			("0" <= k && k < "9") ? ["0", 1]
-			: ("a" <= k && k < "z") ? ["a", 11]
-			: [k, 0];
-		return cc(str, i) - cc(b) + o;
-	});
-	return (v[0] * 37 * 37 + v[1] * 37 + v[2]) / (37 * 37 * 37);
-}
-
-// Returns a timestamp WHEN a user should be scanned.
-export function getRefreshTime(x:LocalStorageUserEntity) : number {
-	const downloads = calcDownloadsInLastYear(x);
-
-	const waitTime =
-		  downloads >= 20 ? 1 * MONTHS
-		: downloads >= 10 ? 2 * MONTHS
-		: downloads >= 5 ? 3 * MONTHS
-		: 6 * MONTHS;
-
-	return (x.lastVisit || 0)
-		+ waitTime
-		+ Math.floor((strToFloat(x.username||"") - 0.5) * 14 * DAYS); // spread out over 2 weeks.
 }
 
 export function lastVisitOlderThanThresholdOrMissing(lastVisit: number | undefined, threshold: number): boolean {

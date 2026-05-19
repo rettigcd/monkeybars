@@ -1,8 +1,9 @@
+import type { ValueUpdater } from "~/lib/storage";
+import { DAYS, MONTHS } from "~/lib/time";
 import { userRepo, type LocalStorageUserEntity } from "./local-storage";
 import { calcDownloadsInLastYear, getTotalDownloads } from "./services/download-stats";
 import { pageOwnerName } from "./services/instaDom";
 import { loadTimeMs } from "./services/storage-time";
-import type { InstagramUser } from "./trackers/visiting-user-tracker";
 
 export class UserCtx {
 
@@ -12,24 +13,12 @@ export class UserCtx {
 
 	get isTracking(){ return userRepo.containsKey(this.username); }
 
-	get downloadsInLastYear(){
-		const info = userRepo.get(this.username);
-		return calcDownloadsInLastYear(info);
-	}
-
-	get totalDownloads(){
-		const info = userRepo.get(this.username);
-		return getTotalDownloads(info.dl);
-	}
-
-	set isFollowing(newValue:boolean){
-		userRepo.update(this.username, (x) => x.isFollowing = newValue);
-	}
-
+	// ----------
+	// Downloads
+	// ----------
 	public recordDownload(date:Date){
 		const year = date.getFullYear();
-		userRepo.update(this.username, (u) => {
-			u.username ??= this.username;
+		this._update( u => {
 			u.dl ??= {};
 			u.dl[year] = (u.dl[year] || 0) + 1;
 
@@ -40,42 +29,64 @@ export class UserCtx {
 		});
 	}
 
-	public setOwnerAndFollowing(following:boolean|undefined){
-		// !!! it looks like we can do away with saving the username
-		// and simply call userCtx.isFollowing = newValue
-		userRepo.update(this.username, (x) => {
-			x.username = this.username;
-			if (following)
-				x.isFollowing = following;
-		});
+	public get downloadsInLastYear(){
+		return calcDownloadsInLastYear(this._info);
 	}
 
+	public get totalDownloads(){
+		return getTotalDownloads(this._info.dl);
+	}
+
+	// ----------
+	// lastVisit
+	// ----------
+	public get lastVisit(): number | undefined { return this._info.lastVisit; }
 	public recordVisit(){
-		userRepo.update(this.username, u => (u.lastVisit = loadTimeMs));
+		this._update( u => u.lastVisit = loadTimeMs );
 	}
 
-	recordVisit2(user:InstagramUser,following:boolean){
-		userRepo.update(user.username, (u) => {
-			// standard
-			u.lastVisit = loadTimeMs;
-			// valuable
-			u.isPrivate = user.is_private; // valuable
-			u.isFollowing = following;
-			// why?
-			u.id = user.id;
-			u.username = user.username;
-			u.fullName = user.full_name;
-		});
+	// -------------------
+	// Is: private / following 
+	// -------------------
+	public set isFollowing(newValue:boolean){
+		this._update( x => x.isFollowing = newValue);
+	}
+	public set isPrivate(newValue:boolean){
+		this._update( x => x.isPrivate = newValue );
 	}
 
-	public save(user:InstagramUser){
-		userRepo.update(user.username, (u) => {
-			u.username = user.username;
-			u.fullName = user.full_name;
-			u.isPrivate = user.is_private;
-			u.id = user.id;
-			u.isFollowing = true;
-		});
+	// ======== MISC ==========
+
+	public get refreshTime():number {
+		const downloads: number = this.downloadsInLastYear;
+		const waitTime: number =
+			  20 <= downloads ? 1 * MONTHS
+			: 10 <= downloads ? 2 * MONTHS
+			:  5 <= downloads ? 3 * MONTHS
+							  : 6 * MONTHS;
+		return (this.lastVisit || 0)
+			+ waitTime
+			+ Math.floor((strToFloat(this.username) - 0.5) * 14 * DAYS); // spread out over 2 weeks.
+	}
+
+	public get isStale(): boolean {
+		return this.refreshTime < loadTimeMs;
+	}
+
+	public get groupDescriptor():string {
+		const {dl,lastVisit} = this._info;
+		// LastVisit
+		const lvStr = lastVisit !== undefined ? "LV" : "  ";
+		// DL
+		const dlStr = dl === undefined ? "   " 
+			: Object.keys(dl).length == 0 ? "EMP"
+			: "D_L";
+		// stale / fresh
+		const staleStr = this.isStale ? "stale" : "fresh";
+		// following // private
+		const followStr = this.isFollowing ? "following " : this.isFollowing===false ? "not-follow" : "          "
+		const privateStr = this.isPrivate ? "private" : this.isPrivate ===false ? "public" : "      ";
+		return `${lvStr}:${dlStr}:${staleStr}:${followStr}:${privateStr}`;
 	}
 
 	public prune(): LocalStorageUserEntity {
@@ -88,4 +99,34 @@ export class UserCtx {
 	public cloneLocalStorage(): LocalStorageUserEntity{
 		return structuredClone(userRepo.get(this.username));
 	}
+
+	private get _info() : LocalStorageUserEntity{ 
+		this._cachedInfo ??= userRepo.get(this.username);
+		return this._cachedInfo;
+	}
+	private _cachedInfo?: LocalStorageUserEntity;
+
+	private _update(updateMethod:ValueUpdater<LocalStorageUserEntity> ){
+		userRepo.update(this.username,updateMethod);
+		this._cachedInfo = undefined;
+	}
+}
+
+
+function charTo64(c: string): number { // returns 0..64
+	return ('0' <= c && c <= '9') ? (c.charCodeAt(0) - 48)
+		 : ('A' <= c && c <= 'Z') ? (c.charCodeAt(0) - 55)
+		 : ('a' <= c && c <= 'z') ? (c.charCodeAt(0) - 61)
+		 : c === '_' ? 62
+		 : c === '-' ? 63
+		 : c === '.' ? 64
+		 : 0;
+}
+
+function strToFloat(str:string): number { // returns 0..1
+	const num = 
+		  charTo64(str[0]) * 64 * 64 
+		+ charTo64(str[1]) * 64 
+		+ charTo64(str[3]);
+	return num / (64 * 64 * 64);
 }

@@ -29,8 +29,8 @@ export class UserUpdateService {
 	private onScan_UpdateFollowingLikedLastUpload(batch:PicGroup[]) {
 		batch.forEach(({ owner, following }) => {
 			const userCtx = new UserCtx(owner);
-			if (following || userCtx.isTracking)
-				userCtx.setOwnerAndFollowing(following);
+			if (following !== undefined && (following || userCtx.isTracking))
+				userCtx.isFollowing = following;
 		});
 	}
 

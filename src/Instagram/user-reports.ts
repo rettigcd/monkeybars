@@ -4,26 +4,26 @@ import { by, byDesc, groupBy } from "~/lib/sorting";
 import { DAYS } from "~/lib/time";
 import type { LocalStorageUserEntity } from "./local-storage";
 import { userRepo } from "./local-storage";
-import { calcDownloadsInLastYear, getRefreshTime, lastVisitOlderThanThresholdOrMissing } from "./services/download-stats";
+import { lastVisitOlderThanThresholdOrMissing } from "./services/download-stats";
 import { ImageLookupByUrl } from "./services/image-lookup-by-url";
-import { loadTimeMs } from "./services/storage-time";
+import { UserCtx } from "./user-ctx";
 
-type UserFilter = (x: LocalStorageUserEntity) => boolean;
+type UserFilter = (x: UserCtx) => boolean;
 type TimedUserFilter = (timeframe: number) => UserFilter;
 
 export const filters = {
 	followed: {
-		stale: (timeframe: number) => (x: LocalStorageUserEntity) => !!x.isFollowing && lastVisitOlderThanThresholdOrMissing(x.lastVisit, timeframe),
-		public: (x: LocalStorageUserEntity) => !!x.isFollowing && !x.isPrivate,
+		stale: (timeframe: number) => (x: UserCtx) => !!x.isFollowing && lastVisitOlderThanThresholdOrMissing(x.lastVisit, timeframe),
+		public: (x: UserCtx) => !!x.isFollowing && !x.isPrivate,
 	},
 	tracked: {
-		all: (x: LocalStorageUserEntity) => !x.isFollowing,
-		stale: (timeframe: number) => (x: LocalStorageUserEntity) => !x.isFollowing && !x.isPrivate && lastVisitOlderThanThresholdOrMissing(x.lastVisit, timeframe),
-		private: (x: LocalStorageUserEntity) => !x.isFollowing && !!x.isPrivate,
+		all: (x: UserCtx) => !x.isFollowing,
+		stale: (timeframe: number) => (x: UserCtx) => !x.isFollowing && !x.isPrivate && lastVisitOlderThanThresholdOrMissing(x.lastVisit, timeframe),
+		private: (x: UserCtx) => !x.isFollowing && !!x.isPrivate,
 	},
 	downloaded: {
-		all: (x: LocalStorageUserEntity) => 0 < calcDownloadsInLastYear(x),
-		stale: (x: LocalStorageUserEntity) => 0 < calcDownloadsInLastYear(x) && getRefreshTime(x) < loadTimeMs,
+		all: (x: UserCtx) => 0 < x.downloadsInLastYear,
+		stale: (x: UserCtx) => 0 < x.downloadsInLastYear && x.isStale,
 	},
 } satisfies {
 	followed: {
@@ -59,7 +59,7 @@ export class UserReports {
 	}:UserReportsConstructorArgs) {
 		this.iiLookup = iiLookup;
 
-		function showUsers(filter: UserFilter) { return userRepo.values().filter(filter); }
+		function showUsers(filter: UserFilter): UserCtx[] { return userRepo.keys().map(x=>new UserCtx(x)).filter(filter); }
 
 		this.followed = {
 			stale: (notVisitedDays = 60) => showUsers(filters.followed.stale(notVisitedDays * DAYS)).sort(by((x) => x.lastVisit || 0)),
@@ -73,8 +73,8 @@ export class UserReports {
 		};
 
 		this.downloaded = {
-			all: () => showUsers(filters.downloaded.all).sort(byDesc(calcDownloadsInLastYear).thenBy(getRefreshTime)),
-			stale: () => showUsers(filters.downloaded.stale).sort(byDesc(calcDownloadsInLastYear).thenBy(getRefreshTime)),
+			all: () => showUsers(filters.downloaded.all).sort(byDesc<UserCtx,number>(x=>x.downloadsInLastYear).thenBy(x=>x.refreshTime)),
+			stale: () => showUsers(filters.downloaded.stale).sort(byDesc<UserCtx,number>(x=>x.downloadsInLastYear).thenBy(x=>x.refreshTime)),
 		};
 
 	}

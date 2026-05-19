@@ -2,6 +2,7 @@ import { SyncedPersistentDict } from "~/lib/storage";
 
 // Users
 export type LocalStorageUserEntity = {
+
 	// important!
 	lastVisit?: number;
 	dl?: {
@@ -13,9 +14,9 @@ export type LocalStorageUserEntity = {
 	isFollowing?: boolean;
 
 	// why?
-	username? : string; // why is this here???
-	fullName? : string;
-	id?: number,
+//	username? : string; // why is this here???
+//	fullName? : string;
+//	id?: number,
 
 }
 

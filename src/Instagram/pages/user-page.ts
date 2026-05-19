@@ -1,5 +1,6 @@
 import { $, $qAsync } from "~/lib/dom3";
 
+import { groupBy } from "~/lib/sorting";
 import { HotkeyManager } from "../../lib/hotkey-manager";
 import type { SnlWindow } from "../../snl/window";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
@@ -76,6 +77,12 @@ export class UserPage {
 			gallery,
 			sidePanel,
 			startingState,
+			group: function(){
+				const userCtxs = userRepo.keys().map(k=>new UserCtx(k));
+				const groups = groupBy(userCtxs, ctx=>ctx.groupDescriptor);
+				console.log(Object.entries(groups).map(([k,v])=>([k,v.length])));
+				return groups;
+			}
 		};
 
 		window.addEventListener("load", () => this.onWindowLoad() );
@@ -98,8 +105,11 @@ export class UserPage {
 		if (followerId !== "1039022773")
 			return;
 
-		for (const user of leaders)
-			new UserCtx(user.username).save(user);
+		for (const user of leaders){
+			const userCtx = new UserCtx(user.username);
+			userCtx.isFollowing = true;
+			userCtx.isPrivate = user.is_private;
+		}
 	}
 
 	private onWindowLoad() {

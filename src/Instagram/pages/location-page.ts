@@ -65,7 +65,7 @@ export class LocationPage {
 		const iiLookup = new ImageLookupByUrl(batchProducer);
 		iiLookup.on("missingImage", snooper.checkLogForMissingImage);
 
-		const ctx: LocationPageContext = {
+		const cmd: LocationPageContext = {
 			snoopLog: snooper._loadLog,
 			iiLookup,
 			location: locationKey,
@@ -78,15 +78,15 @@ export class LocationPage {
 
 		const reports = new UserReports({ iiLookup });
 
-		ctx.reports = reports;
-		win.cmd = ctx;
+		cmd.reports = reports;
+		win.cmd = cmd;
 
 		if (isTracking) {
 			locRepo.update(locationKey, (x) => {
 				x.lastVisit = loadTimeMs;
 			});
 		} else {
-			ctx.track = () => {
+			cmd.track = () => {
 				locRepo.update(locationKey, (u) => {
 					u.slug = slug;
 					u.id = id;
@@ -95,7 +95,7 @@ export class LocationPage {
 			};
 		}
 
-		ctx.stop = () => {
+		cmd.stop = () => {
 			if (confirm(`Remove all tracking info for ${locationKey}?`)) {
 				locRepo.remove(locationKey);
 			}

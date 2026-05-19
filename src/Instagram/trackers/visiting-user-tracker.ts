@@ -33,11 +33,13 @@ export class VisitingUserTracker {
 			const handledRequest = snoopRequest as HandledRequest;
 			handledRequest.handled = VisitingUserTracker.name;
 			const user = (snoopRequest.json as any).user as InstagramUser;
-			const following = user.friendship_status == "followiwng!!!"; // !!! WRONG
+			const isFollowing = user.friendship_status == "followiwng!!!"; // !!! WRONG
 
 			const userCtx = new UserCtx(user.username);
-			if (following || userCtx.isTracking) {
-				userCtx.recordVisit2(user,following);
+			if (isFollowing || userCtx.isTracking) {
+				userCtx.recordVisit();
+				userCtx.isPrivate = user.is_private;
+				userCtx.isFollowing = isFollowing;
 				setPublicPrivateLabel(user.is_private);
 			}
 		}
