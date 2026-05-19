@@ -2,7 +2,7 @@ import { $ } from "~/lib/dom3";
 import { download, downloadAsync } from "~/lib/gm";
 import { formatDateForFilename } from "./date-formats";
 import { SingleImage } from "./models/single-image";
-import { instaDom } from "./services/instaDom";
+import { instaDom, pageOwnerName } from "./services/instaDom";
 
 export type MousePoint = { clientX: number; clientY: number };
 type SourceUnderPoint = { el: HTMLElement; src: string };
@@ -168,14 +168,14 @@ export class ScreenImageActions {
 				context.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
 				const coverImageSrc = canvas.toDataURL("image/jpeg");
-				const extractFilename = (instaDom.pageOwner || "instagram_img") + " " + formatDateForFilename(new Date()) + ".jpg";
+				const extractFilename = (pageOwnerName || "instagram_img") + " " + formatDateForFilename(new Date()) + ".jpg";
 
 				download({ url: coverImageSrc, name: extractFilename });
 				return;
 			}
 
 			const extension = await this.getExtensionFromBlobType(imgUrl);
-			const filename = (instaDom.pageOwner || "instagram_img") + " " + formatDateForFilename(new Date()) + "." + extension;
+			const filename = (pageOwnerName || "instagram_img") + " " + formatDateForFilename(new Date()) + "." + extension;
 
 			await downloadAsync({ url: imgUrl, name: filename });
 			console.log(`downloaded: ${filename}`);

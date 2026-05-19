@@ -1,16 +1,12 @@
 import { RequestSnooper, type SnoopHandler } from "~/lib/snoop";
-import { SyncedPersistentDict } from "~/lib/storage";
-import type { LocalStorageUserEntity } from "../types/local-storage-types";
+import { UserCtx } from "../user-ctx";
 
 // UnfollowTracking
 // Doesn't need to be a class.
 // Could just be a function that takes the snooper and userRepo as arguments and adds the handler to the snooper.
 export class UnfollowTracker {
 
-	_userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
-
-	constructor(snooper: RequestSnooper, userRepo:SyncedPersistentDict<LocalStorageUserEntity>) {
-		this._userRepo = userRepo;
+	constructor(snooper: RequestSnooper) {
 		snooper.addHandler(this.snoop);
 	}
 
@@ -21,7 +17,7 @@ export class UnfollowTracker {
 		) {
 			const { data: { xdt_destroy_friendship: { username } } } = JSON.parse(responseText);
 			console.log("unfriending: ", username);
-			this._userRepo.update(username, (x) => x.isFollowing = false);
+			new UserCtx(username).isFollowing = false;
 		}
 	};
 }

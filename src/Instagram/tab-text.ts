@@ -1,4 +1,4 @@
-import { instaDom } from "./services/instaDom";
+import { instaDom, pageOwnerName } from "./services/instaDom";
 
 export function scheduleSetTabTitle(): void {
 	Promise.all([
@@ -36,7 +36,7 @@ function getGoodTitleAsync(timeoutAfter = 10000): Promise<string> {
 				logAndResolve(title);
 			else if (timeoutAt <= Date.now()){
 				console.debug({titleLog});
-				logAndResolve(instaDom.pageOwner);
+				logAndResolve(pageOwnerName);
 			}
 
 		}, 200);

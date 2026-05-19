@@ -6,11 +6,11 @@ import { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { InitialLocationPageParser } from "../extractors/location/initial-location-page-parser";
 import { LocationContent } from "../extractors/location/location-content";
 import { DetailsPopup } from "../extractors/misc/details-popup";
+import type { LocalStorageLocationEntity } from "../local-storage";
 import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { buildRequestSnooper } from "../services/snoopBuilder";
 import { loadTimeMs, reportLast } from "../services/storage-time";
 import { UserUpdateService } from "../trackers/user-update-service";
-import type { LocalStorageLocationEntity, LocalStorageUserEntity } from "../types/local-storage-types";
 import { Gallery } from "../ui/gallery";
 import { SidePanel } from "../ui/side-panel";
 import { UserReports } from "../user-reports";
@@ -22,7 +22,6 @@ type LocationPageConstructor = {
 
 type LocationPageContext = {
 	snoopLog: unknown;
-	userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 	iiLookup: ImageLookupByUrl;
 	location: string;
 	locRepo: SyncedPersistentDict<LocalStorageLocationEntity>;
@@ -36,7 +35,6 @@ type LocationPageContext = {
 
 export class LocationPage {
 	constructor({ win, hotkeys }: LocationPageConstructor) {
-		const userRepo = new SyncedPersistentDict<LocalStorageUserEntity>("users");
 		const snooper = buildRequestSnooper(win);
 		const locRepo = new SyncedPersistentDict<LocalStorageLocationEntity>("locations");
 
@@ -58,10 +56,10 @@ export class LocationPage {
 			new DetailsPopup(snooper),
 		]);
 
-		new UserUpdateService({ userRepo, batchProducer });
+		new UserUpdateService({ batchProducer });
 
 		const gallery = new Gallery({ batchProducer });
-		const sidePanel = new SidePanel({ batchProducer, userRepo });
+		const sidePanel = new SidePanel({ batchProducer });
 		sidePanel.register(hotkeys);
 
 		const iiLookup = new ImageLookupByUrl(batchProducer);
@@ -69,7 +67,6 @@ export class LocationPage {
 
 		const ctx: LocationPageContext = {
 			snoopLog: snooper._loadLog,
-			userRepo,
 			iiLookup,
 			location: locationKey,
 			locRepo,
@@ -79,7 +76,7 @@ export class LocationPage {
 			reports: null,
 		};
 
-		const reports = new UserReports({ userRepo, iiLookup });
+		const reports = new UserReports({ iiLookup });
 
 		ctx.reports = reports;
 		win.cmd = ctx;

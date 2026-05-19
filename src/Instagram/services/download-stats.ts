@@ -1,5 +1,5 @@
 import { DAYS, MONTHS } from "~/lib/time";
-import { type LocalStorageUserEntity } from "../types/local-storage-types";
+import { type LocalStorageUserEntity } from "../local-storage";
 import { loadTimeMs } from "./storage-time";
 
 const now = new Date();

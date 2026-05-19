@@ -1,25 +1,24 @@
 import { $, $qAsync } from "~/lib/dom3";
-import { SyncedPersistentDict } from "~/lib/storage";
 
 import { HotkeyManager } from "../../lib/hotkey-manager";
 import type { SnlWindow } from "../../snl/window";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
-import { calcDownloadsInLastYear } from "../services/download-stats";
+import { userRepo, type LocalStorageUserEntity } from "../local-storage";
 import { ImageLookupByUrl } from "../services/image-lookup-by-url";
-import { instaDom } from "../services/instaDom";
+import { instaDom, pageOwnerName } from "../services/instaDom";
 import { buildRequestSnooper } from "../services/snoopBuilder";
-import { loadTimeMs, reportLast } from "../services/storage-time";
+import { reportLast } from "../services/storage-time";
 import { scheduleSetTabTitle } from "../tab-text";
 import { FollowingScrollerTracker } from "../trackers/following-scroller-tracker";
 import { IdentifyUnhandledRequests } from "../trackers/identify-unhandled-requests";
 import { UnfollowTracker } from "../trackers/unfollow-tracker";
 import { UserUpdateService } from "../trackers/user-update-service";
-import { type InstagramUser, setPublicPrivateLabel, VisitingUserTracker } from "../trackers/visiting-user-tracker";
-import type { LocalStorageUserEntity } from "../types/local-storage-types";
+import { setPublicPrivateLabel, VisitingUserTracker, type InstagramUser } from "../trackers/visiting-user-tracker";
 import { Gallery } from "../ui/gallery";
 import { NextLink } from "../ui/next-link";
 import { SidePanel } from "../ui/side-panel";
 import { addCopyButton } from "../ui/ui";
+import { UserCtx } from "../user-ctx";
 import { UserReports } from "../user-reports";
 
 // TODO: add proper types if you have them
@@ -29,22 +28,20 @@ type ConstructorArgs = {
 };
 
 export class UserPage {
-	private userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 	private ctx: any;
 	private reports: UserReports;
 	private pageOwner: string;
 
 	public constructor({ win, hotkeys }: ConstructorArgs) {
 
-		const userRepo = this.userRepo = new SyncedPersistentDict("users");
 		const snooper = buildRequestSnooper( win );
 
 		const { pageOwner, isTracking, startingState } = this.captureStartingState();
 		this.pageOwner = pageOwner;
 
 		// --- trackers ---
-		new UnfollowTracker(snooper, userRepo);
-		new VisitingUserTracker({snooper,userRepo});
+		new UnfollowTracker(snooper);
+		new VisitingUserTracker({snooper});
 		new IdentifyUnhandledRequests(snooper);
 		new FollowingScrollerTracker(snooper)
 			.on("foundLeaders", (followerId, leaders) =>
@@ -54,17 +51,17 @@ export class UserPage {
 		// --- batch ---
 		const batchProducer = buildBatchProducerGroup_ForUser(snooper,startingState.lastVisit);
 
-		new UserUpdateService({userRepo,batchProducer});
+		new UserUpdateService({batchProducer});
 		const gallery = new Gallery({batchProducer});
 
-		const sidePanel = new SidePanel({ batchProducer, userRepo });
+		const sidePanel = new SidePanel({ batchProducer });
 		sidePanel.register(hotkeys);
 
 		// --- lookup ---
 		const iiLookup = new ImageLookupByUrl(batchProducer);
 		iiLookup.on("missingImage", snooper.checkLogForMissingImage);
 
-		const reports = this.reports = new UserReports({ userRepo, iiLookup });
+		const reports = this.reports = new UserReports({ iiLookup });
 
 		// --- global ctx ---
 		this.ctx = win.cmd = {
@@ -102,25 +99,18 @@ export class UserPage {
 			return;
 
 		for (const user of leaders)
-			this.userRepo.update(user.username, (u: any) => {
-				u.username = user.username;
-				u.fullName = user.full_name;
-				u.isPrivate = user.is_private;
-				u.id = user.id;
-				u.isFollowing = true;
-			});
+			new UserCtx(user.username).save(user);
 	}
 
 	private onWindowLoad() {
 		this.showNextLinks();
 		scheduleSetTabTitle();
-		this.addDownloadCountBadge(calcDownloadsInLastYear);
+		this.addDownloadCountBadge();
 		addCopyButton(this.pageOwner);
 	}
 
-	private addDownloadCountBadge(countUserDownloads: any) {
-		const user = this.userRepo.get(this.pageOwner) || {};
-		const count = countUserDownloads(user);
+	private addDownloadCountBadge() {
+		const count = new UserCtx(this.pageOwner).downloadsInLastYear;
 
 		if (count <= 0)
 			return;
@@ -165,10 +155,10 @@ export class UserPage {
 		isTracking: boolean;
 		startingState: Partial<LocalStorageUserEntity>;
 	} {
-		const pageOwner = this.pageOwner = instaDom.pageOwner;
-		const isTracking = this.userRepo.containsKey(pageOwner);
+		const pageOwner = this.pageOwner = pageOwnerName;
+		const isTracking = new UserCtx(pageOwner).isTracking;
 		const startingState: Partial<LocalStorageUserEntity> = isTracking
-			? structuredClone(this.userRepo.get(pageOwner))
+			? new UserCtx(pageOwner).cloneLocalStorage()
 			: {};
 
 		return { pageOwner, isTracking, startingState };
@@ -179,16 +169,12 @@ export class UserPage {
 	}
 
 	private initTrackedUser({ pageOwner, startingState }: any) {
-		const { userRepo, ctx } = this;
+		const { ctx } = this;
 
-		userRepo.update(pageOwner, (u: any) => (u.lastVisit = loadTimeMs));
+		new UserCtx(pageOwner).recordVisit();
 		setPublicPrivateLabel(startingState.isPrivate);
 
-		ctx.stop = () => {
-			ctx.old = userRepo.get(pageOwner);
-			userRepo.remove(pageOwner);
-			console.log("Stopped tracking:", ctx.old);
-		};
+		ctx.stop = () => ctx.old = new UserCtx(pageOwner).prune();
 	}
 
 	private initUntrackedUser() {

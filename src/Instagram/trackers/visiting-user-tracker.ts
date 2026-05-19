@@ -1,13 +1,10 @@
 import { $, $qAsync } from "~/lib/dom3";
 import { RequestSnooper, type SnoopHandler } from "~/lib/snoop";
-import { SyncedPersistentDict } from "~/lib/storage";
 import type { HandledRequest } from "../extractors/base-pic-extractor";
-import { loadTimeMs } from "../services/storage-time";
-import type { LocalStorageUserEntity } from "../types/local-storage-types";
+import { UserCtx } from "../user-ctx";
 
 type VisitingUserTrackerConstructionArgs = {
 	snooper: RequestSnooper, 
-	userRepo: SyncedPersistentDict<LocalStorageUserEntity>
 }
 
 export type InstagramUser = {
@@ -22,12 +19,7 @@ export type InstagramUser = {
 // checks if we are following them and if so, saves following=true status to userRepo
 export class VisitingUserTracker {
 
-	private userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
-	private loadTimeMs: number; // !!!
-
-	constructor({ snooper, userRepo } : VisitingUserTrackerConstructionArgs) {
-		this.userRepo = userRepo;
-		this.loadTimeMs = loadTimeMs;
+	constructor({ snooper } : VisitingUserTrackerConstructionArgs) {
 		snooper.addHandler(this.snoop);
 	}
 
@@ -43,16 +35,9 @@ export class VisitingUserTracker {
 			const user = (snoopRequest.json as any).user as InstagramUser;
 			const following = user.friendship_status == "followiwng!!!"; // !!! WRONG
 
-			if (following || this.userRepo.containsKey(user.username)) {
-				this.userRepo.update(user.username, (u) => {
-					u.id = user.id;
-					u.username = user.username;
-					u.fullName = user.full_name;
-					u.isPrivate = user.is_private;
-					u.isFollowing = following;
-					u.lastVisit = this.loadTimeMs;
-				});
-
+			const userCtx = new UserCtx(user.username);
+			if (following || userCtx.isTracking) {
+				userCtx.recordVisit2(user,following);
 				setPublicPrivateLabel(user.is_private);
 			}
 		}

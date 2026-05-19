@@ -2,17 +2,14 @@ import { $, ElementBuilder } from "~/lib/dom3";
 import { openInTab } from "~/lib/gm";
 import { HotkeyManager } from "~/lib/hotkey-manager";
 import type { TaskStatus } from "~/lib/progress-types";
-import { SyncedPersistentDict } from "~/lib/storage";
 import { throwNever } from "~/lib/throw";
 import { PicGroup } from "../models/pic-group";
 import { SingleImage } from "../models/single-image";
-import { calcDownloadsInLastYear, getTotalDownloads } from "../services/download-stats";
-import { instaDom } from "../services/instaDom";
-import type { LocalStorageUserEntity } from "../types/local-storage-types";
+import { instaDom, pageOwnerName } from "../services/instaDom";
+import { UserCtx } from "../user-ctx";
 
 type SidePanelConstructorArgs = {
 	batchProducer: { on(eventName: "batchReceived", handler: (batch: PicGroup[]) => void): void; };
-	userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 };
 
 type Css = Partial<CSSStyleDeclaration>;
@@ -91,11 +88,8 @@ export class SidePanel {
 	private readonly containerCollapsedWidth = "350px";
 	private readonly elementId = "sidePanel";
 
-	private readonly userRepo: SyncedPersistentDict<LocalStorageUserEntity>;
 	private readonly pageOwner?: string;
 
-	private readonly countUserDownloads: (user: LocalStorageUserEntity) => number;
-	private readonly getTotalDownloads: (downloads?: Record<string, number>) => number;
 	private readonly openInTab: (url: string) => void;
 
 	private outer?: HTMLDivElement;
@@ -104,12 +98,8 @@ export class SidePanel {
 
 	public constructor({
 		batchProducer,
-		userRepo,
 	}: SidePanelConstructorArgs) {
-		this.userRepo = userRepo;
-		this.pageOwner = instaDom.pageOwner;
-		this.countUserDownloads = calcDownloadsInLastYear;
-		this.getTotalDownloads = getTotalDownloads;
+		this.pageOwner = pageOwnerName;
 		this.openInTab = openInTab;
 
 		batchProducer.on("batchReceived", (batch) => this.showNewBatches(batch));
@@ -191,11 +181,11 @@ export class SidePanel {
 		owner,
 		captionText,
 	}: SeparatorArgs) {
-		const user = this.userRepo.get(owner) ?? {};
-		const isTracking = this.userRepo.containsKey(owner);
+		const userCtx = new UserCtx(owner);
+		const isTracking = userCtx.isTracking;
 		const onOwnersPage = owner === this.pageOwner;
-		const downloadsInLastYear = this.countUserDownloads(user);
-		const totalDownloads = this.getTotalDownloads(user.dl);
+		const downloadsInLastYear = userCtx.downloadsInLastYear;
+		const totalDownloads = userCtx.totalDownloads;
 		const downloadText = totalDownloads > 0
 			? ` ↓ ${downloadsInLastYear}/${totalDownloads}`
 			: "";

@@ -1,8 +1,8 @@
 import { type EventHost, EventHostBase } from "~/lib/observable";
 import type { BatchProducerEvents } from "../extractors/base-pic-extractor";
+import type { LocalStorageUserEntity } from "../local-storage";
 import { PicGroup } from "../models/pic-group";
 import { SingleImage } from "../models/single-image";
-import type { LocalStorageUserEntity } from "../types/local-storage-types";
 
 type ImageLookupEntry = {
 	singleImage?: SingleImage;

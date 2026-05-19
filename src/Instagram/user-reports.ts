@@ -1,12 +1,12 @@
 import { makeStackedBar } from "~/lib/charts";
 import { con } from "~/lib/console";
 import { by, byDesc, groupBy } from "~/lib/sorting";
-import { SyncedPersistentDict } from "~/lib/storage";
 import { DAYS } from "~/lib/time";
+import type { LocalStorageUserEntity } from "./local-storage";
+import { userRepo } from "./local-storage";
 import { calcDownloadsInLastYear, getRefreshTime, lastVisitOlderThanThresholdOrMissing } from "./services/download-stats";
 import { ImageLookupByUrl } from "./services/image-lookup-by-url";
 import { loadTimeMs } from "./services/storage-time";
-import type { LocalStorageUserEntity } from "./types/local-storage-types";
 
 type UserFilter = (x: LocalStorageUserEntity) => boolean;
 type TimedUserFilter = (timeframe: number) => UserFilter;
@@ -43,8 +43,7 @@ export const filters = {
 
 
 type UserReportsConstructorArgs = {
-	userRepo: SyncedPersistentDict<LocalStorageUserEntity>
-	iiLookup: ImageLookupByUrl,
+	iiLookup: ImageLookupByUrl;
 }
 
 export class UserReports {
@@ -56,7 +55,6 @@ export class UserReports {
 	private iiLookup;
 
 	constructor({
-		userRepo,
 		iiLookup,
 	}:UserReportsConstructorArgs) {
 		this.iiLookup = iiLookup;
@@ -114,7 +112,7 @@ const statParts: Array<{ label: UserStatsCategory; color: string }> = [
 	{ label: "complete:fresh", color: "green" },
 ];
 
-export function showStats(userRepo: SyncedPersistentDict<LocalStorageUserEntity>): void {
+export function showStats(): void {
 	const grouped = groupBy(userRepo.values(), classifyUserStats);
 
 	con.print( statParts.map(({ label }) => [label, grouped[label]?.length ?? 0]) );
