@@ -68,3 +68,20 @@ Tests:
 672zcU
 
 Remove extra fields saved on localStorage.user.
+
+Wrap UserRepo so nothing interacts with UserRepo directly.
+
+
+Clean up Groups
+
+
+'lastView:D_L:fresh:          :      ', 2037	GOOD
+'lastView:D_L:stale:          :      ',  680	GOOD
+
+'lastView:   :fresh:          :      ', 1624	OK - will have long refresh time
+'lastView:   :stale:          :      ', 2804	OK - already passed refresh time
+
+'        :D_L:stale:          :      ', 285		This can happen if we download from a location or from a users tagged page.
+
+'        :   :stale:          :      ', 1242	Review then prune
+

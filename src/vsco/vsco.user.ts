@@ -100,6 +100,10 @@ import { pageOwnerName } from "./vscoDom";
 	win.cmd = {
 		userStore,
 		reports,
+		gallery,
+
+		// the old links.show() is now:  cmd.pageOwnerCtx.links.asGalleryRowsAsync().then(rows => cmd.gallery.rows = rows)
+
 		groups:function(): unknown{
 			const groups = groupBy<UserCtx,string>(userStore.allUsers,x=>x.data.group);
 			const lengths = Object.fromEntries(

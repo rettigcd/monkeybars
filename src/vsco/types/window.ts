@@ -1,5 +1,6 @@
 import type { HasConsole } from "~/lib/console";
 import type { ISnoopedWindow, } from "~/lib/snoop";
+import type { Gallery } from "../models/gallery-model";
 import type { UserCtx } from "../user-ctx";
 import type { UserStore } from "../user-store";
 
@@ -11,6 +12,7 @@ export type VscoWindow = Window
 		cmd?: {
 			userStore: UserStore;
 			reports: Record<string,unknown>;
+			gallery: Gallery;
 			// missingViewDate: (b:boolean) => void;
 			// nextToPrune: (years:number)) => void;{
 			// showLinks: () => Promise<void>;
