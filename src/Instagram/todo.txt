@@ -54,6 +54,17 @@ Tests:
 		To get off of "Prune List-Unknown"?
 			Option - Download something
 			Option - unfollow / prune
+
+	If( DL ){
+		IF (nothing for 4 years)
+			"PRUNE"
+		else
+			"PRODUCING/CURRNET"
+	} else IF ( isFollowing )
+		"no-dl followee"
+	else
+		"missing DL";
+
 672zcU
 
 Remove extra fields saved on localStorage.user.
