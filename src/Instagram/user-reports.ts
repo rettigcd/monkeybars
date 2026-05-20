@@ -1,11 +1,8 @@
 import { makeStackedBar } from "~/lib/charts";
 import { con } from "~/lib/console";
-import { by, byDesc, groupBy } from "~/lib/sorting";
+import { groupBy } from "~/lib/sorting";
 import { DAYS } from "~/lib/time";
-import type { LocalStorageUserEntity } from "./local-storage";
-import { userRepo } from "./local-storage";
 import { lastVisitOlderThanThresholdOrMissing } from "./services/download-stats";
-import { ImageLookupByUrl } from "./services/image-lookup-by-url";
 import { UserCtx } from "./user-ctx";
 
 type UserFilter = (x: UserCtx) => boolean;
@@ -42,60 +39,6 @@ export const filters = {
 };
 
 
-type UserReportsConstructorArgs = {
-	iiLookup: ImageLookupByUrl;
-}
-
-export class UserReports {
-
-	followed: any;
-	tracked: any;
-	downloaded: any;
-
-	private iiLookup;
-
-	constructor({
-		iiLookup,
-	}:UserReportsConstructorArgs) {
-		this.iiLookup = iiLookup;
-
-		function showUsers(filter: UserFilter): UserCtx[] { return userRepo.keys().map(x=>new UserCtx(x)).filter(filter); }
-
-		this.followed = {
-			stale: (notVisitedDays = 60) => showUsers(filters.followed.stale(notVisitedDays * DAYS)).sort(by((x) => x.lastVisit || 0)),
-			public: () => showUsers(filters.followed.public),
-		};
-
-		this.tracked = {
-			stale: (notVisitedDays = 60) => showUsers(filters.tracked.stale(notVisitedDays * DAYS)).sort(by((x) => x.lastVisit || 0)),
-			all: () => showUsers(filters.tracked.all).sort(by((x) => x.username)),
-			private: () =>showUsers(filters.tracked.private).sort(by((x) => x.username)),
-		};
-
-		this.downloaded = {
-			all: () => showUsers(filters.downloaded.all).sort(byDesc<UserCtx,number>(x=>x.downloadsInLastYear).thenBy(x=>x.refreshTime)),
-			stale: () => showUsers(filters.downloaded.stale).sort(byDesc<UserCtx,number>(x=>x.downloadsInLastYear).thenBy(x=>x.refreshTime)),
-		};
-
-	}
-
-	dayOfWeek () {
-		const counts = [0, 0, 0, 0, 0, 0, 0];
-		const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
-		const imageDays = this.iiLookup.allImages()
-			.filter((x) => x.date != null)
-			.map((x) => x.date.getDay());
-
-		for (const day of imageDays)
-			counts[day]++;
-
-		return counts.map((count, idx) => [dayNames[idx], count]);
-	};
-
-}
-
-
 // Generates a bar chart showing how big each group of users is.
 type UserStatsCategory =
 	| "missing_both"
@@ -113,7 +56,7 @@ const statParts: Array<{ label: UserStatsCategory; color: string }> = [
 ];
 
 export function showStats(): void {
-	const grouped = groupBy(userRepo.values(), classifyUserStats);
+	const grouped = groupBy(UserCtx.allUsers(), classifyUserStats);
 
 	con.print( statParts.map(({ label }) => [label, grouped[label]?.length ?? 0]) );
 
@@ -124,9 +67,9 @@ export function showStats(): void {
 	document.body.appendChild(bar);
 }
 
-function classifyUserStats(user: LocalStorageUserEntity): UserStatsCategory {
-	const mdl = user.dl == null;
-	const mlv = user.lastVisit == null;
+function classifyUserStats(user: UserCtx): UserStatsCategory {
+	const mdl = user.cloneLocalStorage().dl == null; // !!!
+	const mlv = user.lastVisit === undefined;
 	if (mdl && mlv) return "missing_both";
 	if (mdl) return "missing_dl";
 	if (mlv) return "missing_lastVisit";

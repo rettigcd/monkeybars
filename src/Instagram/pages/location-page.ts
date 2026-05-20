@@ -13,7 +13,6 @@ import { loadTimeMs, reportLast } from "../services/storage-time";
 import { UserUpdateService } from "../trackers/user-update-service";
 import { Gallery } from "../ui/gallery";
 import { SidePanel } from "../ui/side-panel";
-import { UserReports } from "../user-reports";
 
 type LocationPageConstructor = {
 	win: SnlWindow;
@@ -28,7 +27,6 @@ type LocationPageContext = {
 	gallery: Gallery;
 	sidePanel: SidePanel;
 	startingState: LocalStorageLocationEntity;
-	reports: UserReports | null;
 	track?: () => void;
 	stop?: () => void;
 };
@@ -73,12 +71,8 @@ export class LocationPage {
 			gallery,
 			sidePanel,
 			startingState,
-			reports: null,
 		};
 
-		const reports = new UserReports({ iiLookup });
-
-		cmd.reports = reports;
 		win.cmd = cmd;
 
 		if (isTracking) {

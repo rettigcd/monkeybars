@@ -7,6 +7,8 @@ import { loadTimeMs } from "./services/storage-time";
 
 export class UserCtx {
 
+	public static allUsers(): UserCtx[] { return userRepo.keys().map(username=>new UserCtx(username)); }
+
 	constructor(
 		public readonly username:string
 	){}

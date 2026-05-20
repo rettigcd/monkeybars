@@ -1,17 +1,5 @@
 Make entire file use regular Javascript timestamps (ms) - scope storageTime to just inside the userRepo object.
 
-Remove extra fields saved on localStorage.user
-
-Decide how to handle globals:
-		document
-			document.location
-			document.title
-		dom
-		storageTime
-		$, $q, $qAll
+Remove extra fields saved on localStorage.user.
 
 UserReports => replace / remove
-
-Remove deprecated properties from users in localStorage.
-
-Wrap UserRepo so nothing interacts with UserRepo directly.

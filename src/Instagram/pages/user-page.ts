@@ -1,6 +1,6 @@
 import { $, $qAsync } from "~/lib/dom3";
 
-import { groupBy } from "~/lib/sorting";
+import { by, groupBy } from "~/lib/sorting";
 import { HotkeyManager } from "../../lib/hotkey-manager";
 import type { SnlWindow } from "../../snl/window";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
@@ -20,7 +20,6 @@ import { NextLink } from "../ui/next-link";
 import { SidePanel } from "../ui/side-panel";
 import { addCopyButton } from "../ui/ui";
 import { UserCtx } from "../user-ctx";
-import { UserReports } from "../user-reports";
 
 // TODO: add proper types if you have them
 type ConstructorArgs = {
@@ -30,7 +29,6 @@ type ConstructorArgs = {
 
 export class UserPage {
 	private ctx: any;
-	private reports: UserReports;
 	private pageOwner: string;
 
 	public constructor({ win, hotkeys }: ConstructorArgs) {
@@ -62,23 +60,18 @@ export class UserPage {
 		const iiLookup = new ImageLookupByUrl(batchProducer);
 		iiLookup.on("missingImage", snooper.checkLogForMissingImage);
 
-		const reports = this.reports = new UserReports({ iiLookup });
-
 		// --- global ctx ---
 		this.ctx = win.cmd = {
 			snoopLog: snooper._loadLog,
 			userRepo,
 			iiLookup,
-			reports,
 			page: this,
-			next: () => this.oldestTrackedLink(reports).goto(),
-			nextDownloaded: () => this.oldestDownloadedLink(reports).goto(),
 			pageOwner,
 			gallery,
 			sidePanel,
 			startingState,
 			group: function(){
-				const userCtxs = userRepo.keys().map(k=>new UserCtx(k));
+				const userCtxs = UserCtx.allUsers();
 				const groups = groupBy(userCtxs, ctx=>ctx.groupDescriptor);
 				console.log(Object.entries(groups).map(([k,v])=>([k,v.length])));
 				return groups;
@@ -144,7 +137,6 @@ export class UserPage {
 	}
 
 	private showNextLinks() {
-		const { reports } = this;
 
 		const host = $("div")
 			.css({
@@ -156,8 +148,9 @@ export class UserPage {
 			})
 			.appendTo(instaDom.body);
 
-		this.oldestDownloadedLink(reports).appendTo(host.el);
-		this.oldestTrackedLink(reports).appendTo(host.el);
+		const allUsers = UserCtx.allUsers();
+		NextLink.forFirstUser("stale downloaded", allUsers.filter(x=>x.totalDownloads && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
+		NextLink.forFirstUser("stale followed", allUsers.filter(x=>x.isFollowing && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
 	}
 
 	private captureStartingState() : {
@@ -195,11 +188,4 @@ export class UserPage {
 		};
 	}
 
-	private oldestDownloadedLink(reports: UserReports) {
-		return NextLink.forFirstUser("stale downloaded", reports.downloaded.stale(), '');
-	}
-
-	private oldestTrackedLink(reports: UserReports) {
-		return NextLink.forFirstUser("stale followed", reports.followed.stale(), '');
-	}
 }

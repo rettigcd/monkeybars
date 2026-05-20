@@ -13,11 +13,6 @@ export type LocalStorageUserEntity = {
 	isPrivate? : boolean;
 	isFollowing?: boolean;
 
-	// why?
-//	username? : string; // why is this here???
-//	fullName? : string;
-//	id?: number,
-
 }
 
 export const userRepo = new SyncedPersistentDict<LocalStorageUserEntity>("users");
