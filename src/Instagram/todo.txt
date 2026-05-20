@@ -1,5 +1,59 @@
-Make entire file use regular Javascript timestamps (ms) - scope storageTime to just inside the userRepo object.
+Tests:
+	downloading from (location), (saved-posts), or (tagged) page
+		- if user is tracked
+			- incrments dl
+		- if user is NOT tracked
+			- does not increment dl.
+			- does NOT update view date
+	on user page
+		- downloads
+			- updates DL
+			- if no viewState, sets it
+		- if isTracked 
+			- updates viewDate
+		- if not tracked 
+			- does not updat viewDate
+			- then downloads, increments DL and sets viewDate
+
+	scrolling through users we are following
+		- tracks all followed users with .isFollowing = true
+			- ** can creat followed Users with no DL nor viewDate
+
+	viewDate / stale
+		- should include all tracked users missing viewDate
+		- should include users with viewDate if it is past the refresh time.
+		- users missing viewDate should come first.
+		- visiting a tracked person's page, updates viewDate
+
+		ViewDate Groups:
+		if( viewDate !== undefined )
+			return isStale ? "stale"		// LIST 
+				: "fresh";
+		else if(dl !== undefined)
+			return "dl wants matching viewDate"; // LIST
+		else if( isFollowing )
+			return "vitit-new-followees"	// LIST
+		else
+			return "remove-from-repo";
+
+	DL
+		- only set DL if on user's page or isTracked or isFollowing
+		- downloading on users page, set viewState and DL
+
+	Pruning
+		- only prune/notify people with viewDate
+		Scaned Lists / Links
+			=> "Prune List-unknown" => no-dl => NOTIFY
+			=> "Prune List-following" => dl & none in 4 years, following => NOTIFY
+			=> "Prune List-prune"     => dl & none in 4 years, not following => PRUNE
+
+		- on (.isTracked) USER PAGE
+			- if no downloads => show and offer to PRUNE
+			- if following but DL are older than 4 years => show and offer to unfollow / prune		
+
+		To get off of "Prune List-Unknown"?
+			Option - Download something
+			Option - unfollow / prune
+672zcU
 
 Remove extra fields saved on localStorage.user.
-
-UserReports => replace / remove

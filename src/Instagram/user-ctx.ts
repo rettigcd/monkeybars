@@ -115,7 +115,7 @@ export class UserCtx {
 }
 
 
-function charTo64(c: string): number { // returns 0..64
+export function charTo64(c: string): number { // returns 0..64
 	return ('0' <= c && c <= '9') ? (c.charCodeAt(0) - 48)
 		 : ('A' <= c && c <= 'Z') ? (c.charCodeAt(0) - 55)
 		 : ('a' <= c && c <= 'z') ? (c.charCodeAt(0) - 61)
