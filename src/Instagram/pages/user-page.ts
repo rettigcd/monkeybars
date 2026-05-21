@@ -1,6 +1,5 @@
 import { $, $qAsync } from "~/lib/dom3";
 
-import { by, groupBy } from "~/lib/sorting";
 import { HotkeyManager } from "../../lib/hotkey-manager";
 import type { SnlWindow } from "../../snl/window";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
@@ -9,6 +8,7 @@ import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { instaDom, pageOwnerName } from "../services/instaDom";
 import { buildRequestSnooper } from "../services/snoopBuilder";
 import { reportLast } from "../services/storage-time";
+import { makeStatusGroupTree } from "../status-group-tree";
 import { scheduleSetTabTitle } from "../tab-text";
 import { FollowingScrollerTracker } from "../trackers/following-scroller-tracker";
 import { IdentifyUnhandledRequests } from "../trackers/identify-unhandled-requests";
@@ -16,8 +16,8 @@ import { UnfollowTracker } from "../trackers/unfollow-tracker";
 import { UserUpdateService } from "../trackers/user-update-service";
 import { setPublicPrivateLabel, VisitingUserTracker, type InstagramUser } from "../trackers/visiting-user-tracker";
 import { Gallery } from "../ui/gallery";
-import { NextLink } from "../ui/next-link";
 import { SidePanel } from "../ui/side-panel";
+import { makeStatusGroupTable } from "../ui/status-group-table";
 import { addCopyButton } from "../ui/ui";
 import { UserCtx } from "../user-ctx";
 
@@ -29,14 +29,24 @@ type ConstructorArgs = {
 
 export class UserPage {
 	private ctx: any;
-	private pageOwner: string;
+	private pageOwnerName: string;
 
 	public constructor({ win, hotkeys }: ConstructorArgs) {
 
 		const snooper = buildRequestSnooper( win );
 
-		const { pageOwner, isTracking, startingState } = this.captureStartingState();
-		this.pageOwner = pageOwner;
+		// const { pageOwnerName, isTracking, startingState } = this.captureStartingState();
+		// capture starting state
+		this.pageOwnerName = pageOwnerName;
+		const pageOwnerCtx = new UserCtx(pageOwnerName);
+
+		pageOwnerCtx.applyDlYear();
+
+		const isTracking = pageOwnerCtx.isTracking;
+		const startingState: Partial<LocalStorageUserEntity> = isTracking
+			? pageOwnerCtx.cloneLocalStorage()
+			: {};
+		this.pageOwnerName = pageOwnerName;
 
 		// --- trackers ---
 		new UnfollowTracker(snooper);
@@ -51,14 +61,16 @@ export class UserPage {
 		const batchProducer = buildBatchProducerGroup_ForUser(snooper,startingState.lastVisit);
 
 		new UserUpdateService({batchProducer});
-		const gallery = new Gallery({batchProducer});
 
-		const sidePanel = new SidePanel({ batchProducer });
-		sidePanel.register(hotkeys);
-
-		// --- lookup ---
 		const iiLookup = new ImageLookupByUrl(batchProducer);
 		iiLookup.on("missingImage", snooper.checkLogForMissingImage);
+
+		// === UI stuff ===
+		const gallery = new Gallery({batchProducer});
+
+		const sidePanel = new SidePanel({ batchProducer }).register(hotkeys);
+
+		window.addEventListener("load", () => this.onWindowLoad() ); // more UI init
 
 		// --- global ctx ---
 		this.ctx = win.cmd = {
@@ -66,22 +78,16 @@ export class UserPage {
 			userRepo,
 			iiLookup,
 			page: this,
-			pageOwner,
+			pageOwnerName,
+			pageOwnerCtx,
 			gallery,
 			sidePanel,
 			startingState,
-			group: function(){
-				const userCtxs = UserCtx.allUsers();
-				const groups = groupBy(userCtxs, ctx=>ctx.groupDescriptor);
-				console.log(Object.entries(groups).map(([k,v])=>([k,v.length])));
-				return groups;
-			}
+			group: makeStatusGroupTree
 		};
 
-		window.addEventListener("load", () => this.onWindowLoad() );
-
 		if (isTracking)
-			this.initTrackedUser({ pageOwner, startingState });
+			this.initTrackedUser({ pageOwnerName, startingState });
 		else
 			this.initUntrackedUser();
 
@@ -109,11 +115,11 @@ export class UserPage {
 		this.showNextLinks();
 		scheduleSetTabTitle();
 		this.addDownloadCountBadge();
-		addCopyButton(this.pageOwner);
+		addCopyButton(this.pageOwnerName);
 	}
 
 	private addDownloadCountBadge() {
-		const count = new UserCtx(this.pageOwner).downloadsInLastYear;
+		const count = new UserCtx(this.pageOwnerName).downloadsInLastYear;
 
 		if (count <= 0)
 			return;
@@ -148,36 +154,28 @@ export class UserPage {
 			})
 			.appendTo(instaDom.body);
 
-		const allUsers = UserCtx.allUsers();
-		NextLink.forFirstUser("stale downloaded", allUsers.filter(x=>x.totalDownloads && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
-		NextLink.forFirstUser("stale followed", allUsers.filter(x=>x.isFollowing && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
-	}
+		// NEW
+		const tree = makeStatusGroupTree();
+		const table = makeStatusGroupTable(tree);
+		table.appendTo(host.el);
 
-	private captureStartingState() : {
-		pageOwner: string;
-		isTracking: boolean;
-		startingState: Partial<LocalStorageUserEntity>;
-	} {
-		const pageOwner = this.pageOwner = pageOwnerName;
-		const isTracking = new UserCtx(pageOwner).isTracking;
-		const startingState: Partial<LocalStorageUserEntity> = isTracking
-			? new UserCtx(pageOwner).cloneLocalStorage()
-			: {};
-
-		return { pageOwner, isTracking, startingState };
+		// OLD
+		// const allUsers = UserCtx.allUsers();
+		// NextLink.forFirstUser("stale downloaded", allUsers.filter(x=>x.totalDownloads && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
+		// NextLink.forFirstUser("stale followed", allUsers.filter(x=>x.isFollowing && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
 	}
 
 	private logStartingState(startingState: Partial<LocalStorageUserEntity>) {
 		console.log(JSON.stringify(startingState, null, "\t"));
 	}
 
-	private initTrackedUser({ pageOwner, startingState }: any) {
+	private initTrackedUser({ pageOwnerName, startingState }: any) {
 		const { ctx } = this;
 
-		new UserCtx(pageOwner).recordVisit();
+		new UserCtx(pageOwnerName).recordVisit();
 		setPublicPrivateLabel(startingState.isPrivate);
 
-		ctx.stop = () => ctx.old = new UserCtx(pageOwner).prune();
+		ctx.stop = () => ctx.old = new UserCtx(pageOwnerName).prune();
 	}
 
 	private initUntrackedUser() {

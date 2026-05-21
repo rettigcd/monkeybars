@@ -56,12 +56,6 @@ function downloadTextToFile(text:string, filename:string) {
 
 export function initInstagram4(): void {
 
-	// unsafeWindow.console = {
-	// 	__proto__: unsafeWindow.console,
-	// 	log: function () { this.logArgs.push(arguments); },
-	// 	logArgs: [],
-	// };
-
 	const hotkeys = new HotkeyManager();
 	const screenImageActions = new ScreenImageActions(win);
 	hotkeys.register(" ", () => screenImageActions.downloadImageInCenter());

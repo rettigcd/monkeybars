@@ -1,3 +1,7 @@
+FIX:	Unfollowing someone that isn't tracked, starts tracking them with { isFollowing:false }
+FIX:	downloading from Pop-up window doesn't add download to users dl{}
+FIX:	https://www.instagram.com/carlie.nicole/ red & black bikini photo has 2 owners and both get marked with the download.
+
 Tests:
 	downloading from (location), (saved-posts), or (tagged) page
 		- if user is tracked
