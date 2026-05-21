@@ -1,3 +1,4 @@
+import { groupBy } from "~/lib/sorting";
 import type { ValueUpdater } from "~/lib/storage";
 import { DAYS, MONTHS } from "~/lib/time";
 import { userRepo, type LocalStorageUserEntity } from "./local-storage";
@@ -12,12 +13,69 @@ export type LastVisitStatus
 	| "no-visit followee" // is following
 	| "no-visit nothing"; // no reason to keep
 
-	export type DownloadStatus
+export type DownloadStatus
 	= "no-visit" // visit page before trying to getting a DL status
 	| "dl producing"		// dl more recent than 4 years
 	| "dl not-producing" 	// dl over 4 years old - prune
 	| "no-dl followee"		// no-dl but following
 	| "no-dl nothing"; 		// no-dl but visited and never downloaded and not following
+
+
+type VisitState = "none" | "fresh" | "stale";
+type DownloadState = "none" | "producing" | "idle";
+
+type NotVisited = { // not visited
+	visit: "none";
+	has: "downloads" | "followee" | "nothing";
+};
+type SansDownloads = { // no downloads
+	visit: "fresh" | "stale";
+	downloads: "none";
+	has: "followee" | "nothing";
+};
+type WithDownloads = { // all good!
+	visit: "fresh" | "stale";
+	downloads: "producing" | "idle";
+};
+type Visited = SansDownloads | WithDownloads;
+type MyStatus = NotVisited | Visited;
+
+export function makeStatusTree(){
+	const pairs: Array<[UserCtx,MyStatus]> = UserCtx.allUsers()
+		.map(ctx=>([ctx,ctx.myStatus]));
+	const byVisit = groupBy<[UserCtx,MyStatus],string>(pairs,([,s])=>s.visit);
+	const notVisited: Array<[UserCtx,NotVisited]> = (byVisit.none || []) as Array<[UserCtx,NotVisited]>;
+	const notVisitedHas = groupBy<[UserCtx,NotVisited],string>(notVisited,([,status])=>status.has);
+	const visited: Array<[UserCtx,Visited]> = [...(byVisit.fresh||[]),...(byVisit.stale||[])] as Array<[UserCtx,Visited]>;
+	const byDownloads = groupBy<[UserCtx,Visited],string>(visited,([,status])=>status.downloads);
+	const notDownloads = (byDownloads.none || []) as Array<[UserCtx,SansDownloads]>;
+	const notDownloadedHas = groupBy<[UserCtx,SansDownloads],string>(notDownloads,([,status])=>status.has);
+	// const downloads = get from byDownloads...
+	return {
+		notVisited: {
+			total: notVisited.length,
+			has: {
+				downloads:(notVisitedHas.downloads||[]).map(x=>x[0]),
+				followee:(notVisitedHas.followee||[]).map(x=>x[0]),
+				nothing:(notVisitedHas.nothing||[]).map(x=>x[0]),
+			},
+		},
+		visited: {
+			fresh: (byVisit.fresh || []).map(x=>x[0]),
+			stale: (byVisit.stale || []).map(x=>x[0]),
+			hasDownloads : {
+				total: visited.length,
+			},
+			noDownloads : {
+				total: notDownloads.length,
+				has: {
+					followee:(notDownloadedHas.followee||[]).map(x=>x[0]),
+					nothing:(notDownloadedHas.nothing||[]).map(x=>x[0]),
+				},
+			}
+		}
+	};
+}
 
 export class UserCtx {
 
@@ -93,6 +151,39 @@ export class UserCtx {
 	// have any downloads in the last 4 years
 	public get isProducing(): boolean {
 		return true; // !!! add 4-year check
+	}
+
+	// lastVisit: "fresh" | "stale" | undefined
+	// downloads: "producing" | "notproducing" | undefined
+	// 
+
+
+	public get myStatus(): MyStatus {
+		const { dl, lastVisit, isFollowing } = this._info;
+
+		const visit: VisitState = lastVisit !== undefined ? "none" : this.isStale ? "stale" : "fresh";
+
+		if (visit === "none")
+			// needs visited
+			return {
+				visit,
+				has: dl !== undefined ? "downloads" : isFollowing ? "followee" : "nothing",
+			};
+
+		const downloads: DownloadState = dl === undefined ? "none" : this.isProducing ? "producing" : "idle";
+		if (downloads === "none")
+			// visited but no downloads, has===followee => ok, has===nothing => why are we tracking?
+			return {
+				visit,		// visited, fresh or stale
+				downloads,  // no downloads
+				has: isFollowing ? "followee" : "nothing",
+			};
+
+		// has visited and DL
+		return {
+			visit,		// visited: stale or fresh
+			downloads,	// downloaded: producing or idle
+		};
 	}
 
 	public get groupDescriptor():string {

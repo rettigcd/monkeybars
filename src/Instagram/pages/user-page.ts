@@ -1,6 +1,6 @@
 import { $, $qAsync } from "~/lib/dom3";
 
-import { by, groupBy } from "~/lib/sorting";
+import { by } from "~/lib/sorting";
 import { HotkeyManager } from "../../lib/hotkey-manager";
 import type { SnlWindow } from "../../snl/window";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
@@ -19,7 +19,7 @@ import { Gallery } from "../ui/gallery";
 import { NextLink } from "../ui/next-link";
 import { SidePanel } from "../ui/side-panel";
 import { addCopyButton } from "../ui/ui";
-import { UserCtx } from "../user-ctx";
+import { makeStatusTree, UserCtx } from "../user-ctx";
 
 // TODO: add proper types if you have them
 type ConstructorArgs = {
@@ -29,14 +29,22 @@ type ConstructorArgs = {
 
 export class UserPage {
 	private ctx: any;
-	private pageOwner: string;
+	private pageOwnerName: string;
 
 	public constructor({ win, hotkeys }: ConstructorArgs) {
 
 		const snooper = buildRequestSnooper( win );
 
-		const { pageOwner, isTracking, startingState } = this.captureStartingState();
-		this.pageOwner = pageOwner;
+		// const { pageOwnerName, isTracking, startingState } = this.captureStartingState();
+		// capture starting state
+		this.pageOwnerName = pageOwnerName;
+		const pageOwnerCtx = new UserCtx(pageOwnerName);
+		const isTracking = pageOwnerCtx.isTracking;
+		const startingState: Partial<LocalStorageUserEntity> = isTracking
+			? pageOwnerCtx.cloneLocalStorage()
+			: {};
+
+		this.pageOwnerName = pageOwnerName;
 
 		// --- trackers ---
 		new UnfollowTracker(snooper);
@@ -66,22 +74,24 @@ export class UserPage {
 			userRepo,
 			iiLookup,
 			page: this,
-			pageOwner,
+			pageOwnerName,
+			pageOwnerCtx,
 			gallery,
 			sidePanel,
 			startingState,
-			group: function(){
-				const userCtxs = UserCtx.allUsers();
-				const groups = groupBy(userCtxs, ctx=>ctx.groupDescriptor);
-				console.log(Object.entries(groups).map(([k,v])=>([k,v.length])));
-				return groups;
-			}
+			// group: function(){
+			// 	const userCtxs = UserCtx.allUsers();
+			// 	const groups = groupBy(userCtxs, ctx=>ctx.groupDescriptor);
+			// 	console.log(Object.entries(groups).map(([k,v])=>([k,v.length])));
+			// 	return groups;
+			// }
+			group: makeStatusTree
 		};
 
 		window.addEventListener("load", () => this.onWindowLoad() );
 
 		if (isTracking)
-			this.initTrackedUser({ pageOwner, startingState });
+			this.initTrackedUser({ pageOwnerName, startingState });
 		else
 			this.initUntrackedUser();
 
@@ -109,11 +119,11 @@ export class UserPage {
 		this.showNextLinks();
 		scheduleSetTabTitle();
 		this.addDownloadCountBadge();
-		addCopyButton(this.pageOwner);
+		addCopyButton(this.pageOwnerName);
 	}
 
 	private addDownloadCountBadge() {
-		const count = new UserCtx(this.pageOwner).downloadsInLastYear;
+		const count = new UserCtx(this.pageOwnerName).downloadsInLastYear;
 
 		if (count <= 0)
 			return;
@@ -153,31 +163,17 @@ export class UserPage {
 		NextLink.forFirstUser("stale followed", allUsers.filter(x=>x.isFollowing && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
 	}
 
-	private captureStartingState() : {
-		pageOwner: string;
-		isTracking: boolean;
-		startingState: Partial<LocalStorageUserEntity>;
-	} {
-		const pageOwner = this.pageOwner = pageOwnerName;
-		const isTracking = new UserCtx(pageOwner).isTracking;
-		const startingState: Partial<LocalStorageUserEntity> = isTracking
-			? new UserCtx(pageOwner).cloneLocalStorage()
-			: {};
-
-		return { pageOwner, isTracking, startingState };
-	}
-
 	private logStartingState(startingState: Partial<LocalStorageUserEntity>) {
 		console.log(JSON.stringify(startingState, null, "\t"));
 	}
 
-	private initTrackedUser({ pageOwner, startingState }: any) {
+	private initTrackedUser({ pageOwnerName, startingState }: any) {
 		const { ctx } = this;
 
-		new UserCtx(pageOwner).recordVisit();
+		new UserCtx(pageOwnerName).recordVisit();
 		setPublicPrivateLabel(startingState.isPrivate);
 
-		ctx.stop = () => ctx.old = new UserCtx(pageOwner).prune();
+		ctx.stop = () => ctx.old = new UserCtx(pageOwnerName).prune();
 	}
 
 	private initUntrackedUser() {
