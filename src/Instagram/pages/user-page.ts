@@ -1,6 +1,5 @@
 import { $, $qAsync } from "~/lib/dom3";
 
-import { by } from "~/lib/sorting";
 import { HotkeyManager } from "../../lib/hotkey-manager";
 import type { SnlWindow } from "../../snl/window";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
@@ -9,6 +8,7 @@ import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { instaDom, pageOwnerName } from "../services/instaDom";
 import { buildRequestSnooper } from "../services/snoopBuilder";
 import { reportLast } from "../services/storage-time";
+import { makeStatusGroupTree } from "../status-group-tree";
 import { scheduleSetTabTitle } from "../tab-text";
 import { FollowingScrollerTracker } from "../trackers/following-scroller-tracker";
 import { IdentifyUnhandledRequests } from "../trackers/identify-unhandled-requests";
@@ -16,10 +16,10 @@ import { UnfollowTracker } from "../trackers/unfollow-tracker";
 import { UserUpdateService } from "../trackers/user-update-service";
 import { setPublicPrivateLabel, VisitingUserTracker, type InstagramUser } from "../trackers/visiting-user-tracker";
 import { Gallery } from "../ui/gallery";
-import { NextLink } from "../ui/next-link";
 import { SidePanel } from "../ui/side-panel";
+import { makeStatusGroupTable } from "../ui/status-group-table";
 import { addCopyButton } from "../ui/ui";
-import { makeStatusTree, UserCtx } from "../user-ctx";
+import { UserCtx } from "../user-ctx";
 
 // TODO: add proper types if you have them
 type ConstructorArgs = {
@@ -59,14 +59,16 @@ export class UserPage {
 		const batchProducer = buildBatchProducerGroup_ForUser(snooper,startingState.lastVisit);
 
 		new UserUpdateService({batchProducer});
-		const gallery = new Gallery({batchProducer});
 
-		const sidePanel = new SidePanel({ batchProducer });
-		sidePanel.register(hotkeys);
-
-		// --- lookup ---
 		const iiLookup = new ImageLookupByUrl(batchProducer);
 		iiLookup.on("missingImage", snooper.checkLogForMissingImage);
+
+		// === UI stuff ===
+		const gallery = new Gallery({batchProducer});
+
+		const sidePanel = new SidePanel({ batchProducer }).register(hotkeys);
+
+		window.addEventListener("load", () => this.onWindowLoad() ); // more UI init
 
 		// --- global ctx ---
 		this.ctx = win.cmd = {
@@ -79,16 +81,8 @@ export class UserPage {
 			gallery,
 			sidePanel,
 			startingState,
-			// group: function(){
-			// 	const userCtxs = UserCtx.allUsers();
-			// 	const groups = groupBy(userCtxs, ctx=>ctx.groupDescriptor);
-			// 	console.log(Object.entries(groups).map(([k,v])=>([k,v.length])));
-			// 	return groups;
-			// }
-			group: makeStatusTree
+			group: makeStatusGroupTree
 		};
-
-		window.addEventListener("load", () => this.onWindowLoad() );
 
 		if (isTracking)
 			this.initTrackedUser({ pageOwnerName, startingState });
@@ -158,9 +152,15 @@ export class UserPage {
 			})
 			.appendTo(instaDom.body);
 
-		const allUsers = UserCtx.allUsers();
-		NextLink.forFirstUser("stale downloaded", allUsers.filter(x=>x.totalDownloads && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
-		NextLink.forFirstUser("stale followed", allUsers.filter(x=>x.isFollowing && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
+		// NEW
+		const tree = makeStatusGroupTree();
+		const table = makeStatusGroupTable(tree);
+		table.appendTo(host.el);
+
+		// OLD
+		// const allUsers = UserCtx.allUsers();
+		// NextLink.forFirstUser("stale downloaded", allUsers.filter(x=>x.totalDownloads && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
+		// NextLink.forFirstUser("stale followed", allUsers.filter(x=>x.isFollowing && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
 	}
 
 	private logStartingState(startingState: Partial<LocalStorageUserEntity>) {

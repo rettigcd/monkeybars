@@ -105,9 +105,10 @@ export class SidePanel {
 		batchProducer.on("batchReceived", (batch) => this.showNewBatches(batch));
 	}
 
-	public register(hotkeys:HotkeyManager){
+	public register(hotkeys:HotkeyManager): this{
 		hotkeys.register("o", () => this.openLastClosed());
 		hotkeys.register("x", () => this.closeFirst());
+		return this;
 	}
 
 	public showNewBatches(batch: PicGroup[]): void {
