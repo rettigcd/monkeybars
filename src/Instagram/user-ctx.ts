@@ -5,22 +5,7 @@ import { calcDownloadsInLastYear, getTotalDownloads } from "./services/download-
 import { pageOwnerName } from "./services/instaDom";
 import { loadTimeMs } from "./services/storage-time";
 
-export type LastVisitStatus 
-	= "stale" 
-	| "recent"
-	| "none downloads" // has download 
-	| "none followee" // is following
-	| "none nothing"; // no reason to keep
-
-export type DownloadStatus
-	= "no-visit" // visit page before trying to getting a DL status
-	| "producing"	// dl more recent than 4 years
-	| "idle" 		// dl over 4 years old - prune
-	| "none followee"		// no-dl but following
-	| "none nothing"; 		// no-dl but visited and never downloaded and not following
-
-
-// All of the types required to build MyStatus
+// All of the types required to build UserStatus
 export type HasVisitState = "recent" | "stale";
 export type VisitState = HasVisitState | "none";
 export type HasDownloadState = "producing" | "idle";
@@ -29,22 +14,25 @@ export type NotVisited = { // not visited
 	visit: "none";
 	has: "downloads" | "followee" | "nothing";
 };
-export type SansDownloads = { // no downloads
+export type Visited_SansDownloads = { // no downloads
 	visit: HasVisitState;
 	downloads: "none";
 	has: "followee" | "nothing";
 };
-export type WithDownloads = { // all good!
+export type Visited_WithDownloads = { // all good!
 	visit: HasVisitState;
 	downloads: HasDownloadState;
 };
-export type Visited = SansDownloads | WithDownloads;
-export type UserStatus = NotVisited | Visited;
+export type Visited = Visited_SansDownloads | Visited_WithDownloads;
+export type UserState = NotVisited | Visited;
 
 
 export class UserCtx {
 
 	public static allUsers(): UserCtx[] { return userRepo.keys().map(username=>new UserCtx(username)); }
+
+	private _myState?: UserState;
+	private _cachedInfo?: LocalStorageUserEntity;
 
 	constructor(
 		public readonly username:string
@@ -94,7 +82,7 @@ export class UserCtx {
 		this._update( x => x.isPrivate = newValue );
 	}
 
-	// ======== MISC ==========
+	// ======== MISC - state ==========
 
 	public get refreshTime():number {
 		const downloads: number = this.downloadsInLastYear;
@@ -120,7 +108,11 @@ export class UserCtx {
 		return dl === undefined ? "none" : isProducing ? "producing" : "idle";
 	}
 
-	public get myStatus(): UserStatus {
+	public get state(): UserState {
+		return this._myState ??= this._buildMyState();
+	}
+
+	private _buildMyState(): UserState {
 		const { isFollowing } = this._info;
 		const {visitState,dlState} = this;
 
@@ -146,28 +138,6 @@ export class UserCtx {
 		};
 	}
 
-	public get groupDescriptor():string {
-		return `${this.lastVisitStatus} : ${this.downloadStatus}`;
-	}
-
-	public get lastVisitStatus(): LastVisitStatus {
-		const {dl, isFollowing} = this._info;
-		const {visitState: visitStatus} = this;
-		return visitStatus !== "none" ? visitStatus
-			: dl !== undefined ? "none downloads"	// keep because we downloaded something - get lastVisit date
-			: isFollowing ? "none followee" // keep because is followee - may or may not want lastVisit date
-			: "none nothing"; // no reason to keep
-	}
-
-	public get downloadStatus(): DownloadStatus {
-		if( this.visitState === "none" ) return "no-visit";
-		const {dlState} = this;
-		if (dlState !== "none" ) return dlState;
-		const {isFollowing} = this._info;
-		return isFollowing
-			? "none followee" // followed but never download
-			: "none nothing"; // visited by never downloaded and not following
-	}
 
 	public prune(): LocalStorageUserEntity {
 		const old = userRepo.get(this.username);
@@ -184,11 +154,10 @@ export class UserCtx {
 		this._cachedInfo ??= userRepo.get(this.username);
 		return this._cachedInfo;
 	}
-	private _cachedInfo?: LocalStorageUserEntity;
 
 	private _update(updateMethod:ValueUpdater<LocalStorageUserEntity> ){
 		userRepo.update(this.username,updateMethod);
-		this._cachedInfo = undefined;
+		delete this._cachedInfo;
 	}
 }
 
