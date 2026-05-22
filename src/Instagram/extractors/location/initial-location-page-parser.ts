@@ -8,7 +8,7 @@ import { type Edge } from "../ig-types";
 // sample response: location-initial-script
 export class InitialLocationPageParser extends EventHostBase<BatchProducerEvents> {
 
-	id: number;
+	id: ReturnType<typeof setInterval>;
 
 	constructor() {
 		super();

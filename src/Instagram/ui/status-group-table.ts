@@ -21,7 +21,7 @@ export function makeStatusGroupTable(tree:StatusGroupTree){
 
 		$titleRow('Visited', 4, visitColor, tree.visited.total),
 		$('tr').withChildren(
-			$td().txt('Fresh'), $num(tree.visited.fresh.length),
+			$td().txt('Recent'), $num(tree.visited.recent.length),
 			$td().txt('Stale'), $link(tree.visited.stale),
 		),
 

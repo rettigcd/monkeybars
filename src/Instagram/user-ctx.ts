@@ -6,35 +6,37 @@ import { pageOwnerName } from "./services/instaDom";
 import { loadTimeMs } from "./services/storage-time";
 
 export type LastVisitStatus 
-	= "visited-stale" 
-	| "visited-fresh"
-	| "no-visit downloads" // has download 
-	| "no-visit followee" // is following
-	| "no-visit nothing"; // no reason to keep
+	= "stale" 
+	| "recent"
+	| "none downloads" // has download 
+	| "none followee" // is following
+	| "none nothing"; // no reason to keep
 
 export type DownloadStatus
 	= "no-visit" // visit page before trying to getting a DL status
-	| "dl producing"		// dl more recent than 4 years
-	| "dl not-producing" 	// dl over 4 years old - prune
-	| "no-dl followee"		// no-dl but following
-	| "no-dl nothing"; 		// no-dl but visited and never downloaded and not following
+	| "producing"	// dl more recent than 4 years
+	| "idle" 		// dl over 4 years old - prune
+	| "none followee"		// no-dl but following
+	| "none nothing"; 		// no-dl but visited and never downloaded and not following
 
 
 // All of the types required to build MyStatus
-export type VisitState = "none" | "fresh" | "stale";
-export type DownloadState = "none" | "producing" | "idle";
+export type HasVisitState = "recent" | "stale";
+export type VisitState = HasVisitState | "none";
+export type HasDownloadState = "producing" | "idle";
+export type DownloadState = HasDownloadState | "none";
 export type NotVisited = { // not visited
 	visit: "none";
 	has: "downloads" | "followee" | "nothing";
 };
 export type SansDownloads = { // no downloads
-	visit: "fresh" | "stale";
+	visit: HasVisitState;
 	downloads: "none";
 	has: "followee" | "nothing";
 };
 export type WithDownloads = { // all good!
-	visit: "fresh" | "stale";
-	downloads: "producing" | "idle";
+	visit: HasVisitState;
+	downloads: HasDownloadState;
 };
 export type Visited = SansDownloads | WithDownloads;
 export type UserStatus = NotVisited | Visited;
@@ -106,46 +108,41 @@ export class UserCtx {
 			+ Math.floor((strToFloat(this.username) - 0.5) * 14 * DAYS); // spread out over 2 weeks.
 	}
 
-	// checks if lastVisit is recent enough
-	public get isStale(): boolean {
-		return this.refreshTime < loadTimeMs;
+	public get visitState(): VisitState {
+		return this._info.lastVisit === undefined ? "none" 
+			: this.refreshTime < loadTimeMs ? "stale"  // last visit was too long ago
+			: "recent"; // last visit was recent
 	}
 
-	// have any downloads in the last 4 years
-	public get isProducing(): boolean {
-		return true; // !!! add 4-year check
+	public get dlState(): DownloadState {
+		const {dl} = this._info;
+		const isProducing = true; // have any downloads in the last 4 years - !!! implemented
+		return dl === undefined ? "none" : isProducing ? "producing" : "idle";
 	}
-
-	// lastVisit: "fresh" | "stale" | undefined
-	// downloads: "producing" | "notproducing" | undefined
-	// 
-
 
 	public get myStatus(): UserStatus {
-		const { dl, lastVisit, isFollowing } = this._info;
+		const { isFollowing } = this._info;
+		const {visitState,dlState} = this;
 
-		const visit: VisitState = lastVisit === undefined ? "none" : this.isStale ? "stale" : "fresh";
-
-		if (visit === "none")
+		if (visitState === "none")
 			// needs visited
 			return {
-				visit,
-				has: dl !== undefined ? "downloads" : isFollowing ? "followee" : "nothing",
+				visit: visitState,
+				has: dlState !== "none" ? "downloads" : isFollowing ? "followee" : "nothing",
 			};
 
-		const downloads: DownloadState = dl === undefined ? "none" : this.isProducing ? "producing" : "idle";
-		if (downloads === "none")
+		if (dlState === "none")
 			// visited but no downloads, has===followee => ok, has===nothing => why are we tracking?
 			return {
-				visit,		// visited, fresh or stale
-				downloads,  // no downloads
+				visit: visitState,		// visited, recent or stale
+				downloads: dlState,  // no downloads
 				has: isFollowing ? "followee" : "nothing",
 			};
 
 		// has visited and DL
 		return {
-			visit,		// visited: stale or fresh
-			downloads,	// downloaded: producing or idle
+			visit: visitState,		// visited: stale or recent
+			downloads: dlState,	// downloaded: producing or idle
 		};
 	}
 
@@ -154,25 +151,22 @@ export class UserCtx {
 	}
 
 	public get lastVisitStatus(): LastVisitStatus {
-		const {dl,lastVisit, isFollowing} = this._info;
-		return lastVisit !== undefined ? ( this.isStale 
-				? "visited-stale" 
-				: "visited-fresh")
-			: dl !== undefined ? "no-visit downloads"	// keep because we downloaded something - get lastVisit date
-			: isFollowing ? "no-visit followee" // keep because is followee - may or may not want lastVisit date
-			: "no-visit nothing"; // no reason to keep
+		const {dl, isFollowing} = this._info;
+		const {visitState: visitStatus} = this;
+		return visitStatus !== "none" ? visitStatus
+			: dl !== undefined ? "none downloads"	// keep because we downloaded something - get lastVisit date
+			: isFollowing ? "none followee" // keep because is followee - may or may not want lastVisit date
+			: "none nothing"; // no reason to keep
 	}
 
 	public get downloadStatus(): DownloadStatus {
-		const {dl,lastVisit, isFollowing} = this._info;
-		if( lastVisit === undefined ) return "no-visit";
-		if (dl!==undefined )
-			return this.isProducing
-				? "dl producing"		// keep on keeping on.
-				: "dl not-producing"; 	// over 4 years old - prune
-		if( isFollowing )
-			return "no-dl followee"; // followed but never download
-		return "no-dl nothing"; // visited by never downloaded and not following
+		if( this.visitState === "none" ) return "no-visit";
+		const {dlState} = this;
+		if (dlState !== "none" ) return dlState;
+		const {isFollowing} = this._info;
+		return isFollowing
+			? "none followee" // followed but never download
+			: "none nothing"; // visited by never downloaded and not following
 	}
 
 	public prune(): LocalStorageUserEntity {
