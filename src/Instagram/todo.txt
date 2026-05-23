@@ -1,6 +1,16 @@
 FIX:	Unfollowing someone that isn't tracked, starts tracking them with { isFollowing:false }
 FIX:	downloading from Pop-up window doesn't add download to users dl{}
 FIX:	https://www.instagram.com/carlie.nicole/ red & black bikini photo has 2 owners and both get marked with the download.
+FIX:	the public/private indicators are getting appened to the vsco links instead of the following button.
+
+IDEA:	For people with DL, split out by last year they produced so we can pick a good prune cut-off # of years.
+IDEA:	use lastUpload or lastGood to seed lastVisit where missing
+IDEA:	have tab text based on new images, not total images when available.
+IDEA:	Button to open 10 tabs of lastViewed/stale people (set a flag so tab knows it was opened as such), if a tab finds no new images, set window timer for 20 seconds to load the next stale, or close window/tab. and show a cancel-timer button.
+FIX:	Collapsed view should have width of 0 so it doesn't obstruct images under it for normal scrolling
+SCRUB:	username, id, fullname, score
+
+CHECK:	If we prune someone, do unflush updates on them bring them back?
 
 Tests:
 	downloading from (location), (saved-posts), or (tagged) page

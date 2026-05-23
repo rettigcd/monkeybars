@@ -126,11 +126,22 @@ export class UserCtx {
 		}
 	}
 
+	// for people missing viewDate, use lastUpload where available
+	public applyLastUpload(){
+		const {visitState} = this;
+		if( visitState !== "none" ) return;
+		const {lastUpload} = this._info as any;
+		if( lastUpload === undefined ) return;
+		const date = new Date(lastUpload);
+		console.log("Setting viewDate to ", date.toDateString());
+		this.setLastVisit(date);
+	}
+
 
 	private _buildMyState(): UserState {
 		const { isFollowing } = this._info;
 		const {visitState,dlState} = this;
-
+		
 		if (visitState === "none")
 			// needs visited
 			return {
