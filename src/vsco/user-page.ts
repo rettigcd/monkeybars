@@ -5,11 +5,10 @@ import type { LocalStorageUserEntity } from "./local-storage";
 import { CalendarModel } from "./models/calendar-model";
 import { Gallery } from "./models/gallery-model";
 import { GalleryRowModel } from "./models/gallery-row-model";
-import { UserData } from "./models/user/user-data";
 import type { UserStatusType } from "./types/types";
 import { type VscoWindow } from "./types/window";
-import { UserCtx } from "./user-ctx";
 import { UserStore } from "./user-store";
+import { UserCtx } from "./user/user-ctx";
 import { Layout } from "./views/layout";
 
 const consoleCss = {
@@ -22,7 +21,7 @@ const consoleCss = {
 function makePruneButton(pageOwnerCtx:UserCtx){
 	return $('button').txt('Prune').on('click',function(event){
 		pageOwnerCtx.prune();
-		con.print(`[${pageOwnerCtx.data.username}] pruned`);
+		con.print(`[${pageOwnerCtx.username}] pruned`);
 		(event.currentTarget! as HTMLElement).remove();
 	}).el	
 }
@@ -52,7 +51,7 @@ export async function initUserPageAsync(
 
 	UserStore.pageOwnerName = pageOwnerName;
 	const pageOwnerCtx: UserCtx = userStore.get( pageOwnerName );
-	const startingState: LocalStorageUserEntity = pageOwnerCtx.data.cloneLocalStorageEntity();
+	const startingState: LocalStorageUserEntity = pageOwnerCtx.cloneLocalStorageEntity();
 	const startingStatus = pageOwnerCtx.status;
 	logStartingState(startingState,startingStatus);
 
@@ -106,9 +105,8 @@ export async function initUserPageAsync(
 				calendar.loadAsync();
 			} else {
 				// Check if user should be pruned - !!! should use same code as is in UserCtx
-				const startingData = new UserData(pageOwnerName, startingState);
 				const earliestEmptyYear = new Date().getFullYear() - 4;
-				if( startingData.lastYear<earliestEmptyYear ){
+				if( pageOwnerCtx.lastDownloadYear<earliestEmptyYear ){
 					uiLayout.withActions( makePruneButton(pageOwnerCtx) );
 //					calendar.loadAsync();
 				}

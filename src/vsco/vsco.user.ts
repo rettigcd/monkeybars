@@ -29,9 +29,9 @@ import { Gallery } from "./models/gallery-model";
 import { ImageModel } from "./models/image-model";
 import { NewImagesModel } from "./models/new-images-model";
 import { win } from "./types/window";
-import { UserCtx } from "./user-ctx";
 import { initUserPageAsync } from "./user-page";
 import { UserStore } from "./user-store";
+import { UserCtx } from "./user/user-ctx";
 import { scrollToTop } from "./views/calendar-view";
 import { Layout } from "./views/layout";
 import { pageOwnerName } from "./vscoDom";
@@ -81,19 +81,21 @@ import { pageOwnerName } from "./vscoDom";
 	const reports = {
 		status : function(status=throwExp('must supply status')){
 			return userStore.allUsers
-				.filter(u=>u.data.status==status)
+				.filter(u=>u.status==status)
 				.sort(by(user=>user.username))
-				.map( user=>[user.username,user.data.status].join('\t') )
+				.map( user=>[user.username,user.status].join('\t') )
 				.join('\r\n');
 		},
 		failures : function(){
 			return userStore.allUsers
-				.filter(u=>u.data.status=="failed")
-				.sort(by(user=>user.data.firstFailure))
-				.map(user => user.data.toFailureString() )
+				.filter(u=>u.status=="failed")
+				.sort(by(user=>user.firstFailure))
+				.map(user => user.toFailureString() )
 				.join("\r\n")
 		},
-		toReview : function(){ console.log(userStore.allUsers.filter(u=>u.data.status=="queued").map(user=>user.username).join("\r\n")); },
+		toReview : function(){ console.log(userStore.allUsers.filter(u=>u.status=="queued")
+			.map(user=>user.username)
+			.join("\r\n")); },
 		findLinksTo: function(needle:string){ console.log(userStore.findFriendLinksTo(needle).join("\r\n")); }
 	}
 
@@ -105,7 +107,7 @@ import { pageOwnerName } from "./vscoDom";
 		// the old links.show() is now:  cmd.pageOwnerCtx.links.asGalleryRowsAsync().then(rows => cmd.gallery.rows = rows)
 
 		groups:function(): unknown{
-			const groups = groupBy<UserCtx,string>(userStore.allUsers,x=>x.data.group);
+			const groups = groupBy<UserCtx,string>(userStore.allUsers,x=>x.group);
 			const lengths = Object.fromEntries(
 				Object.entries(groups)
 					.map(([key, value]) => [key, value.length])

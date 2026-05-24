@@ -31,7 +31,6 @@ export class UserCtx {
 
 	public static allUsers(): UserCtx[] { return userRepo.keys().map(username=>new UserCtx(username)); }
 
-	private _myState?: UserState;
 	private _cachedInfo?: LocalStorageUserEntity;
 
 	constructor(
@@ -112,33 +111,6 @@ export class UserCtx {
 	}
 
 	public get state(): UserState {
-		return this._myState ??= this._buildMyState();
-	}
-
-	// for people missing viewDate, create a viewDate at beginning of 1st DL year
-	public applyDlYear(){
-		const {visitState,dlState} = this;
-		if( visitState === "none" && dlState !== "none" ){
-			const year:string = Object.keys(this._info.dl!).sort().shift()!;
-			const date = new Date(Number(year),0,1);
-			console.log("Setting viewDate to ", year, date.toDateString());
-			this.setLastVisit(date);
-		}
-	}
-
-	// for people missing viewDate, use lastUpload where available
-	public applyLastUpload(){
-		const {visitState} = this;
-		if( visitState !== "none" ) return;
-		const {lastUpload} = this._info as any;
-		if( lastUpload === undefined ) return;
-		const date = new Date(lastUpload);
-		console.log("Setting viewDate to ", date.toDateString());
-		this.setLastVisit(date);
-	}
-
-
-	private _buildMyState(): UserState {
 		const { isFollowing } = this._info;
 		const {visitState,dlState} = this;
 		
@@ -174,6 +146,32 @@ export class UserCtx {
 	public cloneLocalStorage(): LocalStorageUserEntity{
 		return structuredClone(userRepo.get(this.username));
 	}
+
+	// Data cleanup methods
+
+	// for people missing viewDate, create a viewDate at beginning of 1st DL year
+	public applyDlYear(){
+		const {visitState,dlState} = this;
+		if( visitState === "none" && dlState !== "none" ){
+			const year:string = Object.keys(this._info.dl!).sort().shift()!;
+			const date = new Date(Number(year),0,1);
+			console.log("Setting viewDate to ", year, date.toDateString());
+			this.setLastVisit(date);
+		}
+	}
+
+	// for people missing viewDate, use lastUpload where available
+	public applyLastUpload(){
+		const {visitState} = this;
+		if( visitState !== "none" ) return;
+		const {lastUpload} = this._info as any;
+		if( lastUpload === undefined ) return;
+		const date = new Date(lastUpload);
+		console.log("Setting viewDate to ", date.toDateString());
+		this.setLastVisit(date);
+	}
+
+	// private
 
 	private get _info() : LocalStorageUserEntity{ 
 		this._cachedInfo ??= userRepo.get(this.username);

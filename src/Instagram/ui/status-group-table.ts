@@ -11,7 +11,6 @@ export function makeStatusGroupTable(tree:StatusGroupTree){
 	const $num = (num:number) => $td().css({textAlign:"right"}).txt(String(num));
 	const $label = (label:string) => $td().txt(label); 
 	const $link = (users:UserCtx[]) => {
-		const td = 
 		users = users.filter(x=>x.username != pageOwnerName);
 		return $td().css({textAlign:"right"}).withChildren(
 			users.length 

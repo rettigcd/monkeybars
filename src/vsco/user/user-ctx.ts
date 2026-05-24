@@ -2,14 +2,14 @@ import { assertNotNull } from "~/laundry/location";
 import { openInTab } from "~/lib/gm";
 import { EventHostBase } from "~/lib/observable";
 import { CachedPersistentArray } from "~/lib/storage";
-import { Fetcher } from "./fetcher";
-import { commonRepo, newImageRepo, userRepo } from "./local-storage";
-import { ImageModel } from "./models/image-model";
-import { UserData } from "./models/user/user-data";
-import { UserLinks } from "./models/user/user-links";
-import { NewImageStore } from "./new-image-store";
-import type { ILinkedUser, UserStatusType } from "./types/types";
-import { pageOwnerName } from "./vscoDom";
+import { Fetcher } from "../fetcher";
+import { commonRepo, newImageRepo, userRepo } from "../local-storage";
+import { ImageModel } from "../models/image-model";
+import { NewImageStore } from "../new-image-store";
+import type { ILinkedUser, UserStatusType } from "../types/types";
+import { pageOwnerName } from "../vscoDom";
+import { UserData } from "./user-data";
+import { UserLinks } from "./user-links";
 
 type UserCtxEvents = {
 	imageDownloaded: [];
@@ -17,21 +17,47 @@ type UserCtxEvents = {
 
 export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser {
 
+	// Static
 	public static readonly commonRepo: CachedPersistentArray = commonRepo; // init from local-storage.ts
-
 	public static nowMs: number; // for detecting what Users are stale
 
-	public username: string;
-
-	_track: (x:ImageModel)=>void;
+	// private
+	private _track: (x:ImageModel)=>void;
+	private  _username: string;
 
 	constructor(username: string, track: (x:ImageModel)=>void){
 		super();
-		this.username = username;
+		this._username = username;
 		this._track = track;
 	}
 
-	get isPageOwner(): boolean{ return this.username === pageOwnerName; }
+	public get isPageOwner(): boolean{ return this.username === pageOwnerName; }
+
+	// Data / LocalStorageUserEntity stuff
+	public get username(){ return this._username; }
+	public set username(newName:string){ userRepo.rename(this._username,newName); this._username=newName; }
+	public get viewDateMs(){ return this.data.viewDateMs; }
+	public setViewDateToNow() { this._update( data=> data.setViewDateToNow() ); } // also clears failures
+	public get downloadsInLastYear(){ return this.data.downloadsInLastYear; }
+	public get isDueToScanNewImages(){ return this.data.isDueToScanNewImages; }
+	public get lastDownloadYear(){ return this.data.lastDownloadYear; }
+	public get lastCount(){ return this.data.lastCount; }
+	public get byYear(){ return this.data.byYear; }
+	public get status(){ return this.data.status; }
+	public set status(status: UserStatusType){ 
+		// when we follow someone, assume everything has been viewed.
+		if(status=='following')
+			this.setViewDateToNow();
+		this._update( data => data.status=status);
+	}
+	public get firstFailure(){ return this.data.firstFailure; }
+	public get toFailureString(){ return this.data.toFailureString; }
+	public get group(){ return this.data.group; }
+	public get shouldPrune(){ return this.data.shouldPrune; }
+
+	get isPersisted(){ return userRepo.containsKey(this.username); }
+
+	public cloneLocalStorageEntity(){ return this.data.cloneLocalStorageEntity(); }
 
 	get links(){ 
 		return new UserLinks(
@@ -41,7 +67,6 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 			this._track
 		);
 	}
-	get data(){ return new UserData(this.username,userRepo.get(this.username)); }
 
 	get newImages(){ // uses responsiveUrl as key to prevent duplicates, only need values
 		return Object.values( newImageRepo.get(this.username) )
@@ -61,17 +86,6 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 	}
 	mask(){ UserCtx.commonRepo.add(this.username); console.log(`${this.username} masked!`); }
 
-	get isPersisted(){ return userRepo.containsKey(this.username); }
-
-	// status
-	get status(){ return this.data.status; }
-	set status(status: UserStatusType){ 
-		// when we follow someone, assume everything has been viewed.
-		if(status=='following')
-			this.setViewDateToNow();
-		this._update( data => data.status=status);
-	}
-
 	// Counts
 	logDownloadImage(imgModel:ImageModel){
 		const imageYear = imgModel.imgDate.getFullYear();
@@ -80,9 +94,6 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 	}
 
 	public prune(){ userRepo.remove(this.username);}
-
-	// ui items
-	rename(newName:string){ userRepo.rename(this.username,newName); this.username=newName; }
 
 	get fetch(){ return new Fetcher(this.username, this.isPageOwner, this._track ); }
 
@@ -110,13 +121,11 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 		}
 	}
 
-	public setViewDateToNow() {
-		this._update( data=> data.setViewDateToNow() ); // also clears failures
-	}
-
 	public clearFailure() {
 		this._update( data => data.clearFailure() );
 	}
+
+	private get data(){ return new UserData(this.username,userRepo.get(this.username)); }
 
 	private _update(action:(d:UserData)=>void){
 		return userRepo.update( this.username, 

@@ -1,12 +1,12 @@
 import { by, byDesc, onlyUnique } from "~/lib/sorting";
 import { linkRepo } from "~/vsco/local-storage";
-import { UserCtx } from "~/vsco/user-ctx";
+import { UserCtx } from "~/vsco/user/user-ctx";
 import { pageOwnerName } from "~/vsco/vscoDom";
-import { Fetcher } from "../../fetcher";
-import { executePromisesInParallelAsync } from "../../parallel";
-import type { ILinkedUser } from "../../types/types";
-import { GalleryRowModel } from "../gallery-row-model";
-import { ImageModel } from "../image-model";
+import { Fetcher } from "../fetcher";
+import { GalleryRowModel } from "../models/gallery-row-model";
+import { ImageModel } from "../models/image-model";
+import { executePromisesInParallelAsync } from "../parallel";
+import type { ILinkedUser } from "../types/types";
 
 type GetLinkedUser = (username: string) => ILinkedUser;	
 

@@ -2,7 +2,7 @@ import { by, byDesc } from "~/lib/sorting";
 import { linkRepo, newImageRepo, userRepo } from "./local-storage";
 import { ImageModel } from "./models/image-model";
 import type { UserStatusType } from "./types/types";
-import { UserCtx } from "./user-ctx";
+import { UserCtx } from "./user/user-ctx";
 import { NextLink } from "./views/next-link";
 import { pageOwnerName } from "./vscoDom";
 
@@ -66,7 +66,7 @@ export class UserStore {
 
 	private _getLinkForUserStatus( label:string, status:UserStatusType ): NextLink {
 		const users = this.allUsers
-			.filter(user => user.data.status == status);
+			.filter(user => user.status == status);
 		return new NextLink({
 			label,
 			tooltip: '',
@@ -86,15 +86,15 @@ export class UserStore {
 		const pageOwner = UserStore.pageOwnerName;
 
 		const yearSorter = sortLongestOutageFirst
-			? by<UserCtx,number>(x=>x.data.lastYear)
-			: byDesc<UserCtx,number>(x=>x.data.lastYear);
+			? by<UserCtx,number>(x=>x.lastDownloadYear)
+			: byDesc<UserCtx,number>(x=>x.lastDownloadYear);
 
 		const users = this.allUsers
-			.filter(ctx => ctx.data.status === "following"
-					&& ctx.data.viewDateMs === undefined
-					&& ctx.data.username !== pageOwner
+			.filter(ctx => ctx.status === "following"
+					&& ctx.viewDateMs === undefined
+					&& ctx.username !== pageOwner
 				)
-			.sort(yearSorter.thenBy(x=>x.data.lastCount).thenBy(x=>x.username));
+			.sort(yearSorter.thenBy(x=>x.lastCount).thenBy(x=>x.username));
 		return new NextLink({ label: 'missing view-date', tooltip: 'No view-date recorded.', users });
 	}
 
@@ -111,8 +111,8 @@ export class UserStore {
 	// Helper - exposes users for pruning so we can do them in batch
 	toPruneUsers(): UserCtx[]{
 		return this.allUsers
-			.filter(ctx => ctx.data.shouldPrune)
-			.sort(by<UserCtx,number>(x=>x.data.lastYear).thenBy(x=>x.data.lastCount).thenBy(x=>x.username));
+			.filter(ctx => ctx.shouldPrune)
+			.sort(by<UserCtx,number>(x=>x.lastDownloadYear).thenBy(x=>x.lastCount).thenBy(x=>x.username));
 	}
 
 }

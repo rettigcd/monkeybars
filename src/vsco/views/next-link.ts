@@ -1,6 +1,6 @@
 import { con } from "~/lib/console";
 import { $ } from "~/lib/dom3";
-import { UserCtx } from "../user-ctx";
+import { UserCtx } from "../user/user-ctx";
 import { pageOwnerName } from "../vscoDom";
 
 // since links are generated before we init the user page,

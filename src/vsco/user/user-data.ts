@@ -1,9 +1,9 @@
 import { throwNever } from "~/lib/throw";
 import { DAYS, SECONDS, toMs, YEARS } from "~/lib/time";
-import { formatDate } from "../../format-date";
-import type { LocalStorageUserEntity, StarType } from "../../local-storage";
-import type { UserStatusType } from "../../types/types";
-import { UserCtx } from "../../user-ctx";
+import { formatDate } from "../format-date";
+import type { LocalStorageUserEntity, StarType } from "../local-storage";
+import type { UserStatusType } from "../types/types";
+import { UserCtx } from "./user-ctx";
 
 // Storing times in userRepo as Seconds-since-epoch / Unix time.
 const pageLoadSecondsSinceEpoch = Math.floor(Date.now() / SECONDS +0.5);
@@ -137,20 +137,21 @@ export class UserData {
 		return nextScanTime < UserCtx.nowMs;
 	}
 
-	public get lastYear(): number {
+	// The last year of the most recent downloaded image
+	public get lastDownloadYear(): number {
 		const defaultLastYear = 1980;
 		return (this._info.dl === undefined) ? defaultLastYear 
 			: Math.max(...Object.keys(this._info.dl).map(x=>Number(x))) || defaultLastYear;
 	};
 
 	public get lastCount(): number {
-		return this._info.dl?.[this.lastYear] || 0;
+		return this._info.dl?.[this.lastDownloadYear] || 0;
 	}
 
 	public get shouldPrune(): boolean {
 		return this.status=="following"
 			&& this.viewDateMs !== undefined // was viewed
-			&& this.lastYear<earliestEmptyYear
+			&& this.lastDownloadYear<earliestEmptyYear
 	}
 
 	public get group():string {

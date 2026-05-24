@@ -5,7 +5,7 @@ import { CalendarModel } from "../models/calendar-model";
 import { Gallery } from "../models/gallery-model";
 import { NewImagesModel } from "../models/new-images-model";
 import type { UserStatusType } from "../types/types";
-import { UserCtx } from "../user-ctx";
+import { UserCtx } from "../user/user-ctx";
 import { CalendarView } from "./calendar-view";
 import { GalleryView } from "./gallery-view";
 import { makeScanNewImagesMenu } from "./scan-new-images";
@@ -88,15 +88,19 @@ function makeUserStatusControl(userCtx:UserCtx){
 }
 
 function makeDownloadCountsControl(userCtx:UserCtx){
+	// Create UI
 	const div = $('div').css({padding:"2px",border:"thin solid green"});
+	// UI-update function
 	function updateUi() {
-		const {data} = userCtx;
-		div.txt(`↓ ${data.downloadsInLastYear}`);
-		const byYear = Object.entries(data.byYear).sort(byDesc(x=>x[0])).map(x=>x[0]+':'+x[1]);
-		if( byYear.length > 0)
+		div.txt(`↓ ${userCtx.downloadsInLastYear}`);
+		const byYear = Object.entries(userCtx.byYear)
+			.sort(byDesc(x=>x[0]))
+			.map(x=>x[0]+':'+x[1]);
+		if( 0 < byYear.length)
 			div.attr('title',byYear.join(' '));
 	}
 	updateUi();
 	userCtx.on( 'imageDownloaded', updateUi );
+
 	return div;
 }

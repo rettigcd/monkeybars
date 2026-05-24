@@ -4,8 +4,8 @@ import { type LTProgress, openInTab } from "~/lib/gm";
 import { ObservableBase } from "~/lib/observable";
 import { by, byDesc } from "~/lib/sorting";
 import { executePromisesInParallelAsync } from "../parallel";
-import { UserCtx } from "../user-ctx";
 import { UserStore } from "../user-store";
+import { UserCtx } from "../user/user-ctx";
 import { GalleryRowModel } from "./gallery-row-model";
 import type { TaskStatus } from "./image-model";
 
@@ -40,7 +40,7 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
 	// converts stale users into new-image users
 	public async scanStaleUsersAsync(){
 		const toScan:UserCtx[] = this._staleUsers
-			.sort(by(user=>user.data.viewDateMs))
+			.sort(by(user=>user.viewDateMs))
 			.slice(0,numToScan); // only scan 200 oldest
 		const unexecutedPromiseGenerators = toScan
 			.map(user => async () => {
@@ -68,7 +68,7 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
 
 		// Assigns a slice of the NewImage-Users' images to the gallery.
 		const newRows = this._cachedNewImageUsers
-			.sort(byDesc<UserCtx,number>(user=>user.data.downloadsInLastYear).thenBy(user=>user.username))
+			.sort(byDesc<UserCtx,number>(user=>user.downloadsInLastYear).thenBy(user=>user.username))
 			.slice(0,take)
 			.map( user => this.makeGalleryRowForNewImages(user) );
 		this.scannedNewImages = [...this.scannedNewImages, ...newRows]; // trigger change
@@ -85,13 +85,13 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
 	}
 
 	private refreshStaleUsers(){
-		this._staleUsers = this._userStore.allUsers.filter( user=>user.data.isDueToScanNewImages );
+		this._staleUsers = this._userStore.allUsers.filter( user=>user.isDueToScanNewImages );
 		this.staleUserCount = this._staleUsers.length;
 	}
 
  	private makeGalleryRowForNewImages(user:UserCtx):GalleryRowModel {
  		const rowModel = new GalleryRowModel({
- 			labelText : user.username + ' ' + user.data.downloadsInLastYear,
+ 			labelText : user.username + ' ' + user.downloadsInLastYear,
  			images : user.newImages,
  			actions : { 
  				open: function(){openInTab(user.fetch.galleryUrl);}, // !!! ??? should this move to the UI
