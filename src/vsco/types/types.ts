@@ -5,7 +5,7 @@ export type UserStatusType = "following" | "new" | "queued" | "notFollowing" | "
 export interface ILinkedUser{
 	username: string;
 	status: UserStatusType;
-	open: () => void;
-	save: () => void;
-	mask: () => void;
+	openInNewTab: () => void;
+	markAsQueued: () => void;
+	maskAsCommon: () => void;
 }
