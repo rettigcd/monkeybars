@@ -155,7 +155,7 @@ export class UserCtx {
 		if( visitState === "none" && dlState !== "none" ){
 			const year:string = Object.keys(this._info.dl!).sort().shift()!;
 			const date = new Date(Number(year),0,1);
-			console.log("Setting viewDate to ", year, date.toDateString());
+			console.log(`%cSetting viewDate to ${year} ${date.toDateString()}`, "color:black;background-color:red;font-size:16px");
 			this.setLastVisit(date);
 		}
 	}

@@ -40,7 +40,9 @@ export class UserPage {
 		this.pageOwnerName = pageOwnerName;
 		const pageOwnerCtx = new UserCtx(pageOwnerName);
 
-		pageOwnerCtx.applyDlYear();
+		// BUG: This would be correct if dl indicated we actually visited a page.
+		// However, location pages are incorrectly ++dl so this is not correct until we get that stopped.
+		// pageOwnerCtx.applyDlYear();
 
 		const isTracking = pageOwnerCtx.isTracking;
 		const startingState: Partial<LocalStorageUserEntity> = isTracking
