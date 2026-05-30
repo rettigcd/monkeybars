@@ -1,4 +1,3 @@
-
 FIX:	Unfollowing someone that isn't tracked, starts tracking them with { isFollowing:false }
 FIX:	downloading from Pop-up window doesn't add download to users dl{}
 FIX:	https://www.instagram.com/carlie.nicole/ red & black bikini photo has 2 owners and both get marked with the download.
@@ -13,7 +12,6 @@ IDEA:	use lastUpload or lastGood to seed lastVisit where missing
 IDEA:	have tab text based on new images, not total images when available.
 IDEA:	Button to open 10 tabs of lastViewed/stale people (set a flag so tab knows it was opened as such), if a tab finds no new images, set window timer for 20 seconds to load the next stale, or close window/tab. and show a cancel-timer button.
 IDEA:	When closing a many-image row via 'x', scroll to top so we don't miss small rows that got moved to the top off-screen.
-
 SCRUB:	username, id, fullname, score
 
 CHECK:	If we prune someone, do unflush updates on them bring them back?
