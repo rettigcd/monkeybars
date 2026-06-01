@@ -50,8 +50,9 @@ export class VisitingUserTracker {
 let publicPrivateSpan: HTMLElement | null = null;
 let savedIsPrivate: boolean | undefined;
 
-export function setPublicPrivateLabel(isPrivate:boolean) {
-	if (publicPrivateSpan == null) {
+export function setPublicPrivateLabel(isPrivate?:boolean) {
+	if (publicPrivateSpan === null) {
+		// create the span & attach it to its host.
 		const span = publicPrivateSpan = $("span").el;
 		$qAsync("div._ap3a")
 			.then((div) => div.appendChild(span));

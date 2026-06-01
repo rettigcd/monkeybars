@@ -1,11 +1,18 @@
 import { $, $qAsync } from "~/lib/dom3";
 
+const copyButtonCss = { 
+	margin: "3px", 
+	padding: "2px", 
+	cursor: "pointer", 
+	color: "black"
+};
+
 // Adds a clickable button to copy the page owner's name to clipboard.
 // Used as a quick UI utility for copying usernames.
 export async function addCopyButton(pageOwnerName:string) {
 	const button = $("div")
 		.txt("📋")
-		.css({ margin: "3px", padding: "2px", cursor: "pointer", color: "black" })
+		.css( copyButtonCss )
 		.on("click", async () => {
 			await navigator.clipboard.writeText(pageOwnerName);
 		});

@@ -4,11 +4,14 @@ import { pageOwnerName } from "../services/instaDom";
 import type { StatusGroupTree } from "../status-group-tree";
 import type { UserCtx } from "../user-ctx";
 
+const tdCss = {padding:"0 2px", lineHeight:"16px", fontSize:"12px"};
+const totalCss = {textAlign:"right"};
+const numCss = {textAlign:"right"};
 
 export function makeStatusGroupTable(tree:StatusGroupTree){
-	const $td = () => $('td').css({padding:"0 2px", lineHeight:"16px", fontSize:"12px"});
-	const $total = () => $td().css({textAlign:"right"}).txt('total:');
-	const $num = (num:number) => $td().css({textAlign:"right"}).txt(String(num));
+	const $td = () => $('td').css(tdCss);
+	const $total = () => $td().css(totalCss).txt('total:');
+	const $num = (num:number) => $td().css(numCss).txt(String(num));
 	const $label = (label:string) => $td().txt(label); 
 	const $link = (users:UserCtx[]) => {
 		users = users.filter(x=>x.username != pageOwnerName);
@@ -22,7 +25,7 @@ export function makeStatusGroupTable(tree:StatusGroupTree){
 		users = users.filter(x => x.username != pageOwnerName);
 		return 0 < users.length ? [$label(label), $link(users)] : [];
 	}
-	const visitColor = '#8080F0', dlColor = '#F08080';
+	const visitColor = '#8080F0', dlColor = '#F08080', miscColor = '#80f080';
 	const $titleRow = (label:string,colSpan:number,bgColor:string,total:number) =>
 		$('tr').css({backgroundColor:bgColor}).withChildren( $td().txt(label).attr('colspan',String(colSpan)), $total(), $num(total) );
 	return $('table').css({borderCollapse:"collapse"}).withChildren(
@@ -51,5 +54,6 @@ export function makeStatusGroupTable(tree:StatusGroupTree){
 			$label('producing'), $num(tree.visited.hasDownloads.producing.length),
 			...$linkPair('idle', tree.visited.hasDownloads.idle),
 		),
+		$titleRow(`Following: ${tree.followeeCount} Queued: ${tree.queuedCount}`,4, miscColor, 0),
 	)
 }
