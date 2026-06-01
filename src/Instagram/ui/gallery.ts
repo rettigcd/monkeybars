@@ -1,9 +1,9 @@
 import { $ } from "~/lib/dom3";
+import { getAgeColor, getAgeText, getAgeType, type AgeType } from "../age";
 import { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { PicGroup } from "../models/pic-group";
 import { sanitizeImgUrl } from "../services/image-lookup-by-url";
 import { instaDom } from "../services/instaDom";
-import { timestampToAgeString } from "../services/storage-time";
 
 type GalleryConstructorArgs = {
 	batchProducer: BatchProducerGroup;
@@ -16,6 +16,40 @@ type ThumbRowElement = HTMLElement & {
 
 type ThumbCellElement = HTMLElement & {
 	decorated?: boolean;
+};
+
+const css = {
+	galleryRowLabel : {
+		position: "absolute",
+		bottom: "5px",
+		right: "10px",
+		background: "rgba(0,0,0,0.2)",
+		padding: "2px 10px",
+		color: "white",
+	},
+	galleryShowImageSpan : {
+		position: "absolute",
+		bottom: "0",
+		zIndex: "1000",
+		color: "red",
+		background: "white",
+		border: "thin solid red",
+		borderRadius: "4px",
+		font: "bold 28px Arial",
+		padding: "4px 12px",
+	},
+	getGalleryBadge: function(isNew:boolean,following:boolean,ageType:AgeType){
+		return {
+			...(isNew
+				? { color: "black", background: "yellow" }
+				: { color: "white", background: getAgeColor(ageType) }),
+			...(following
+				? { border: "solid black thick", fontWeight: "900" }
+				: {}),
+			position: "absolute",
+			zIndex: "1000",
+		};
+	}
 };
 
 // Stores PicGroups as they come in via the batch producer.
@@ -91,7 +125,11 @@ export class Gallery {
 	}): void {
 		const { imgEl, picGroup } = args;
 		const { following = false, liked = false, pics } = picGroup;
-		const { ageText, ageColor } = timestampToAgeString(picGroup.dateMs);
+
+		// const { ageColor } = timestampToAgeString(picGroup.dateMs);
+		const ageType = getAgeType(picGroup.dateMs);
+		const ageText = getAgeText(picGroup.dateMs,ageType);
+
 		const isNew = picGroup.isNew ?? false;
 
 		picGroup.thumbUrl = imgEl.src;
@@ -102,9 +140,8 @@ export class Gallery {
 
 		const a = this.sanitizeImgUrl(imgEl.src);
 		const b = this.sanitizeImgUrl(firstPic.smallestUrl);
-		if (a !== b) {
+		if (a !== b)
 			console.warn("Group urls do not match", a, b);
-		}
 
 		const host = imgEl.parentElement;
 		if (host == null)
@@ -114,7 +151,7 @@ export class Gallery {
 
 		this.buildAgeBadge({
 			ageText,
-			ageColor,
+			ageType,
 			liked,
 			isNew,
 			following,
@@ -132,29 +169,22 @@ export class Gallery {
 	private buildRowRangeLabel(rowIndex: number) {
 		return $("div")
 			.txt(`${rowIndex * 3 + 1}-${rowIndex * 3 + 3}`)
-			.css({
-				position: "absolute",
-				bottom: "5px",
-				right: "10px",
-				background: "rgba(0,0,0,0.2)",
-				padding: "2px 10px",
-				color: "white",
-			});
+			.css(css.galleryRowLabel);
 	}
 
 	private buildAgeBadge(args: {
 		ageText: string;
-		ageColor: string;
 		liked: boolean;
 		isNew: boolean;
 		following: boolean;
+		ageType: AgeType;
 	}) {
 		const {
 			ageText,
-			ageColor,
 			liked,
 			isNew,
 			following,
+			ageType
 		} = args;
 
 		let txt = `Age: ${ageText}`;
@@ -163,18 +193,7 @@ export class Gallery {
 		if (isNew)
 			txt += " NEW! ";
 
-		return $("span")
-			.txt(txt)
-			.css({
-				...(isNew
-					? { color: "black", background: "yellow" }
-					: { color: "white", background: ageColor }),
-				...(following
-					? { border: "solid black thick", fontWeight: "900" }
-					: {}),
-				position: "absolute",
-				zIndex: "1000",
-			});
+		return $("span").txt(txt).css(css.getGalleryBadge(isNew, following, ageType));
 	}
 
 	private buildMultiImageOverlay(args: {
@@ -186,17 +205,7 @@ export class Gallery {
 
 		const showImagesSpan = $("span")
 			.txt(`+ ${pics.length - 1}`)
-			.css({
-				position: "absolute",
-				bottom: "0",
-				zIndex: "1000",
-				color: "red",
-				background: "white",
-				border: "thin solid red",
-				borderRadius: "4px",
-				font: "bold 28px Arial",
-				padding: "4px 12px",
-			})
+			.css(css.galleryShowImageSpan)
 			.on("click", (event: Event) => {
 				event.stopPropagation();
 				event.preventDefault();

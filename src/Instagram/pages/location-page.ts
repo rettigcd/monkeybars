@@ -2,6 +2,7 @@ import { SyncedPersistentDict } from "~/lib/storage";
 
 import { HotkeyManager } from "../../lib/hotkey-manager";
 import { type SnlWindow } from "../../snl/window";
+import { loadTimeMs, reportLast } from "../age";
 import { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { InitialLocationPageParser } from "../extractors/location/initial-location-page-parser";
 import { LocationContent } from "../extractors/location/location-content";
@@ -9,7 +10,6 @@ import { DetailsPopup } from "../extractors/misc/details-popup";
 import type { LocalStorageLocationEntity } from "../local-storage";
 import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { buildRequestSnooper } from "../services/snoopBuilder";
-import { loadTimeMs, reportLast } from "../services/storage-time";
 import { UserUpdateService } from "../trackers/user-update-service";
 import { Gallery } from "../ui/gallery";
 import { SidePanel } from "../ui/side-panel";

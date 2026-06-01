@@ -1,13 +1,13 @@
-import { $, $qAsync } from "~/lib/dom3";
+import { $ } from "~/lib/dom3";
 
 import { HotkeyManager } from "../../lib/hotkey-manager";
 import type { SnlWindow } from "../../snl/window";
+import { reportLast } from "../age";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
 import { userRepo, type LocalStorageUserEntity } from "../local-storage";
 import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { instaDom, pageOwnerName } from "../services/instaDom";
 import { buildRequestSnooper } from "../services/snoopBuilder";
-import { reportLast } from "../services/storage-time";
 import { makeStatusGroupTree } from "../status-group-tree";
 import { scheduleSetTabTitle } from "../tab-text";
 import { FollowingScrollerTracker } from "../trackers/following-scroller-tracker";
@@ -27,27 +27,46 @@ type ConstructorArgs = {
 	hotkeys: HotkeyManager
 };
 
+const badgeCss = {
+	margin: "3px",
+	padding: "2px 6px",
+	color: "white",
+	background: "#446",
+	borderRadius: "4px",
+	fontSize: "12px",
+	display: "inline-block",
+};
+
+const nextLinkHostCss = {
+	position: "fixed",
+	top: "0",
+	right: "0",
+	background: "#ddf",
+	padding: "5px",
+};
+
+
 export class UserPage {
-	private ctx: any;
+	private cmd: any;
 	private pageOwnerName: string;
+	private pageOwnerCtx: UserCtx;
+	private readonly startingState: Partial<LocalStorageUserEntity>;
+
 
 	public constructor({ win, hotkeys }: ConstructorArgs) {
 
 		const snooper = buildRequestSnooper( win );
 
-		// const { pageOwnerName, isTracking, startingState } = this.captureStartingState();
 		// capture starting state
 		this.pageOwnerName = pageOwnerName;
-		const pageOwnerCtx = new UserCtx(pageOwnerName);
+		const pageOwnerCtx = this.pageOwnerCtx = new UserCtx(pageOwnerName);
 
 		// BUG: This would be correct if dl indicated we actually visited a page.
 		// However, location pages are incorrectly ++dl so this is not correct until we get that stopped.
 		// pageOwnerCtx.applyDlYear();
 
 		const isTracking = pageOwnerCtx.isTracking;
-		const startingState: Partial<LocalStorageUserEntity> = isTracking
-			? pageOwnerCtx.cloneLocalStorage()
-			: {};
+		this.startingState = isTracking ? pageOwnerCtx.cloneLocalStorage() : {};
 		this.pageOwnerName = pageOwnerName;
 
 		// --- trackers ---
@@ -60,7 +79,7 @@ export class UserPage {
 			);
 
 		// --- batch ---
-		const batchProducer = buildBatchProducerGroup_ForUser(snooper,startingState.lastVisit);
+		const batchProducer = buildBatchProducerGroup_ForUser(snooper,this.startingState.lastVisit);
 
 		new UserUpdateService({batchProducer});
 
@@ -75,7 +94,7 @@ export class UserPage {
 		window.addEventListener("load", () => this.onWindowLoad() ); // more UI init
 
 		// --- global ctx ---
-		this.ctx = win.cmd = {
+		this.cmd = win.cmd = {
 			snoopLog: snooper._loadLog,
 			userRepo,
 			iiLookup,
@@ -84,17 +103,17 @@ export class UserPage {
 			pageOwnerCtx,
 			gallery,
 			sidePanel,
-			startingState,
+			startingState:this.startingState,
 			group: makeStatusGroupTree
 		};
 
 		if (isTracking)
-			this.initTrackedUser({ pageOwnerName, startingState });
+			this.initTrackedUser();
 		else
 			this.initUntrackedUser();
 
-		this.logStartingState(startingState);
-		reportLast(startingState.lastVisit, "Visit");
+		this.logStartingState();
+		reportLast(this.startingState.lastVisit, "Visit");
 
 	}
 
@@ -116,74 +135,49 @@ export class UserPage {
 	private onWindowLoad() {
 		this.showNextLinks();
 		scheduleSetTabTitle();
-		this.addDownloadCountBadge();
 		addCopyButton(this.pageOwnerName);
-	}
-
-	private addDownloadCountBadge() {
-		const count = new UserCtx(this.pageOwnerName).downloadsInLastYear;
-
-		if (count <= 0)
-			return;
-
-		$qAsync("h2").then((h2El) => {
-			const badge = $("div")
-				.txt(`↓ ${count} last year`)
-				.css({
-					margin: "3px",
-					padding: "2px 6px",
-					color: "white",
-					background: "#446",
-					borderRadius: "4px",
-					fontSize: "12px",
-					display: "inline-block",
-				});
-
-			const ref = h2El.parentNode;
-			ref?.parentNode?.insertBefore(badge.el, ref.nextSibling);
-		});
 	}
 
 	private showNextLinks() {
 
-		const host = $("div")
-			.css({
-				position: "fixed",
-				top: "0",
-				right: "0",
-				background: "#ddf",
-				padding: "5px",
-			})
+		$("div").css(nextLinkHostCss)
+			.withChildren(
+				makeStatusGroupTable(makeStatusGroupTree()),
+				this.makeStatusDiv(),
+				this.pageOwnerCtx.isTracking ? $('button').on('click',(e)=>{ 
+					if(!confirm("Pruning current user.")) return;
+					this.pageOwnerCtx.prune(); 
+					(e.currentTarget as HTMLButtonElement)?.remove();
+				} ).txt("prune") : null
+			)
 			.appendTo(instaDom.body);
 
-		// NEW
-		const tree = makeStatusGroupTree();
-		const table = makeStatusGroupTable(tree);
-		table.appendTo(host.el);
-
-		// OLD
-		// const allUsers = UserCtx.allUsers();
-		// NextLink.forFirstUser("stale downloaded", allUsers.filter(x=>x.totalDownloads && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
-		// NextLink.forFirstUser("stale followed", allUsers.filter(x=>x.isFollowing && x.isStale).sort(by<UserCtx,number>(x=>x.refreshTime)), '').appendTo(host.el);
 	}
 
-	private logStartingState(startingState: Partial<LocalStorageUserEntity>) {
-		console.log(JSON.stringify(startingState, null, "\t"));
+	private makeStatusDiv(){
+		const {lastVisit} = this.startingState;
+		return $('div').css({fontSize:"12px", backgroundColor:"#C0C0C0"}).withChildren(
+			$('span').txt((lastVisit !== undefined && 0 < lastVisit) ? `Last Visit: ${new Date(lastVisit).toDateString()}` : "Last Visit: none" ).css({color:"#800000",padding:"5px"}),
+			$('span').txt(`DL:${this.pageOwnerCtx.downloadsInLastYear}` ).css({color:"blue",padding:"5px"}),
+		)
 	}
 
-	private initTrackedUser({ pageOwnerName, startingState }: any) {
-		const { ctx } = this;
+	private logStartingState() {
+		console.log(JSON.stringify(this.startingState, null, "\t"));
+	}
 
-		new UserCtx(pageOwnerName).recordVisit();
-		setPublicPrivateLabel(startingState.isPrivate);
+	private initTrackedUser() {
+		const { cmd } = this;
 
-		ctx.stop = () => ctx.old = new UserCtx(pageOwnerName).prune();
+		this.pageOwnerCtx.recordVisit();
+		setPublicPrivateLabel(this.startingState.isPrivate);
+		cmd.stop = () => cmd.old = new UserCtx(pageOwnerName).prune();
 	}
 
 	private initUntrackedUser() {
-		const { ctx } = this;
+		const { cmd } = this;
 
-		ctx.stop = () => {
+		cmd.stop = () => {
 			console.log("Tracking was previously stopped.");
 		};
 	}

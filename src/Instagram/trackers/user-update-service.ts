@@ -1,16 +1,18 @@
 import { type ObservableListener } from "~/lib/observable";
+import { loadTimeMs } from "../age";
 import type { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { PicGroup } from "../models/pic-group";
 import { SingleImage } from "../models/single-image";
 import { pageOwnerName } from "../services/instaDom";
-import { loadTimeMs } from "../services/storage-time";
 import { UserCtx } from "../user-ctx";
 
 type UserUpdateServiceConstructor = {
 	batchProducer: BatchProducerGroup;
 }
 
-// Monitors Batches as they come in and updates User data
+// Monitors Batches as they come in:
+// -> attaches a downloadProgress monitor to each image
+// -> calls .recordDownload(date) on user for each image downloaded.
 export class UserUpdateService {
 
 	pageOwner: string;

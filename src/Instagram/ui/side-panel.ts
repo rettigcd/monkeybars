@@ -41,8 +41,9 @@ export class SidePanel {
 		background: "#66C",
 		padding: "5px",
 		marginRight: "120px",
-		width: "350px",
+		width: "350px", // start covering things.
 	};
+	private readonly containerCollapsedWidth = "100px"; // let user toggle it narrower to see what is behind stuff
 
 	private readonly headerCss: Css = {
 		marginBottom: "8px",
@@ -85,7 +86,6 @@ export class SidePanel {
 	};
 
 	private readonly newImageSize = 300;
-	private readonly containerCollapsedWidth = "350px";
 	private readonly elementId = "sidePanel";
 
 	private readonly pageOwner?: string;

@@ -1,9 +1,9 @@
 import type { ValueUpdater } from "~/lib/storage";
 import { DAYS, MONTHS } from "~/lib/time";
+import { loadTimeMs } from "./age";
 import { userRepo, type LocalStorageUserEntity } from "./local-storage";
 import { calcDownloadsInLastYear, getTotalDownloads } from "./services/download-stats";
 import { pageOwnerName } from "./services/instaDom";
-import { loadTimeMs } from "./services/storage-time";
 
 // All of the types required to build UserStatus
 export type HasVisitState = "recent" | "stale";
@@ -43,17 +43,24 @@ export class UserCtx {
 	// Downloads
 	// ----------
 	public recordDownload(date:Date){
+		// we only record downloads on user's own page.
+		// this is because we want to ensure lastVisit covers all downloads.
+		if (this.username !== pageOwnerName)
+			return;
+
 		const year = date.getFullYear();
 		this._update( u => {
 			u.dl ??= {};
 			u.dl[year] = (u.dl[year] || 0) + 1;
 
-			// if we weren't tracking them before, we wouldn't have set lastVisit
-			// but since we downloaded, set it now 
-			if (this.username === pageOwnerName && (u.lastVisit || 0) < loadTimeMs)
+			// I don't think this part ever fires because we only ++downloads on user's own page and lastVisit should already be set.
+			if ((u.lastVisit || 0) < loadTimeMs){
+				console.log('%setting lastVisit due to download',"color:yellow;background-color:blue;");
 				u.lastVisit = loadTimeMs;
+			}
 		});
 	}
+
 
 	public get downloadsInLastYear(){
 		return calcDownloadsInLastYear(this._info);
@@ -77,9 +84,8 @@ export class UserCtx {
 	// -------------------
 	// Is: private / following 
 	// -------------------
-	public set isFollowing(newValue:boolean){
-		this._update( x => x.isFollowing = newValue);
-	}
+	public set isFollowing(newValue:boolean){ this._update( x => x.isFollowing = newValue); }
+	public get isFollowing(){ return this._info.isFollowing === true; }
 	public set isPrivate(newValue:boolean){
 		this._update( x => x.isPrivate = newValue );
 	}

@@ -28,6 +28,8 @@ export type StatusGroupTree = {
 			},
 		}
 	}
+	followeeCount: number;
+	queuedCount: number;
 };
 
 
@@ -74,6 +76,8 @@ export function makeStatusGroupTree(): StatusGroupTree {
 					nothing:(notDownloadedHas.nothing||[]).map(x=>x[0]),
 				},
 			}
-		}
+		},
+		followeeCount: pairs.filter(x=>x[0].isFollowing).length,
+		queuedCount: (localStorage.getItem("newOwners")||"").split("\r\n").length
 	};
 }

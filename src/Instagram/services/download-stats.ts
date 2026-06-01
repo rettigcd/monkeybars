@@ -1,6 +1,6 @@
 import { DAYS } from "~/lib/time";
+import { loadTimeMs } from "../age";
 import { type LocalStorageUserEntity } from "../local-storage";
-import { loadTimeMs } from "./storage-time";
 
 const now = new Date();
 const thisYear = now.getFullYear();

@@ -11,6 +11,12 @@ type UserLike = {
 	username?: string | null;
 };
 
+const nextLinkCss = {
+	textDecoration: "underline",
+	cursor: "pointer",
+	fontSize: "12px",
+};
+
 export class NextLink {
 	public readonly label: string;
 	public readonly nextUrl?: string;
@@ -41,11 +47,7 @@ export class NextLink {
 
 		$("div")
 			.txt(`${label}: ${count}`)
-			.css({
-				textDecoration: "underline",
-				cursor: "pointer",
-				fontSize: "12px",
-			})
+			.css(nextLinkCss)
 			.on("click", () => {
 				window.location.href = nextUrl;
 			})
