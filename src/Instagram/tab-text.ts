@@ -32,7 +32,7 @@ function getGoodTitleAsync(timeoutAfter = 10000): Promise<string> {
 			const title = document.title;
 			titleLog.push(title);
 
-			if (title !== "" && title !== "Instagram")
+			if (title !== "" && !title.includes("Instagram"))
 				logAndResolve(title);
 			else if (timeoutAt <= Date.now()){
 				console.debug({titleLog});

@@ -35,6 +35,9 @@ export function getAgeText(timestamp:number, ageType:AgeType) {
 	return `${num} ${label}${s}`;
 }
 
+export type GetAgeTextFn = typeof getAgeText;
+
+
 // Logs the last visit time with a formatted age string and color coding.
 // Used for debugging or displaying recency information in logs.
 export function reportLast(lastVisitMs:number|undefined, label:string) {

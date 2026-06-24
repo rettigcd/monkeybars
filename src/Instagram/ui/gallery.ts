@@ -1,5 +1,5 @@
 import { $ } from "~/lib/dom3";
-import { getAgeColor, getAgeText, getAgeType, type AgeType } from "../age";
+import { getAgeColor, getAgeType, getAgeText as StdGetAgeText, type AgeType, type GetAgeTextFn } from "../age";
 import { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { PicGroup } from "../models/pic-group";
 import { sanitizeImgUrl } from "../services/image-lookup-by-url";
@@ -7,6 +7,7 @@ import { instaDom } from "../services/instaDom";
 
 type GalleryConstructorArgs = {
 	batchProducer: BatchProducerGroup;
+	getAgeText?: GetAgeTextFn;
 };
 
 
@@ -57,12 +58,15 @@ const css = {
 export class Gallery {
 	private readonly lookup: Record<string, PicGroup>;
 	private readonly sanitizeImgUrl: (url: string) => string;
+	private readonly ageTextFormatter: GetAgeTextFn;
 
 	public constructor({
 		batchProducer,
+		getAgeText
 	}: GalleryConstructorArgs) {
 		this.lookup = {};
 		this.sanitizeImgUrl = sanitizeImgUrl;
+		this.ageTextFormatter = getAgeText ?? StdGetAgeText;
 
 		this.startWatchingThumbs();
 		batchProducer.on("batchReceived", (batch) => this.storeBatch(batch));
@@ -127,8 +131,8 @@ export class Gallery {
 		const { following = false, liked = false, pics } = picGroup;
 
 		// const { ageColor } = timestampToAgeString(picGroup.dateMs);
-		const ageType = getAgeType(picGroup.dateMs);
-		const ageText = getAgeText(picGroup.dateMs,ageType);
+		const ageType:AgeType = getAgeType(picGroup.dateMs);
+		const ageText:string  = this.ageTextFormatter(picGroup.dateMs,ageType);
 
 		const isNew = picGroup.isNew ?? false;
 
