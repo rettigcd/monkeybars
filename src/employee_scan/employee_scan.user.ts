@@ -1,14 +1,13 @@
 // ==UserScript==
-// @name         Instagram 4
+// @name         Employees Phone List
 // @namespace    http://tampermonkey.net/
-// @version      4
-// @description  Make individual Instagram images more accessible.
+// @version      1
+// @description  Tracks Employee info
 // @author       Dean Rettig
 // @run-at       document-start
-// @require      file://C:/[monkeyBarsFolder]/employee_Scan.user.js
-// @match        https://www.instagram.com/*
-// @exclude      https://www.instagram.com/p/*/
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=instagram.com
+// @require      file://C:/[monkeybars]/employee_scan.user.js
+// @match        https://intranetapps.tql.com/extensionlist/
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=tql.com
 // @grant        GM_download
 // @grant        GM_openInTab
 // @grant        unsafeWindow
@@ -37,6 +36,8 @@ declare global {
 	var activeIvyIds: number[];
 	var ids: any; // I'm to lazy to type these.
 }
+
+declare const unsafeWindow: Window;
 
 globalThis.ids = ids;
 
@@ -89,6 +90,12 @@ void (async function (): Promise<void> {
 	globalThis.showEmployeesByIdAsync = showEmployeesByIdAsync;
 	globalThis.saveEmployees = saveEmployees;
 	globalThis.groups = groupBy<Employee,string>(Object.values(globalThis.employeeData),x=>x.dept);
+
+	(unsafeWindow as any).cmd = {
+		scanEmployeesAsync,
+		showEmployeesByIdAsync,
+		saveEmployees
+	};
 
 	function foo(str: string): void {
 		queueMicrotask(console.log.bind(console, `%c${str}`, "color:#00c;font-style:italic;font-weight:800;"));
