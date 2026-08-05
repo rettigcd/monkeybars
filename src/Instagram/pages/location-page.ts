@@ -1,3 +1,4 @@
+import { $ } from "~/lib/dom3";
 import { SyncedPersistentDict } from "~/lib/storage";
 
 import { DAYS } from "~/lib/time";
@@ -10,10 +11,21 @@ import { LocationContent } from "../extractors/location/location-content";
 import { DetailsPopup } from "../extractors/misc/details-popup";
 import type { LocalStorageLocationEntity } from "../local-storage";
 import { ImageLookupByUrl } from "../services/image-lookup-by-url";
+import { instaDom } from "../services/instaDom";
 import { buildRequestSnooper } from "../services/snoopBuilder";
 import { UserUpdateService } from "../trackers/user-update-service";
 import { Gallery } from "../ui/gallery";
+import { makeLocationTable } from "../ui/location-table";
 import { SidePanel } from "../ui/side-panel";
+
+const locationTableHostCss = {
+	position: "fixed",
+	top: "0",
+	right: "0",
+	background: "#ddf",
+	padding: "5px",
+	zIndex: "1000",
+};
 
 type LocationPageConstructor = {
 	win: SnlWindow;
@@ -88,6 +100,12 @@ export class LocationPage {
 		};
 
 		win.cmd = cmd;
+
+		window.addEventListener("load", () => {
+			$("div").css(locationTableHostCss)
+				.withChildren(makeLocationTable(locRepo))
+				.appendTo(instaDom.body);
+		});
 
 		if (isTracking) {
 			locRepo.update(locationKey, (x) => {
