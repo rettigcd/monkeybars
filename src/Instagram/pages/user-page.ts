@@ -27,16 +27,6 @@ type ConstructorArgs = {
 	hotkeys: HotkeyManager
 };
 
-const badgeCss = {
-	margin: "3px",
-	padding: "2px 6px",
-	color: "white",
-	background: "#446",
-	borderRadius: "4px",
-	fontSize: "12px",
-	display: "inline-block",
-};
-
 const nextLinkHostCss = {
 	position: "fixed",
 	top: "0",
