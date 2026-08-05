@@ -1,12 +1,12 @@
-https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/choose - SNL
+https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF - SNL
 https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27688 - dress
 https://bookings-us.qudini.com/booking-widget/events/B9KIOO7ZIQF#/event/27689 - live
 
 Find test case by googling "https://bookings-us.qudini.com/booking-widget/events" with the quotes
-https://bookings-us.qudini.com/booking-widget/events/DBY5E5JLLXG#/event/choose  - Hotwheels
-https://bookings-us.qudini.com/booking-widget/events/6CO60SDFVYO#/event/choose  - Thanksgiving Apps and sides
-https://bookings-us.qudini.com/booking-widget/events/UZJLSRJUNZC/event/choose   - cafe classic
-https://bookings-us.qudini.com/booking-widget/events/2HYM77D8NYO/event/choose   - how to design cozy holiday bed
+https://bookings-us.qudini.com/booking-widget/events/DBY5E5JLLXG  - Hotwheels / Story time
+https://bookings-us.qudini.com/booking-widget/events/6CO60SDFVYO  - Cafe - Thanksgiving Apps and sides
+https://bookings-us.qudini.com/booking-widget/events/UZJLSRJUNZC  - Cafe - cafe classic
+https://bookings-us.qudini.com/booking-widget/events/2HYM77D8NYO  - how to design cozy holiday bed
 
 Current time and Computers offset can be found: https://www.time.gov/
 
