@@ -53,9 +53,10 @@ export class UserCtx {
 			u.dl ??= {};
 			u.dl[year] = (u.dl[year] || 0) + 1;
 
-			// I don't think this part ever fires because we only ++downloads on user's own page and lastVisit should already be set.
+			// I saw this fire on Places page when downloading an image. 
+			// ??? Is this still correct?
 			if ((u.lastVisit || 0) < loadTimeMs){
-				console.log('%setting lastVisit due to download',"color:yellow;background-color:blue;");
+				console.log('%csetting lastVisit due to download',"color:yellow;background-color:blue;");
 				u.lastVisit = loadTimeMs;
 			}
 		});

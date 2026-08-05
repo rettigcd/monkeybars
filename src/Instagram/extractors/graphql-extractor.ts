@@ -19,10 +19,8 @@ export abstract class GraphQLContentExtractor<TData> extends BasePicExtractor {
 	}
 
 	findMediaArray(json: { data?: TData; errors?: unknown[] }): MediaNode[] {
-		if (Array.isArray(json.errors) && json.errors.length > 0) {
+		if (Array.isArray(json.errors) && 0 < json.errors.length)
 			console.log("Query error", json);
-			return [];
-		}
 
 		const root = json.data?.[this.rootProp] as { edges?: Edge[] } | undefined;
 		const edges = root?.edges;

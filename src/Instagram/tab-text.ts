@@ -7,7 +7,8 @@ export function scheduleSetTabTitle(): void {
 	]).then(([title, count]) => {
 		let runs = 7;
 		function updateTitle(){
-			document.title = `${getImageCountGroup(count)} ${title}`;
+			// document.title = `${getImageCountGroup(count)} ${title}`;
+			document.title = `${count} ${title}`;
 			if(--runs === 0) clearInterval(id);
 		}
 		updateTitle();
@@ -52,7 +53,7 @@ function getImageCountAsync( timeoutAfter = 2000 ): Promise<number|undefined> {
 		const intervalId = window.setInterval(() => {
 			const imageCountSpan = instaDom.imageCountSpan;
 			if (imageCountSpan != null){
-				resolve(Number(imageCountSpan.innerText));
+				resolve(Number( imageCountSpan.innerText.trim().replaceAll(",","")));
 				window.clearInterval(intervalId);
 				return;
 			}
