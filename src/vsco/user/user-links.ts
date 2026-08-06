@@ -32,7 +32,7 @@ export class UserLinks {
 	}
 
 	// returns array of linked user names, using cache if possible
-	cached(): Promise<string[]>{
+	private cached(): Promise<string[]>{
 		return linkRepo.containsKey(this.username)  // in cache?
 			? Promise.resolve( linkRepo.get(this.username) ) // use cache
 			: this._scanAndSaveToCache();  // else scan
@@ -60,9 +60,9 @@ export class UserLinks {
 			labelText:user.username,
 			images:images,
 			actions:{
-				open: ()=>user.open(),
-				save: ()=>user.save(),
-				X:    ()=>user.mask(),
+				open: ()=>user.openInNewTab(),
+				save: ()=>user.markAsQueued(),
+				X:    ()=>user.maskAsCommon(),
 			}
 		});
 	}

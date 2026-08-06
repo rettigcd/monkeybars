@@ -45,7 +45,9 @@ export function makeStatusGroupTree(): StatusGroupTree {
 	const hasDownloads = [...(byDownloads.producing||[]), ...(byDownloads.idle||[])] as Array<[UserCtx,Visited_WithDownloads]>;
 	const notDownloads = (byDownloads.none || []) as Array<[UserCtx,Visited_SansDownloads]>;
 	const notDownloadedHas = groupBy<[UserCtx,Visited_SansDownloads],"followee" | "nothing">(notDownloads,([,status])=>status.has);
-	// const downloads = get from byDownloads...
+	// !!! TODO: add simple Following / Not Following counts
+	// !!! TODO: add queued/saved-for-later counts
+
 	return {
 		total: pairs.length,
 		notVisited: {
