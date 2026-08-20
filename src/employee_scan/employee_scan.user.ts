@@ -19,7 +19,7 @@ import { throwExp } from "~/lib/throw";
 import { type Employee, type EmployeeDirectory, getEmployeeDictAsync } from "./data-source";
 import { ids } from "./ids";
 import { store } from "./store";
-import { appendEmployeeAsync, clearEmployees } from "./ui";
+import { appendEmployeeAsync, clearEmployees, renderEmployeeTable, renderTerminatedTable } from "./ui";
 
 
 declare global {
@@ -27,6 +27,8 @@ declare global {
 	var scanEmployeesAsync: (start: number, count?: number) => Promise<void>;
 	var showEmployeesByIdAsync: (ids?: number[] | null) => Promise<void>;
 	var saveEmployees: (ids:number[]) => void;
+	var table: () => void;
+	var updateTerms: () => void;
 	var groups: any;
 
 	var ivy2f3_marketing: number[];
@@ -80,6 +82,30 @@ function saveEmployees(ids:number[]){
 	}
 }
 
+// Renders a table of all employees saved to localStorage.
+function table(): void {
+	renderEmployeeTable(store.employees);
+}
+
+// Checks saved employees against the current data-source; any newly-terminated
+// employees are updated in localStorage and listed in a "terminated" table.
+function updateTerms(): void {
+	const dir = employeeDirectory();
+	const terminated: Employee[] = [];
+
+	for (const saved of store.employees) {
+		const current = dir[saved.employeeId];
+		if (current?.statusCode !== "TERM") continue;
+
+		const updated: Employee = { ...saved, statusCode: "TERM", lastWorkDate: current.lastWorkDate };
+		store.saveEmployee(updated);
+		terminated.push(updated);
+	}
+
+	renderTerminatedTable(terminated);
+	console.log(`updateTerms: ${terminated.length} employee(s) newly marked terminated.`);
+}
+
 //=============================
 //====  Employee-Specific  ====
 //=============================
@@ -89,12 +115,16 @@ void (async function (): Promise<void> {
 	globalThis.scanEmployeesAsync = scanEmployeesAsync;
 	globalThis.showEmployeesByIdAsync = showEmployeesByIdAsync;
 	globalThis.saveEmployees = saveEmployees;
+	globalThis.table = table;
+	globalThis.updateTerms = updateTerms;
 	globalThis.groups = groupBy<Employee,string>(Object.values(globalThis.employeeData),x=>x.dept);
 
 	(unsafeWindow as any).cmd = {
 		scanEmployeesAsync,
 		showEmployeesByIdAsync,
-		saveEmployees
+		saveEmployees,
+		table,
+		updateTerms
 	};
 
 	function foo(str: string): void {
@@ -106,9 +136,13 @@ void (async function (): Promise<void> {
 	foo("scanEmployeesAsync(start,count=100);");
 	foo("showEmployeesByIdAsync(ids=null);");
 	foo("saveEmployees([...])");
+	foo("table()");
+	foo("cmd.updateTerms()");
 
 	const lastEmployee = Object.values(globalThis.employeeData).pop();
 	foo(`Last employee: ${lastEmployee?.employeeId ?? "?"}, Last scanned:${store.maxEmployeeId}`);
+
+	console.log(`Active employees saved: ${store.activeEmployeeCount}`);
 
 	queueMicrotask(console.log.bind(console, "%cemployee_scan.ts initialized", "background-color:#DFD")); // Last line of file
 })();

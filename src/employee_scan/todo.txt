@@ -1,3 +1,8 @@
+Add a cmd function called table()
+- it generetes a UI table that contains columns for all of the employee properties that we save.
+- it has 1 row for each employee saved to localStorage
+- it has a show-pic column that starts with the text: "show pic".  If the user clicks on it, it loads the image associated with employee ID and replaces the text.
+
 When we load
 	scan data-source for employees that are missing OR have been marked terminated 
 	mark them terminated
@@ -5,8 +10,7 @@ When we load
 	??? log in console their info?
 	??? move them to a terminated repo and out of the current repo
 
-When we load
-	display peopled hired since last time.
+Add a function to cmd called showNew() that displays peopled hired since last time.
 
 Reports
 	Departments & numbers

@@ -1,7 +1,7 @@
-import { $, $qAll, ElementBuilder, loadImgSrcAsync } from "~/lib/dom3";
+import { $, $q, $qAll, ElementBuilder, loadImgSrcAsync } from "~/lib/dom3";
 import { type Employee } from "./data-source";
 import { downloadImageAsync } from "./download";
-import { store } from "./store";
+import { savedEmployeeFields, store } from "./store";
 
 
 export function clearEmployees(): void {
@@ -66,4 +66,97 @@ function buildEmployeeCard(employeeId:number, emp?: Employee): {
 	}
 
 	return { div, img };
+}
+
+//=============================
+//====      Table          ====
+//=============================
+
+const thCss: Partial<CSSStyleDeclaration> = {
+	border: "thin solid gray",
+	padding: "2px 6px",
+	textAlign: "left",
+	background: "#eee",
+};
+
+const tdCss: Partial<CSSStyleDeclaration> = {
+	border: "thin solid gray",
+	padding: "2px 6px",
+};
+
+export function renderEmployeeTable(employees: Employee[]): void {
+	renderTable("employeeTable", null, employees, savedEmployeeFields);
+}
+
+export function renderTerminatedTable(employees: Employee[]): void {
+	renderTable("terminatedTable", "terminated", employees, terminatedTableFields);
+}
+
+const terminatedTableFields = ["firstName", "lastName", "employeeId", "location", "startDate", "lastWorkDate"] as const satisfies readonly (keyof Employee)[];
+
+function renderTable(id: string, title: string | null, employees: Employee[], fields: readonly (keyof Employee)[]): void {
+	$q(`#${id}`)?.remove();
+
+	const headerCells = [
+		...fields.map(field => $("th").txt(field).css(thCss)),
+		$("th").txt("show-pic").css(thCss),
+	];
+
+	const tbody = $("tbody").withChildren(...sortEmployees(employees).map(emp => buildEmployeeRow(emp, fields)));
+
+	const table = $("table")
+		.css({ borderCollapse: "collapse", fontSize: "0.75rem" })
+		.withChildren(
+			$("thead").withChildren($("tr").withChildren(...headerCells)),
+			tbody
+		);
+
+	const container = $("div").attr("id", id);
+	if (title) container.withChildren($("h2").txt(title));
+	container.withChildren(table).appendTo(document.body);
+}
+
+// TERM employees sort to the bottom; within each group, sort by employeeId.
+function sortEmployees(employees: Employee[]): Employee[] {
+	return [...employees].sort((a, b) => {
+		const termDiff = Number(a.statusCode === "TERM") - Number(b.statusCode === "TERM");
+		if (termDiff !== 0) return termDiff;
+		return Number(a.employeeId) - Number(b.employeeId);
+	});
+}
+
+const noLastWorkDate = "1900-01-01T00:00:00";
+
+function buildEmployeeRow(emp: Employee, fields: readonly (keyof Employee)[]): ElementBuilder<HTMLTableRowElement> {
+	const dataCells = fields.map(field => $("td").txt(formatCell(field, emp[field])).css(tdCss));
+	return $("tr").withChildren(...dataCells, buildShowPicCell(emp.employeeId));
+}
+
+const dateFields: readonly (keyof Employee)[] = ["startDate", "lastWorkDate"];
+
+function formatCell(field: keyof Employee, value: unknown): string {
+	if (field === "lastWorkDate" && value === noLastWorkDate) return "";
+	if (value == null) return "";
+	return dateFields.includes(field) ? String(value).slice(0, 10) : String(value);
+}
+
+function buildShowPicCell(employeeId: string): ElementBuilder<HTMLTableCellElement> {
+	const cell = $("td").css(tdCss);
+	const link = $("a")
+		.attr("href", "#")
+		.txt("show pic")
+		.css({ cursor: "pointer" });
+
+	link.on("click", async (e) => {
+		e.preventDefault();
+		const img = $("img").css({ width: "80px" });
+		try {
+			await loadImgSrcAsync(img.el, `https://intranetapps.tql.com/api/photo/photos/${employeeId}`, 5000);
+			cell.el.replaceChildren(img.el);
+		} catch {
+			link.txt("no photo");
+		}
+	});
+
+	return cell.withChildren(link);
 }
