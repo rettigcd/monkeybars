@@ -3,6 +3,7 @@ import { download, downloadAsync } from "~/lib/gm";
 import { formatDateForFilename } from "./date-formats";
 import { SingleImage } from "./models/single-image";
 import { instaDom, pageOwnerName } from "./services/instaDom";
+import { showToast } from "./ui/toast";
 
 export type MousePoint = { clientX: number; clientY: number };
 type SourceUnderPoint = { el: HTMLElement; src: string };
@@ -170,6 +171,7 @@ export class ScreenImageActions {
 				const coverImageSrc = canvas.toDataURL("image/jpeg");
 				const extractFilename = (pageOwnerName || "instagram_img") + " " + formatDateForFilename(new Date()) + ".jpg";
 
+				void showToast("using now as image timestamp", 3000);
 				download({ url: coverImageSrc, name: extractFilename });
 				return;
 			}
@@ -177,6 +179,7 @@ export class ScreenImageActions {
 			const extension = await this.getExtensionFromBlobType(imgUrl);
 			const filename = (pageOwnerName || "instagram_img") + " " + formatDateForFilename(new Date()) + "." + extension;
 
+			void showToast("using now as image timestamp", 3000);
 			await downloadAsync({ url: imgUrl, name: filename });
 			console.log(`downloaded: ${filename}`);
 		} catch (ex) {
