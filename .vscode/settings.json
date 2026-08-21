@@ -1,11 +1,16 @@
 {
 	// Appearance - easy to identify this Workspace
 	"workbench.colorCustomizations": {
+		// Title Bar
+		"titleBar.activeBackground": "#68350b",
+		"titleBar.activeForeground": "#b89578",
+		"titleBar.inactiveBackground": "#68350b",
+		"titleBar.inactiveForeground": "#b89578",
 		// Activty bar (left icons)
-		"activityBar.background": "#008636",
-		"activityBar.foreground": "#ffffff",
-		"activityBar.activeBorder": "#ffffff",
-		"activityBar.inactiveForeground": "#000000",
+		"activityBar.background": "#68350b",
+		"activityBar.foreground": "#b89578",
+		"activityBar.activeBorder": "#a07b5c",
+		"activityBar.inactiveForeground": "#b89578"
 	},
 
 	// Tab / indents
@@ -19,3 +24,4 @@
 		"source.organizeImports": "explicit"
 	},
 }
+// old: 008636
