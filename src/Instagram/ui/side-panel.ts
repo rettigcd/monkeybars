@@ -30,6 +30,12 @@ const newImageCss: Css = {
 };
 
 
+// Renders the fixed, collapsible side panel that streams incoming PicGroup batches as thumbnail rows. 
+// Each row shows a separator with the owner, date, and download stats, 
+// plus actions to open the owner's profile or mark them as newly tracked, 
+// followed by clickable thumbnails that download the full image and show progress. Visibility of groups is
+// driven by PicGroup.isVisible and can be toggled via registered hotkeys
+// ("o" reopens the last closed group, "x" closes the first visible one).
 export class SidePanel {
 	private readonly picGroups: PicGroup[] = [];
 
@@ -37,17 +43,17 @@ export class SidePanel {
 		position: "fixed",
 		top: "5px",
 		left: "150px",
-		height: "95%",
 		background: "#66C",
 		padding: "5px",
 		marginRight: "120px",
-		width: "350px", // start covering things.
 	};
+	private readonly expandedHeight = "95%";
 	private readonly containerCollapsedWidth = "100px"; // let user toggle it narrower to see what is behind stuff
 
 	private readonly headerCss: Css = {
-		marginBottom: "8px",
-		fontSize: "16px",
+		marginTop: "2px",
+		marginBottom: "2px",
+		fontSize: "12px",
 		fontWeight: "bold",
 		fontFamily: "Tahoma",
 		color: "white",
@@ -94,7 +100,9 @@ export class SidePanel {
 
 	private outer?: HTMLDivElement;
 	private headerTextEl?: HTMLSpanElement;
+	private toggleEl?: HTMLSpanElement;
 	private newImageContainer?: HTMLDivElement;
+	private isExpanded = false;
 
 	public constructor({
 		batchProducer,
@@ -321,6 +329,23 @@ export class SidePanel {
 
 		this.outer = outerBuilder.el;
 		this.newImageContainer = newImageContainerBuilder.el;
+
+		this.setExpanded(false);
+	}
+
+	private setExpanded(expanded: boolean): void {
+		this.isExpanded = expanded;
+
+		if (this.toggleEl)
+			this.toggleEl.textContent = expanded ? "<<" : ">>";
+
+		if (this.outer) {
+			this.outer.style.width = expanded ? "auto" : this.containerCollapsedWidth;
+			this.outer.style.height = expanded ? this.expandedHeight : "auto";
+		}
+
+		if (this.newImageContainer)
+			this.newImageContainer.style.display = expanded ? "block" : "none";
 	}
 
 	private buildHeader() {
@@ -330,15 +355,8 @@ export class SidePanel {
 		const toggleBuilder = $("span")
 			.txt(">>")
 			.css({ cursor: "pointer" })
-			.on("click", (event: Event) => {
-				const toggle = event.currentTarget;
-				if (!(toggle instanceof HTMLElement) || this.outer == null)
-					return;
-
-				const expand = toggle.textContent === ">>";
-				toggle.textContent = expand ? "<<" : ">>";
-				this.outer.style.width = expand ? "auto" : this.containerCollapsedWidth;
-			});
+			.on("click", () => this.setExpanded(!this.isExpanded));
+		this.toggleEl = toggleBuilder.el;
 
 		return $("h2")
 			.css(this.headerCss)
