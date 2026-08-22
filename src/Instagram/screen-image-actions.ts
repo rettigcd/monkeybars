@@ -39,15 +39,15 @@ export class ScreenImageActions {
 		this.pointerTracker = new PointerTracker(win);
 	}
 
-	// Used by key press tracker
+	// Used by key press tracker (' ')
 	public async downloadImageInCenter(): Promise<void> {
 		const point = this.getCenterOfPresentation() ?? this.pointerTracker.getCurrentPosition();
 		await this.downloadImageUnderPoint(point);
 	}
 
-	// Used by key press tracker
+	// Used by key press tracker ('d')
 	public async downloadImageUnderMouse(): Promise<void> {
-		await this.downloadImageUnderPoint(this.pointerTracker.getCurrentPosition());
+		await this.downloadImagesUnderPoint(this.pointerTracker.getCurrentPosition());
 	}
 
 	// Used by key press tracker
@@ -138,14 +138,28 @@ export class ScreenImageActions {
 	}
 
 	private async downloadImageUnderPoint(point: MousePoint): Promise<void> {
-		try {
-			const sources = this.getSourcesUnder(point);
-			if (sources.length === 0) {
-				console.log("no img");
-				return;
-			}
+		const sources = this.getSourcesUnder(point);
+		if (sources.length === 0) {
+			console.log("no img");
+			return;
+		}
 
-			const source = sources[0];
+		await this.downloadSource(sources[0]);
+	}
+
+	private async downloadImagesUnderPoint(point: MousePoint): Promise<void> {
+		const sources = this.getSourcesUnder(point);
+		if (sources.length === 0) {
+			console.log("no img");
+			return;
+		}
+
+		for(let src of sources)
+			await this.downloadSource(src);
+	}
+
+	private async downloadSource(source: SourceUnderPoint): Promise<void> {
+		try {
 			const imgUrl = source.src;
 
 			if (imgUrl.startsWith("blob:")) {
