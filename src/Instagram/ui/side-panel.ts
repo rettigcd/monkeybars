@@ -44,7 +44,7 @@ export class SidePanel {
 		top: "5px",
 		left: "150px",
 		background: "#66C",
-		padding: "5px",
+		padding: "2px",
 		marginRight: "120px",
 	};
 	private readonly expandedHeight = "95%";
@@ -54,6 +54,7 @@ export class SidePanel {
 		marginTop: "2px",
 		marginBottom: "2px",
 		fontSize: "12px",
+		lineHeight: "15px",
 		fontWeight: "bold",
 		fontFamily: "Tahoma",
 		color: "white",
