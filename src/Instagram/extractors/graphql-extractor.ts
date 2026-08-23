@@ -2,6 +2,10 @@ import { RequestSnooper, SnoopRequest } from "~/lib/snoop";
 import { BasePicExtractor } from "./base-pic-extractor";
 import { type Edge, type MediaNode } from "./ig-types";
 
+// Base class for:
+//    LocationContent.ts
+//    Profile_Posts
+//    Profile_Tags
 export abstract class GraphQLContentExtractor<TData> extends BasePicExtractor {
 	protected abstract readonly friendlyNames: readonly string[];
 	protected abstract readonly rootProp: keyof TData;
@@ -15,7 +19,9 @@ export abstract class GraphQLContentExtractor<TData> extends BasePicExtractor {
 		if (url.pathname !== "/api/graphql" && url.pathname !== "/graphql/query") return false;
 
 		const friendlyName = this.getFriendlyName(body);
-		return !!friendlyName && this.friendlyNames.includes(friendlyName);
+		const isMatch = !!friendlyName && this.friendlyNames.includes(friendlyName);
+		// if(!isMatch) console.debug(["GraphQL no-match",friendlyName,this.friendlyNames]);
+		return isMatch;
 	}
 
 	findMediaArray(json: { data?: TData; errors?: unknown[] }): MediaNode[] {

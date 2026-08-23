@@ -4,8 +4,10 @@ import type { InstagramProfileResponse } from "../ig-types";
 // User's timeline / front page - "Posts"
 export class Profile_Posts extends GraphQLContentExtractor<InstagramProfileResponse["data"]> {
 	protected readonly friendlyNames = [
-		"PolarisProfilePostsQuery",
-		"PolarisProfilePostsTabContentQuery_connection",
+		"PolarisProfilePostsWWWQuery", // new: 2026-08-23
+		"PolarisProfilePostsTabContentWWWQuery_connection", // new: 2026-08-23
+		"PolarisProfilePostsQuery",	// missing: 2026-08-23
+		"PolarisProfilePostsTabContentQuery_connection", // missing: 2026-08-23
 	];
 
 	protected readonly rootProp = "xdt_api__v1__feed__user_timeline_graphql_connection";

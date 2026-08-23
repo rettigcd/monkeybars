@@ -8,6 +8,10 @@ import { instaDom } from "../services/instaDom";
 type GalleryConstructorArgs = {
 	batchProducer: BatchProducerGroup;
 	getAgeText?: GetAgeTextFn;
+	// pk/id of the page owner, if any (e.g. not applicable on location pages).
+	// Lazy because at construction time (document-start) the page's own preload
+	// scripts - where this id comes from - aren't in the DOM yet.
+	getId?: () => string | undefined;
 };
 
 
@@ -59,22 +63,43 @@ export class Gallery {
 	private readonly lookup: Record<string, PicGroup>;
 	private readonly sanitizeImgUrl: (url: string) => string;
 	private readonly ageTextFormatter: GetAgeTextFn;
+	private readonly getId?: () => string | undefined;
+	private resolvedId?: string;
 
 	public constructor({
 		batchProducer,
-		getAgeText
+		getAgeText,
+		getId
 	}: GalleryConstructorArgs) {
 		this.lookup = {};
 		this.sanitizeImgUrl = sanitizeImgUrl;
 		this.ageTextFormatter = getAgeText ?? StdGetAgeText;
+		this.getId = getId;
 
 		this.startWatchingThumbs();
 		batchProducer.on("batchReceived", (batch) => this.storeBatch(batch));
 	}
 
+	// Resolves and caches the page-owner id so we don't re-scan the DOM's
+	// preload scripts (instaDom.pageOwnerId) on every batch once we have it.
+	private resolveId(): string | undefined {
+		if (this.resolvedId == null)
+			this.resolvedId = this.getId?.();
+		return this.resolvedId;
+	}
+
 	private storeBatch(batch: PicGroup[]): void {
+		const id = this.resolveId();
+
 		for (const picGroup of batch) {
 			this.lookup[picGroup.sanitizedImgUrl] = picGroup;
+
+			// The grid thumbnail isn't always the group's first image - e.g. on the
+			// Tagged tab it's whichever slide the page owner was actually tagged in -
+			// so also register that slide's image, if we can find it.
+			const taggedPic = id && picGroup.pics.find(pic => pic.taggedUserIds.includes(id));
+			if (taggedPic)
+				this.lookup[this.sanitizeImgUrl(taggedPic.smallestUrl)] = picGroup;
 		}
 	}
 
@@ -138,14 +163,16 @@ export class Gallery {
 
 		picGroup.thumbUrl = imgEl.src;
 
-		const firstPic = picGroup.pics[0];
-		if (firstPic == null)
+		if (pics.length === 0)
 			return;
 
+		// The rendered thumbnail isn't always the group's first slide (e.g. the
+		// Tagged tab can show whichever slide the page owner was tagged in), so
+		// check against every pic in the group rather than assuming pics[0].
 		const a = this.sanitizeImgUrl(imgEl.src);
-		const b = this.sanitizeImgUrl(firstPic.smallestUrl);
-		if (a !== b)
-			console.warn("Group urls do not match", a, b);
+		const matchesAnyPic = pics.some(pic => this.sanitizeImgUrl(pic.smallestUrl) === a);
+		if (!matchesAnyPic)
+			console.warn("Group urls do not match", a, pics.map(pic => this.sanitizeImgUrl(pic.smallestUrl)));
 
 		const host = imgEl.parentElement;
 		if (host == null)

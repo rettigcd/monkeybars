@@ -77,7 +77,7 @@ export class UserPage {
 		iiLookup.on("missingImage", snooper.checkLogForMissingImage);
 
 		// === UI stuff ===
-		const gallery = new Gallery({batchProducer});
+		const gallery = new Gallery({batchProducer, getId: () => instaDom.pageOwnerId});
 
 		const sidePanel = new SidePanel({ batchProducer }).register(hotkeys);
 

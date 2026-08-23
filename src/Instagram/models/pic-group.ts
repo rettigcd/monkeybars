@@ -38,8 +38,16 @@ export class PicGroup implements ObservableHost<PicGroup> {
 	// for sorting and comparing
 	get dateMs(): number { return this.date.valueOf(); }
 
+	// Instagram media pk's encode the creation time in their upper bits (Snowflake-style),
+	// offset from a custom epoch of 2011-08-24. Used when the API response omits taken_at.
+	static takenAtMsFromPk(pk: string): number {
+		const INSTAGRAM_EPOCH_MS = 1314220021721n;
+		return Number((BigInt(pk) >> 23n) + INSTAGRAM_EPOCH_MS);
+	}
+
 	static fromMediaWithUser(dto: MediaNode): PicGroup {
 		const {
+			pk,
 			user,
 			taken_at,
 			carousel_media,
@@ -51,7 +59,8 @@ export class PicGroup implements ObservableHost<PicGroup> {
 
 		const captionText = caption?.text || undefined;
 		const owner = user.username;
-		const date = new Date(toMs(taken_at * 1000));
+		const dateMs = taken_at !== undefined ? toMs(taken_at * 1000) : PicGroup.takenAtMsFromPk(pk);
+		const date = new Date(dateMs);
 
 		const pics = Array.isArray(carousel_media) && 0 < carousel_media.length
 				? carousel_media.map( ({ usertags, image_versions2 }) => SingleImage.fromMedia({ usertags, image_versions2, owner, date }) )

@@ -18,6 +18,7 @@ export class SingleImage implements ObservableHost<SingleImage> {
 	public readonly owner: string; // so we can mark the download on the user when it finishes
 	public readonly date: Date; // public to mark download in correct year
 	public readonly taggedUsers: string[]; // public so we can display tagged users in the UI
+	public readonly taggedUserIds: string[]; // pk/id of tagged users - usertags don't always carry a username
 
 	// Questionable public props
 	public readonly smallestUrl: string; // used by PicGroup as sanitizedImgUrl
@@ -30,8 +31,9 @@ export class SingleImage implements ObservableHost<SingleImage> {
 
 	public listen!: ListenFn<SingleImage>;
 
-	constructor(taggedUsers: string[], images: ImageCandidate[], owner: string, date: Date) {
+	constructor(taggedUsers: string[], taggedUserIds: string[], images: ImageCandidate[], owner: string, date: Date) {
 		this.taggedUsers = taggedUsers;
+		this.taggedUserIds = taggedUserIds;
 
 		const nonSquareImages = images.filter(({ height, width }) => height !== width);
 		// console.debug(`${nonSquareImages.length} of ${images.length} are non-square`);
@@ -54,12 +56,13 @@ export class SingleImage implements ObservableHost<SingleImage> {
 
 	static fromMedia({ usertags, image_versions2, owner, date = throwExp("date") }: SingleImageMediaArgs): SingleImage {
 		const taggedUsers:string[] = SingleImage.parseUserTags(usertags);
-		return new SingleImage(taggedUsers, image_versions2.candidates, owner, date);
+		const taggedUserIds:string[] = SingleImage.parseUserTagIds(usertags);
+		return new SingleImage(taggedUsers, taggedUserIds, image_versions2.candidates, owner, date);
 	}
 
 	static fromUrlAndOwner(url: string, imageWidth: number, imageHeight: number, owner: string): SingleImage {
 		const imageCandidate: ImageCandidate = { url, width:imageWidth, height:imageHeight };
-		return new SingleImage([], [imageCandidate], owner, new Date());
+		return new SingleImage([], [], [imageCandidate], owner, new Date());
 	}
 
 	static parseUserTags(usertags: UserTags | undefined | null): string[] {
@@ -67,9 +70,22 @@ export class SingleImage implements ObservableHost<SingleImage> {
 			return (
 				usertags &&
 				usertags.in
-					.sort(by(({ position }) => position[0]))
+					.sort(by(({ position }) => position?.[0] ?? 0))
 					.map((x: any) => x.user.username)
 			) || [];
+		}
+		catch {
+			return [];
+		}
+	}
+
+	// Not all usertag responses carry position/username (e.g. the Tagged tab's
+	// carousel usertags only have pk/id), so this doesn't depend on either.
+	static parseUserTagIds(usertags: UserTags | undefined | null): string[] {
+		try {
+			return (usertags?.in ?? [])
+				.map((x: any) => x.user?.pk ?? x.user?.id)
+				.filter((id: unknown): id is string => typeof id === "string");
 		}
 		catch {
 			return [];

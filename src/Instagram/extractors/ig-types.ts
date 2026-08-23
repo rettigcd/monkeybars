@@ -44,8 +44,9 @@ export interface CarouselMedia extends TaggedImageMedia {
 }
 
 export interface MediaNode extends TaggedImageMedia {
+	pk: string;
 	caption: Caption | null;
-	taken_at: number;
+	taken_at?: number;
 	user: User;
 	has_liked: boolean;
 	carousel_media?: CarouselMedia[];
@@ -63,17 +64,17 @@ export interface SavedPostsResponse {
 export interface UserTagUser {
 	id: string;
 	pk: string;
-	username: string;
-	full_name: string;
-	profile_pic_url: string;
-	is_verified: boolean;
+	username?: string;
+	full_name?: string;
+	profile_pic_url?: string;
+	is_verified?: boolean;
 }
 
 export type UserTagPosition = [number, number];
 
 export interface UserTag {
 	user: UserTagUser;
-	position: UserTagPosition;
+	position?: UserTagPosition;
 }
 
 export interface UserTags {

@@ -50,7 +50,7 @@ export abstract class BasePicExtractor extends EventHostBase<BatchProducerEvents
 				this.handleError(err, x.responseText);
 				return;
 			}
-			console.error("Error parsing responseText", err);
+			console.error(`${this.constructor.name}: error parsing responseText`, err);
 		}
 	}
 }
