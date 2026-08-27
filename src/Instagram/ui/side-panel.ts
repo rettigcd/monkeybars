@@ -42,7 +42,7 @@ export class SidePanel {
 	private readonly outerCss: Css = {
 		position: "fixed",
 		top: "5px",
-		left: "150px",
+		left: "5px",
 		background: "#66C",
 		padding: "2px",
 		marginRight: "120px",
