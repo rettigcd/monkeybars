@@ -84,6 +84,16 @@ export class SidePanel {
 		fontSize: "10px",
 	};
 
+	private readonly taggedUsersBadgeCss: Css = {
+		position: "absolute",
+		top: "0",
+		left: "0",
+		background: "rgba(0,0,0,0.6)",
+		color: "white",
+		fontSize: "10px",
+		padding: "1px 3px",
+	};
+
 	private readonly clickedButtonCss: Css = {
 		cursor: "default",
 		opacity: "0.5",
@@ -291,6 +301,13 @@ export class SidePanel {
 				.css(newImageCss)
 				.on("click", () => singleImage.downloadLargestAsync())
 			).el;
+
+		if (singleImage.taggedUserIds.length > 0)
+			$('span')
+				.txt(`♦ ${singleImage.taggedUserIds.length}`)
+				.css(this.taggedUsersBadgeCss)
+				.appendTo(div);
+
 		let overlay: ElementBuilder<HTMLElement> | null = null;
 		singleImage.listen('downloadProgress',({newValue:progress}:{newValue:TaskStatus})=>{
 			switch(progress.status){
