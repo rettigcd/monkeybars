@@ -1,5 +1,5 @@
 import { $ } from "~/lib/dom3";
-import { getAgeColor, getAgeType, getAgeText as StdGetAgeText, type AgeType, type GetAgeTextFn } from "../age";
+import { getAgeColor, getAgeInfo as StdGetAgeInfo, type AgeType, type GetAgeInfoFn } from "../age";
 import { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { PicGroup } from "../models/pic-group";
 import { sanitizeImgUrl } from "../services/image-lookup-by-url";
@@ -7,7 +7,7 @@ import { instaDom } from "../services/instaDom";
 
 type GalleryConstructorArgs = {
 	batchProducer: BatchProducerGroup;
-	getAgeText?: GetAgeTextFn;
+	getAgeInfo?: GetAgeInfoFn;
 	// pk/id of the page owner, if any (e.g. not applicable on location pages).
 	// Lazy because at construction time (document-start) the page's own preload
 	// scripts - where this id comes from - aren't in the DOM yet.
@@ -62,18 +62,18 @@ const css = {
 export class Gallery {
 	private readonly lookup: Record<string, PicGroup>;
 	private readonly sanitizeImgUrl: (url: string) => string;
-	private readonly ageTextFormatter: GetAgeTextFn;
+	private readonly ageInfoFormatter: GetAgeInfoFn;
 	private readonly getId?: () => string | undefined;
 	private resolvedId?: string;
 
 	public constructor({
 		batchProducer,
-		getAgeText,
+		getAgeInfo,
 		getId
 	}: GalleryConstructorArgs) {
 		this.lookup = {};
 		this.sanitizeImgUrl = sanitizeImgUrl;
-		this.ageTextFormatter = getAgeText ?? StdGetAgeText;
+		this.ageInfoFormatter = getAgeInfo ?? StdGetAgeInfo;
 		this.getId = getId;
 
 		this.startWatchingThumbs();
@@ -155,9 +155,7 @@ export class Gallery {
 		const { imgEl, picGroup } = args;
 		const { following = false, liked = false, pics } = picGroup;
 
-		// const { ageColor } = timestampToAgeString(picGroup.dateMs);
-		const ageType:AgeType = getAgeType(picGroup.dateMs);
-		const ageText:string  = this.ageTextFormatter(picGroup.dateMs,ageType);
+		const { ageType, text: ageText } = this.ageInfoFormatter(picGroup.dateMs);
 
 		const isNew = picGroup.isNew ?? false;
 

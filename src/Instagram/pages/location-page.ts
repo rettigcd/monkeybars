@@ -1,10 +1,9 @@
 import { $ } from "~/lib/dom3";
 import { SyncedPersistentDict } from "~/lib/storage";
 
-import { DAYS } from "~/lib/time";
 import { HotkeyManager } from "../../lib/hotkey-manager";
 import { type SnlWindow } from "../../snl/window";
-import { loadTimeMs, reportLast, type AgeType } from "../age";
+import { formatAgeMs, getAgeTypeFromMs, loadTimeMs, reportLast, type AgeInfo } from "../age";
 import { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { InitialLocationPageParser } from "../extractors/location/initial-location-page-parser";
 import { LocationContent } from "../extractors/location/location-content";
@@ -69,20 +68,16 @@ export class LocationPage {
 
 		new UserUpdateService({ batchProducer });
 
-		function getAgeText(timestamp:number, ageType:AgeType) {
+		// Age relative to lastVisit rather than "now" - both the bucket (day/week/
+		// month/year) and the number scale off the same offset, signed +/- for
+		// after/before the last visit.
+		function getAgeInfo(timestamp: number): AgeInfo {
 			const ageMs = timestamp - startingState.lastVisit!;
-			const { divider, label } = {
-				"days"   : { divider:   1*DAYS, label: "day" },
-				"weeks"  : { divider:   1*DAYS, label: "day" },	// even though asking for weeks, display days instead
-				"months" : { divider:  30*DAYS, label: "month" },
-				"years"  : { divider: 365*DAYS, label: "year" }
-			}[ageType];
-			const num = Math.floor(Math.abs(ageMs) * 10 / divider) / 10;
-			const s = (num != 1) ? "s" : "";
-			return `T${ageMs<0?'-':'+'}${num} ${label}${s}`;
+			const ageType = getAgeTypeFromMs(ageMs);
+			return { ageType, text: formatAgeMs(ageMs, ageType, true) };
 		}
 
-		const gallery = new Gallery({ batchProducer, getAgeText: startingState.lastVisit !== undefined ? getAgeText : undefined });
+		const gallery = new Gallery({ batchProducer, getAgeInfo: startingState.lastVisit !== undefined ? getAgeInfo : undefined });
 		const sidePanel = new SidePanel({ batchProducer });
 		sidePanel.register(hotkeys);
 
