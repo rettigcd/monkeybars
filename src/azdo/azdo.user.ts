@@ -14,10 +14,11 @@
 //import { setMosaicFavicon as setFavicon } from "./favicongen/mosaic";
 import { con } from "~/lib/console";
 import { setRuneFavicon as setFavicon } from "./favicongen/glyph";
+import { setUserStoryFavicon } from "./favicongen/user-story";
 import { cacheRepositoryName, getCachedRepositoryName } from "./repository-cache";
 import { createRepositoryResolver } from "./repository-resolver";
 import { snoopAzureDevOpsRequests } from "./snoop";
-import { projectRepo } from "./url";
+import { isWorkItemPage, projectRepo } from "./url";
 
 async function getLocationString(){
 	if (projectRepo == null) return null;
@@ -49,8 +50,12 @@ async function getLocationString(){
 }
 
 (async function(){
-	const locationStr = await getLocationString();
-	if(locationStr != null)
-		setFavicon(locationStr);
+	if (isWorkItemPage) {
+		setUserStoryFavicon();
+	} else {
+		const locationStr = await getLocationString();
+		if(locationStr != null)
+			setFavicon(locationStr);
+	}
 	con.print("%cAzDo loaded", "background-color:#DFD");
 })();

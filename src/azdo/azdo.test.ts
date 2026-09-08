@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { parseAzureDevOpsUrl } from "./azdo.user";
 import { createRepositoryResolver } from "./repository-resolver";
+import { isWorkItemUrl, parseAzureDevOpsUrl } from "./url";
 
 describe("parseAzureDevOpsUrl", () => {
 	it("parses a visualstudio.com pull request URL", () => {
@@ -29,6 +29,30 @@ describe("parseAzureDevOpsUrl", () => {
 			project: "Project Transform",
 			repository: "TQL.Pricing.QuoteMgmt.UI",
 		});
+	});
+});
+
+describe("isWorkItemUrl", () => {
+	it("recognizes a work item edit URL", () => {
+		// Given a user story page URL
+		const url = "https://tqlweb.visualstudio.com/Pricing/_workitems/edit/544632";
+
+		// When the URL is checked
+		const result = isWorkItemUrl(url);
+
+		// Then it is identified as a work item page
+		expect(result).toBe(true);
+	});
+
+	it("does not match a repository URL", () => {
+		// Given a repository URL
+		const url = "https://dev.azure.com/tqlweb/Project%20Transform/_git/TQL.Pricing.QuoteMgmt.UI/pullrequest/242969";
+
+		// When the URL is checked
+		const result = isWorkItemUrl(url);
+
+		// Then it is not identified as a work item page
+		expect(result).toBe(false);
 	});
 });
 

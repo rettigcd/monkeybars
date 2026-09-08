@@ -19,3 +19,11 @@ export function parseAzureDevOpsUrl(value: string | URL): AzureDevOpsLocation | 
 
 // Returns { project, repository }
 export const projectRepo = parseAzureDevOpsUrl(window.location.href);
+
+export function isWorkItemUrl(value: string | URL): boolean {
+	const url = typeof value === "string" ? new URL(value) : value;
+	const path = url.pathname.split("/").filter(Boolean);
+	return path.includes("_workitems");
+}
+
+export const isWorkItemPage = isWorkItemUrl(window.location.href);

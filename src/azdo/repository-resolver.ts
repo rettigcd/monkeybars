@@ -1,5 +1,5 @@
 import type { SnoopedWindow } from "~/lib/snoop";
-import type { AzureDevOpsLocation } from "./azdo.user";
+import type { AzureDevOpsLocation } from "./url";
 
 export type AzureDevOpsRepository = {
 	id: string;
