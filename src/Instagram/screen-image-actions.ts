@@ -144,7 +144,16 @@ export class ScreenImageActions {
 			return;
 		}
 
-		await this.downloadSource(sources[0]);
+		// A paused video shows a static overlay image (e.g. play button) stacked
+		// on top of the blob video source. Prefer the video in that case.
+		const index = this.isStaticOverlayOnBlobVideo(sources) ? 1 : 0;
+		await this.downloadSource(sources[index]);
+	}
+
+	private isStaticOverlayOnBlobVideo(sources: SourceUnderPoint[]): boolean {
+		return sources.length > 1
+			&& sources[0].src.includes("static.cdninstagram.com")
+			&& sources[1].src.startsWith("blob:");
 	}
 
 	private async downloadImagesUnderPoint(point: MousePoint): Promise<void> {

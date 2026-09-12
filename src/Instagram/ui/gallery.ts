@@ -184,6 +184,7 @@ export class Gallery {
 			liked,
 			isNew,
 			following,
+			dateMs: picGroup.dateMs,
 		}).appendTo(host);
 
 		if (pics.length > 1) {
@@ -207,13 +208,15 @@ export class Gallery {
 		isNew: boolean;
 		following: boolean;
 		ageType: AgeType;
+		dateMs: number;
 	}) {
 		const {
 			ageText,
 			liked,
 			isNew,
 			following,
-			ageType
+			ageType,
+			dateMs
 		} = args;
 
 		let txt = `Age: ${ageText}`;
@@ -222,7 +225,9 @@ export class Gallery {
 		if (isNew)
 			txt += " NEW! ";
 
-		return $("span").txt(txt).css(css.getGalleryBadge(isNew, following, ageType));
+		const dateLabel = new Date(dateMs).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+		return $("span").txt(txt).attr("title", dateLabel).css(css.getGalleryBadge(isNew, following, ageType));
 	}
 
 	private buildMultiImageOverlay(args: {
