@@ -11,6 +11,7 @@ type PicGroupArgs = {
 	following?: boolean;
 	liked?: boolean;
 	captionText?: string;
+	coauthors?: string[];
 };
 
 export class PicGroup implements ObservableHost<PicGroup> {
@@ -19,18 +20,19 @@ export class PicGroup implements ObservableHost<PicGroup> {
 	public readonly following?: boolean;
 	public readonly liked?: boolean;
 	public readonly captionText?: string;
+	public readonly coauthors!: string[]; // usernames from Instagram's "collab post" coauthor_producers
 	public readonly sanitizedImgUrl: string;
 	public readonly date!: Date; // used to build separator / row title
 
 	public isVisible: boolean = true; // observable
-	public isNew?: boolean; // this prop is set later after the batch has ben routed to batch-producer-group 
+	public isNew?: boolean; // this prop is set later after the batch has ben routed to batch-producer-group
 	public thumbUrl?: string; // the (sanitized?) url that Instagram is using to represent that group - pulled from the DOM
 
 	public listen!: ListenFn<PicGroup>;
 
 
-	constructor({ owner, date, pics, following, liked, captionText }: PicGroupArgs) {
-		Object.assign(this, { owner, date, pics, following, liked, captionText });
+	constructor({ owner, date, pics, following, liked, captionText, coauthors = [] }: PicGroupArgs) {
+		Object.assign(this, { owner, date, pics, following, liked, captionText, coauthors });
 		makeObservable(this);
 		this.sanitizedImgUrl = sanitizeImgUrl(pics[0].smallestUrl);
 	}
@@ -55,6 +57,7 @@ export class PicGroup implements ObservableHost<PicGroup> {
 			caption,
 			usertags,
 			has_liked,
+			coauthor_producers,
 		} = dto;
 
 		const captionText = caption?.text || undefined;
@@ -62,9 +65,11 @@ export class PicGroup implements ObservableHost<PicGroup> {
 		const dateMs = taken_at !== undefined ? toMs(taken_at * 1000) : PicGroup.takenAtMsFromPk(pk);
 		const date = new Date(dateMs);
 
+		const coauthors = (coauthor_producers ?? []).map(({ username }) => username);
+
 		const pics = Array.isArray(carousel_media) && 0 < carousel_media.length
-				? carousel_media.map( ({ usertags, image_versions2 }) => SingleImage.fromMedia({ usertags, image_versions2, owner, date }) )
-				: [SingleImage.fromMedia({ usertags, image_versions2, owner, date })];
+				? carousel_media.map( ({ usertags, image_versions2 }) => SingleImage.fromMedia({ usertags, image_versions2, owner, date, coauthors }) )
+				: [SingleImage.fromMedia({ usertags, image_versions2, owner, date, coauthors })];
 
 		const following = user?.friendship_status?.following || false;
 
@@ -75,6 +80,7 @@ export class PicGroup implements ObservableHost<PicGroup> {
 			following,
 			liked: has_liked,
 			captionText,
+			coauthors,
 		});
 	}
 

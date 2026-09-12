@@ -31,7 +31,7 @@ export class VisitingUserTracker {
 			&& new URLSearchParams(String(body??"")).get("fb_api_req_friendly_name") === "PolarisProfilePageContentDirectQuery"
 		) {
 			const handledRequest = snoopRequest as HandledRequest;
-			handledRequest.handled = VisitingUserTracker.name;
+			handledRequest.handled = "VisitingUserTracker";
 			const user = (snoopRequest.json as any).user as InstagramUser;
 			const isFollowing = user.friendship_status == "followiwng!!!"; // !!! WRONG
 

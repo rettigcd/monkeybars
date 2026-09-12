@@ -11,6 +11,7 @@ import type { ImageCandidate, TaggedImageMedia, UserTags } from "../extractors/i
 type SingleImageMediaArgs = TaggedImageMedia & {
 	owner: string;
 	date: Date;
+	coauthors?: string[];
 };
 
 export class SingleImage implements ObservableHost<SingleImage> {
@@ -19,6 +20,7 @@ export class SingleImage implements ObservableHost<SingleImage> {
 	public readonly date: Date; // public to mark download in correct year
 	public readonly taggedUsers: string[]; // public so we can display tagged users in the UI
 	public readonly taggedUserIds: string[]; // pk/id of tagged users - usertags don't always carry a username
+	public readonly coauthors: string[]; // usernames from Instagram's "collab post" coauthor_producers
 
 	// Questionable public props
 	public readonly smallestUrl: string; // used by PicGroup as sanitizedImgUrl
@@ -31,9 +33,10 @@ export class SingleImage implements ObservableHost<SingleImage> {
 
 	public listen!: ListenFn<SingleImage>;
 
-	constructor(taggedUsers: string[], taggedUserIds: string[], images: ImageCandidate[], owner: string, date: Date) {
+	constructor(taggedUsers: string[], taggedUserIds: string[], images: ImageCandidate[], owner: string, date: Date, coauthors: string[] = []) {
 		this.taggedUsers = taggedUsers;
 		this.taggedUserIds = taggedUserIds;
+		this.coauthors = coauthors;
 
 		const nonSquareImages = images.filter(({ height, width }) => height !== width);
 		// console.debug(`${nonSquareImages.length} of ${images.length} are non-square`);
@@ -48,16 +51,17 @@ export class SingleImage implements ObservableHost<SingleImage> {
 		this.date = date;
 
 		const ext = this.smallestUrl.includes(".webp") ? ".webp" : ".jpg";
-		this.filename = [owner, ...taggedUsers].slice(0, 10).join(" ")
+		const uniqueUsernames = [...new Set([owner, ...coauthors, ...taggedUsers])];
+		this.filename = uniqueUsernames.slice(0, 10).join(" ")
 			+ " " + formatDateForFilename(date) + ext;
 
 		makeObservable(this);
 	}
 
-	static fromMedia({ usertags, image_versions2, owner, date = throwExp("date") }: SingleImageMediaArgs): SingleImage {
+	static fromMedia({ usertags, image_versions2, owner, date = throwExp("date"), coauthors = [] }: SingleImageMediaArgs): SingleImage {
 		const taggedUsers:string[] = SingleImage.parseUserTags(usertags);
 		const taggedUserIds:string[] = SingleImage.parseUserTagIds(usertags);
-		return new SingleImage(taggedUsers, taggedUserIds, image_versions2.candidates, owner, date);
+		return new SingleImage(taggedUsers, taggedUserIds, image_versions2.candidates, owner, date, coauthors);
 	}
 
 	static fromUrlAndOwner(url: string, imageWidth: number, imageHeight: number, owner: string): SingleImage {

@@ -5,6 +5,8 @@ import { type MediaNode, type SavedPostsResponse } from "../ig-types";
 // https://www.instagram.com/api/v1/feed/saved/posts/ ...stuff
 // Posts that I saved personally, from my user > Saved page.
 export class SavedPosts extends BasePicExtractor {
+	protected readonly label = "SavedPosts";
+
 	constructor(snooper: RequestSnooper) {
 		super();
 		snooper.addHandler(this.snoop);

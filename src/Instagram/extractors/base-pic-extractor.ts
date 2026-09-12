@@ -16,6 +16,10 @@ export type BatchProducerEvents = {
 
 export abstract class BasePicExtractor extends EventHostBase<BatchProducerEvents> {
 
+	// Minification (production build) mangles class names, so `constructor.name`
+	// can't be trusted for logging/labeling. Each subclass hardcodes its own name here.
+	protected abstract readonly label: string;
+
 	setBatch(batch: PicGroup[]): void {
 		this.trigger("batchReceived", batch);
 	}
@@ -38,7 +42,7 @@ export abstract class BasePicExtractor extends EventHostBase<BatchProducerEvents
 		}
 	};
 
-	getHandledLabel(x:SnoopRequest) { void x; return this.constructor.name; }
+	getHandledLabel(x:SnoopRequest) { void x; return this.label; }
 
 	processResponse(x:HandledRequest): void {
 		try {
@@ -50,7 +54,7 @@ export abstract class BasePicExtractor extends EventHostBase<BatchProducerEvents
 				this.handleError(err, x.responseText);
 				return;
 			}
-			console.error(`${this.constructor.name}: error parsing responseText`, err);
+			console.error(`${this.label}: error parsing responseText`, err);
 		}
 	}
 }

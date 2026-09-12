@@ -3,6 +3,8 @@ import type { InstagramProfileResponse } from "../ig-types";
 
 // User's timeline / front page - "Posts"
 export class Profile_Posts extends GraphQLContentExtractor<InstagramProfileResponse["data"]> {
+	protected readonly label = "Profile_Posts";
+
 	protected readonly friendlyNames = [
 		"PolarisProfilePostsWWWQuery", // new: 2026-08-23
 		"PolarisProfilePostsTabContentWWWQuery_connection", // new: 2026-08-23
@@ -15,6 +17,8 @@ export class Profile_Posts extends GraphQLContentExtractor<InstagramProfileRespo
 
 // User's tagged page - "Tagged" 
 export class Profile_Tagged extends GraphQLContentExtractor<InstagramProfileResponse["data"]> {
+	protected readonly label = "Profile_Tagged";
+
 	protected readonly friendlyNames = [
 		"PolarisProfileTaggedTabContentQuery",
 		"PolarisProfileTaggedTabContentQuery_connection",

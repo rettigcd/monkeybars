@@ -50,6 +50,12 @@ export interface MediaNode extends TaggedImageMedia {
 	user: User;
 	has_liked: boolean;
 	carousel_media?: CarouselMedia[];
+	coauthor_producers?: CoauthorProducer[];
+}
+
+// Instagram's "collab post" co-authors - credited alongside the owner.
+export interface CoauthorProducer {
+	username: string;
 }
 
 // == Saved Posts ==

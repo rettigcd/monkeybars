@@ -8,6 +8,8 @@ type UserPostsResponse = {
 
 // https://www.instagram.com/api/v1/feed/user/1560767330/?count=12&max_id=3091713838536813928_1560767330
 export class UserPosts extends BasePicExtractor {
+	protected readonly label = "UserPosts";
+
 	constructor(snooper: RequestSnooper) {
 		super();
 		snooper.addHandler(this.snoop);

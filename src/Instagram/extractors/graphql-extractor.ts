@@ -38,7 +38,7 @@ export abstract class GraphQLContentExtractor<TData> extends BasePicExtractor {
 
 	getHandledLabel(x: SnoopRequest): string {
 		const friendlyName = this.getFriendlyName(x.body);
-		return `${this.constructor.name}( ${friendlyName} )`;
+		return `${this.label}( ${friendlyName} )`;
 	}
 
 	private getFriendlyName(body?: string): string | null {

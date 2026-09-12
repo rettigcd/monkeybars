@@ -6,6 +6,8 @@ import { type DetailsPopupResponse } from "../ig-types";
 // 	- user's Posts page OR 
 //  - user's Tagged page
 export class DetailsPopup extends BasePicExtractor {
+	protected readonly label = "DetailsPopup";
+
 	constructor(snooper:RequestSnooper) {
 		super();
 		snooper.addHandler(this.snoop);
