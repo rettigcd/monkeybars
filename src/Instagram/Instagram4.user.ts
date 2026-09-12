@@ -11,6 +11,7 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=instagram.com
 // @grant        GM_download
 // @grant        GM_openInTab
+// @grant        GM_setClipboard
 // @grant        unsafeWindow
 // ==/UserScript==
 

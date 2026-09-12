@@ -7,6 +7,7 @@ import { PicGroup } from "../models/pic-group";
 import { SingleImage } from "../models/single-image";
 import { instaDom, pageOwnerName } from "../services/instaDom";
 import { UserCtx } from "../user-ctx";
+import { showToast } from "./toast";
 
 type SidePanelConstructorArgs = {
 	batchProducer: { on(eventName: "batchReceived", handler: (batch: PicGroup[]) => void): void; };
@@ -92,6 +93,7 @@ export class SidePanel {
 		color: "white",
 		fontSize: "10px",
 		padding: "1px 3px",
+		cursor: "pointer",
 	};
 
 	private readonly clickedButtonCss: Css = {
@@ -306,6 +308,10 @@ export class SidePanel {
 			$('span')
 				.txt(`♦ ${singleImage.taggedUserIds.length}`)
 				.css(this.taggedUsersBadgeCss)
+				.on("click", (event: Event) => {
+					event.stopPropagation();
+					this.copyTaggedUsers(singleImage);
+				})
 				.appendTo(div);
 
 		let overlay: ElementBuilder<HTMLElement> | null = null;
@@ -330,6 +336,12 @@ export class SidePanel {
 			}
 		})
 		return div;
+	}
+
+	private copyTaggedUsers(singleImage: SingleImage): void {
+		const usernames = singleImage.taggedUsers.filter((u): u is string => !!u);
+		void navigator.clipboard.writeText(usernames.join(" "));
+		void showToast(`${usernames.length} tags copied to clipboard.`, 3000);
 	}
 
 	private createNewImageContainer(): void {
