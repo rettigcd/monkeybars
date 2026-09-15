@@ -15,26 +15,29 @@
 import { con } from "~/lib/console";
 import { setRuneFavicon as setFavicon } from "./favicongen/glyph";
 import { setUserStoryFavicon } from "./favicongen/user-story";
+import { watchLocationChange } from "./location-watcher";
 import { cacheRepositoryName, getCachedRepositoryName } from "./repository-cache";
 import { createRepositoryResolver } from "./repository-resolver";
 import { snoopAzureDevOpsRequests } from "./snoop";
-import { isWorkItemPage, projectRepo } from "./url";
+import { isWorkItemUrl, parseAzureDevOpsUrl } from "./url";
 
 async function getLocationString(){
+	const projectRepo = parseAzureDevOpsUrl(window.location.href);
 	if (projectRepo == null) return null;
 
-	const isGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(projectRepo.repository);
+	const repoIsGuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(projectRepo.repository);
 	// Is project name
-	if(!isGuid)
+	if(!repoIsGuid)
 		return `${projectRepo.project}/${projectRepo.repository}`;
 
-	// Cache has project name
+	// check if cache has the normal name for this repo-guid
 	const cachedName = getCachedRepositoryName(projectRepo.repository);
 	if (cachedName != null) {
 		console.debug("Azure DevOps location", { ...projectRepo, repository: cachedName, source: "cache" });
 		return `${projectRepo.project}/${cachedName}`;
 	}
 	
+	// !!! todo - we are issuing the request, why do we need to snoop?
 	snoopAzureDevOpsRequests(window);
 
 	try{
@@ -49,13 +52,18 @@ async function getLocationString(){
 	}
 }
 
-(async function(){
-	if (isWorkItemPage) {
+async function applyForCurrentLocation(){
+	if (isWorkItemUrl(window.location.href)) {
 		setUserStoryFavicon();
 	} else {
 		const locationStr = await getLocationString();
 		if(locationStr != null)
 			setFavicon(locationStr);
 	}
+}
+
+(async function(){
+	await applyForCurrentLocation();
+	watchLocationChange(() => void applyForCurrentLocation());
 	con.print("%cAzDo loaded", "background-color:#DFD");
 })();
