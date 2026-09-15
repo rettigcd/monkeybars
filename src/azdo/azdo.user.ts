@@ -18,7 +18,6 @@ import { setUserStoryFavicon } from "./favicongen/user-story";
 import { watchLocationChange } from "./location-watcher";
 import { cacheRepositoryName, getCachedRepositoryName } from "./repository-cache";
 import { createRepositoryResolver } from "./repository-resolver";
-import { snoopAzureDevOpsRequests } from "./snoop";
 import { isWorkItemUrl, parseAzureDevOpsUrl } from "./url";
 
 async function getLocationString(){
@@ -37,9 +36,6 @@ async function getLocationString(){
 		return `${projectRepo.project}/${cachedName}`;
 	}
 	
-	// !!! todo - we are issuing the request, why do we need to snoop?
-	snoopAzureDevOpsRequests(window);
-
 	try{
 		// query for project name
 		const repository = await createRepositoryResolver(window, projectRepo).resolve(projectRepo.repository);
