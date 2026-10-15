@@ -35,6 +35,20 @@ const nextLinkHostCss = {
 	padding: "5px",
 };
 
+// Distinct from the status table so it doesn't read as another stat row.
+const pageOwnerBarCss = {
+	display: "flex",
+	gap: "12px",
+	justifyContent: "center",
+	marginTop: "6px",
+	padding: "4px 8px",
+	borderRadius: "4px",
+	background: "#5a2d82",
+	color: "white",
+	fontSize: "12px",
+	fontWeight: "bold",
+};
+
 
 export class UserPage {
 	private cmd: any;
@@ -144,11 +158,16 @@ export class UserPage {
 
 	}
 
+	// Stand-alone bar (below the status table) describing the page owner. Hidden when there is nothing to show.
 	private makeStatusDiv(){
 		const {lastVisit} = this.startingState;
-		return $('div').css({fontSize:"12px", backgroundColor:"#C0C0C0"}).withChildren(
-			$('span').txt((lastVisit !== undefined && 0 < lastVisit) ? `Last Visit: ${new Date(lastVisit).toDateString()}` : "Last Visit: none" ).css({color:"#800000",padding:"5px"}),
-			$('span').txt(`DL:${this.pageOwnerCtx.downloadsInLastYear}` ).css({color:"blue",padding:"5px"}),
+		const hasVisit = lastVisit !== undefined && 0 < lastVisit;
+		if(!hasVisit && this.pageOwnerCtx.totalDownloads === 0)
+			return null;
+
+		return $('div').css(pageOwnerBarCss).withChildren(
+			$('span').txt(hasVisit ? `Last Visit: ${new Date(lastVisit).toDateString()}` : "Last Visit: none" ),
+			$('span').txt(`DL: ${this.pageOwnerCtx.downloadsInLastYear}` ),
 		)
 	}
 
