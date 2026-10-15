@@ -43,8 +43,8 @@ const pageOwnerBarCss = {
 	marginTop: "6px",
 	padding: "4px 8px",
 	borderRadius: "4px",
-	background: "#5a2d82",
-	color: "white",
+	background: "#FFD700",
+	color: "black",
 	fontSize: "12px",
 	fontWeight: "bold",
 };
