@@ -341,7 +341,7 @@ export class SidePanel {
 	private copyTaggedUsers(singleImage: SingleImage): void {
 		const usernames = singleImage.taggedUsers.filter((u): u is string => !!u);
 		void navigator.clipboard.writeText(usernames.join(" "));
-		void showToast(`${usernames.length} tags copied to clipboard.`, 3000);
+		void showToast(`${usernames.length} tags copied to clipboard: ${usernames.join(" ")}`, 3000);
 	}
 
 	private createNewImageContainer(): void {
