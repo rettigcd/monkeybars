@@ -12,6 +12,7 @@ import type { LocalStorageLocationEntity } from "../local-storage";
 import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { instaDom } from "../services/instaDom";
 import { buildRequestSnooper } from "../services/snoopBuilder";
+import { VideoSniffer } from "../services/video-sniffer";
 import { UserUpdateService } from "../trackers/user-update-service";
 import { Gallery } from "../ui/gallery";
 import { makeLocationTable } from "../ui/location-table";
@@ -67,6 +68,7 @@ export class LocationPage {
 		]);
 
 		new UserUpdateService({ batchProducer });
+		new VideoSniffer(snooper); // after the extractors: picks up videos they don't handle
 
 		// Age relative to lastVisit rather than "now" - both the bucket (day/week/
 		// month/year) and the number scale off the same offset, signed +/- for

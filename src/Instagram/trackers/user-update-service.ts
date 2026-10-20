@@ -40,12 +40,12 @@ export class UserUpdateService {
 	private registerDownloadListeners(batch:PicGroup[]) {
 		for (const { pics } of batch)
 			for (const pic of pics)
-				pic.listen("downloadProgress", this.singlePicDownloadListener);
-	}
-
-	// when a pick is downloaded, updates user's download count
-	private readonly singlePicDownloadListener : ObservableListener<SingleImage, "downloadProgress"> = ({ host: { owner, date }, newValue:progress }) => {
-		if (progress.status == "complete" && owner)
-			new UserCtx(owner).recordDownload(date);
+				pic.listen("downloadProgress", recordDownloadWhenComplete);
 	}
 }
+
+// when a pic is downloaded, updates user's download count
+export const recordDownloadWhenComplete : ObservableListener<SingleImage, "downloadProgress"> = ({ host: { owner, date }, newValue:progress }) => {
+	if (progress.status == "complete" && owner)
+		new UserCtx(owner).recordDownload(date);
+};

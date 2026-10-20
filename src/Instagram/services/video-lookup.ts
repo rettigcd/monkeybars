@@ -16,6 +16,10 @@ class VideoLookup {
 			this.byCode.set(code, video);
 	}
 
+	has(code: string | undefined): boolean {
+		return code !== undefined && this.byCode.has(code);
+	}
+
 	get(code: string | undefined): SingleImage | undefined {
 		return code ? this.byCode.get(code) : undefined;
 	}

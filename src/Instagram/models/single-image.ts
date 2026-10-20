@@ -158,8 +158,9 @@ export class SingleImage implements ObservableHost<SingleImage> {
 				return false;
 			}
 			const { video, audio } = best;
-			con.print(`video: downloading best quality ${video.width}x${video.height} (${video.label} ${video.codecs})`
-				+ (audio ? ` + audio (${audio.codecs})` : " without audio"));
+			con.print(`video: downloading %cbest quality%c ${video.width}x${video.height} (${video.label} ${video.codecs})`
+				+ (audio ? ` + audio (${audio.codecs})` : " without audio"),
+				"background:pink;color:black;padding:1px 4px", "");
 			await downloadDashVideo(best, this.filename, onprogress);
 			return true;
 		}
