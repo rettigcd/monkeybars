@@ -4,7 +4,7 @@ import { download, downloadAsync } from "~/lib/gm";
 import { formatDateForFilename } from "./date-formats";
 import { SingleImage } from "./models/single-image";
 import { instaDom, pageOwnerName } from "./services/instaDom";
-import { codeFromPath, type PlayingVideo, videoLookup } from "./services/video-lookup";
+import { codeFromPath, type PlayingVideo, storyItemIdFromPath, videoLookup } from "./services/video-lookup";
 import { showToast } from "./ui/toast";
 
 export type MousePoint = { clientX: number; clientY: number };
@@ -31,6 +31,25 @@ class PointerTracker {
 	public getCurrentPosition(): MousePoint {
 		return this.mousePos;
 	}
+}
+
+// Stories & highlights (photo or video): /stories/<user>/<pk>/ names the item. Otherwise (highlights,
+// or a story's first item before the url updates) the card's "posted ... ago" <time datetime=...>
+// label identifies it by its exact posting time. The viewer also shows neighboring cards with
+// their own labels, so use the nearest ancestor of the media that holds exactly one label.
+function findStoryItem(mediaEl: Element): SingleImage | undefined {
+	const byUrl = videoLookup.getById(storyItemIdFromPath(location.pathname));
+	if (byUrl)
+		return byUrl;
+
+	for (let ancestor = mediaEl.parentElement; ancestor; ancestor = ancestor.parentElement) {
+		const times = ancestor.querySelectorAll("time[datetime]");
+		if (times.length > 1)
+			return undefined; // reached the neighboring cards without finding our own label
+		if (times.length === 1)
+			return videoLookup.getByTakenAt(Date.parse(times[0].getAttribute("datetime")!) / 1000);
+	}
+	return undefined;
 }
 
 export class ScreenImageActions {
@@ -161,6 +180,13 @@ export class ScreenImageActions {
 	// Identify the post by its code (from the page url for a popup, or the thumb's link)
 	// and download its MP4 instead. Returns false when no known video is under the point.
 	private async tryDownloadVideo(sources: SourceUnderPoint[]): Promise<boolean> {
+		if (location.pathname.startsWith("/stories/")) {
+			const storyItem = findStoryItem(sources[0].el);
+			if (storyItem)
+				return this.downloadKnownMedia(storyItem);
+			con.print("story: could not identify the item on screen - falling back to the image/frame");
+		}
+
 		const linkCode = codeFromPath(sources[0].el.closest("a[href]")?.getAttribute("href"));
 		const videoEl = sources.map(({ el }) => el).find((el): el is HTMLVideoElement => el instanceof HTMLVideoElement);
 
@@ -179,13 +205,18 @@ export class ScreenImageActions {
 				con.print(`video: could not tell which carousel slide is playing (duration ${videoEl.duration?.toFixed(2)}s, img_index ${imgIndex || "none"})`);
 			return false;
 		}
+		return this.downloadKnownMedia(video);
+	}
 
-		void showToast(`downloading video (${video.owner})`, 3000);
+	// Downloads media we have API data for (correct owner, date and best quality). Always returns true.
+	private async downloadKnownMedia(media: SingleImage): Promise<boolean> {
+		const kind = media.isVideo ? "video" : "image";
+		void showToast(`downloading ${kind} (${media.owner})`, 3000);
 		try {
-			await video.downloadLargestAsync();
+			await media.downloadLargestAsync();
 		} catch (ex) {
 			console.error(ex);
-			void showToast(`video download failed (${video.owner})`, 5000);
+			void showToast(`${kind} download failed (${media.owner})`, 5000);
 		}
 		return true;
 	}

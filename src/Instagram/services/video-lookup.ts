@@ -5,6 +5,11 @@ export function codeFromPath(path: string | null | undefined): string | undefine
 	return path?.match(/\/(?:p|reels?)\/([A-Za-z0-9_-]+)/)?.[1];
 }
 
+// The story item's media pk from /stories/<user>/<pk>/ (highlights urls carry the highlight's id instead).
+export function storyItemIdFromPath(path: string): string | undefined {
+	return path.match(/^\/stories\/(?!highlights\/)[^/]+\/(\d+)/)?.[1];
+}
+
 // What we know about the <video> playing on screen, to pick the right carousel slide.
 export type PlayingVideo = {
 	duration?: number; // seconds, from the <video> element
@@ -22,6 +27,25 @@ const DURATION_TOLERANCE_S = 0.5;
 // is an undownloadable blob: url - can be traced back to the MP4 urls from the API response.
 class VideoLookup {
 	private readonly byCode = new Map<string, Entry>();
+	private readonly byId = new Map<string, SingleImage>(); // story items (photos and videos) by media pk
+
+	registerById(id: string, media: SingleImage): void {
+		this.byId.set(id, media);
+	}
+
+	hasId(id: string | undefined): boolean {
+		return id !== undefined && this.byId.has(id);
+	}
+
+	getById(id: string | undefined): SingleImage | undefined {
+		return id ? this.byId.get(id) : undefined;
+	}
+
+	// Story item posted at this exact time (seconds) - the story viewer's <time datetime=...> label.
+	getByTakenAt(seconds: number): SingleImage | undefined {
+		const matches = [...this.byId.values()].filter(m => Math.abs(m.date.getTime() / 1000 - seconds) < 1);
+		return matches.length === 1 ? matches[0] : undefined;
+	}
 
 	register(code: string | undefined, slides: SingleImage[], isCarousel: boolean): void {
 		if (code && slides.some(s => s.isVideo))

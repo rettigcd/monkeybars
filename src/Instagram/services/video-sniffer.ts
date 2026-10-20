@@ -19,52 +19,65 @@ export class VideoSniffer {
 	}
 
 	private readonly snoop = (x: SnoopRequest): void => {
-		if (x.responseText?.includes("video_versions"))
+		if (mayHoldMedia(x.responseText))
 			this.scan(parseJsonish(x.responseText), describeRequest(x));
 	};
 
 	private scanScripts(): void {
 		for (const script of instaDom.scripts)
-			if (script.innerHTML.includes("video_versions"))
+			if (mayHoldMedia(script.innerHTML))
 				this.scan(parseJsonish(script.innerHTML), "page script");
 	}
 
 	private scan(roots: unknown[], source: string): void {
-		const nodes = roots.flatMap(root => findVideoNodes(root));
+		const found = roots.flatMap(root => findMediaNodes(root));
 		let added = 0;
-		for (const node of nodes) {
-			if (videoLookup.has(node.code))
-				continue;
+		for (const { node, owner } of found) {
+			const id = node.pk ? String(node.pk) : undefined;
+			if (videoLookup.hasId(id) || videoLookup.has(node.code ?? undefined))
+				continue; // already registered (here, or by an extractor)
 			try {
-				const group = PicGroup.fromMediaWithUser(node); // registers the video by code
+				// story items don't carry their own user - it's on the story ("reel") above them
+				const withUser = node.user?.username ? node : { ...node, user: { ...node.user, username: owner } as MediaNode["user"] };
+				const group = PicGroup.fromMediaWithUser(withUser); // registers videos by post code
 				group.pics.forEach(pic => pic.listen("downloadProgress", recordDownloadWhenComplete));
+				if (id && group.pics.length === 1)
+					videoLookup.registerById(id, group.pics[0]);
 				added++;
 			}
 			catch (err) {
-				con.print(`videos: could not read ${node.code} from ${source}`, err);
+				con.print(`videos: could not read ${node.code ?? id} from ${source}`, err);
 			}
 		}
 		if (added)
-			con.print(`videos: registered ${added} new of ${nodes.length} from ${source}`);
+			con.print(`videos: registered ${added} new of ${found.length} from ${source}`);
 	}
 }
 
-type VideoNode = MediaNode & { code: string };
+const mayHoldMedia = (text: string | undefined) => !!text && (text.includes("video_versions") || text.includes("\"story\""));
 
-// Media nodes that carry their own downloadable video.
-function findVideoNodes(root: unknown, found: VideoNode[] = [], depth = 0): VideoNode[] {
+type FoundNode = { node: MediaNode; owner: string };
+
+// Media nodes that carry their own downloadable video, plus story items (photos too),
+// with the owner taken from the nearest username at or above the node.
+function findMediaNodes(root: unknown, found: FoundNode[] = [], owner?: string, depth = 0): FoundNode[] {
 	if (root == null || typeof root !== "object" || 60 < depth)
 		return found;
 
-	const node = root as Partial<MediaNode>;
-	if (Array.isArray(node.video_versions) && node.video_versions.length
-		&& typeof node.code === "string"
-		&& typeof node.user?.username === "string"
-		&& node.image_versions2?.candidates?.length)
-		found.push(node as VideoNode);
+	const node = root as Partial<MediaNode> & { product_type?: string; owner?: { username?: unknown } };
+	const ownName = typeof node.user?.username === "string" ? node.user.username
+		: typeof node.owner?.username === "string" ? node.owner.username
+		: undefined;
+	owner = ownName ?? owner;
+
+	const hasImage = !!node.image_versions2?.candidates?.length;
+	const isVideo = Array.isArray(node.video_versions) && node.video_versions.length > 0 && typeof node.code === "string";
+	const isStoryItem = node.product_type === "story" && node.pk != null;
+	if (hasImage && (isVideo || isStoryItem) && owner)
+		found.push({ node: node as MediaNode, owner });
 
 	for (const value of Object.values(root))
-		findVideoNodes(value, found, depth + 1);
+		findMediaNodes(value, found, owner, depth + 1);
 	return found;
 }
 
