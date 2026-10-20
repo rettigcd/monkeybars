@@ -1,8 +1,9 @@
 import { con } from "~/lib/console";
+import { EventHostBase } from "~/lib/observable";
 import type { RequestSnooper, SnoopRequest } from "~/lib/snoop";
+import type { BatchProducerEvents } from "../extractors/base-pic-extractor";
 import type { MediaNode } from "../extractors/ig-types";
 import { PicGroup } from "../models/pic-group";
-import { recordDownloadWhenComplete } from "../trackers/user-update-service";
 import { instaDom } from "./instaDom";
 import { videoLookup } from "./video-lookup";
 
@@ -10,10 +11,17 @@ import { videoLookup } from "./video-lookup";
 // scripts on a fresh load) and registers them for download by post code.
 // The dedicated extractors only understand the Posts / Tagged / location queries,
 // while Reels (profile Reels tab, the /reels/ feed, /reel/CODE pages) arrive via other queries.
-export class VideoSniffer {
+// Emits what it finds as batches, so they reach the side panel, gallery and download tracking
+// like any other source. Must be the LAST source on a snooper, so the dedicated extractors
+// register their posts first and the sniffer only adds what they missed.
+export class VideoSniffer extends EventHostBase<BatchProducerEvents> {
 
-	public constructor(snooper: RequestSnooper) {
+	// scanPageScripts: false where another source already reads the page's embedded data
+	// (the location page's InitialLocationPageParser), to avoid emitting those posts twice.
+	public constructor(snooper: RequestSnooper, { scanPageScripts = true } = {}) {
+		super();
 		snooper.addHandler(this.snoop);
+		if (!scanPageScripts) return;
 		if (document.readyState === "complete") this.scanScripts();
 		else window.addEventListener("load", () => this.scanScripts());
 	}
@@ -31,7 +39,7 @@ export class VideoSniffer {
 
 	private scan(roots: unknown[], source: string): void {
 		const found = roots.flatMap(root => findMediaNodes(root));
-		let added = 0;
+		const batch: PicGroup[] = [];
 		for (const { node, owner } of found) {
 			const id = node.pk ? String(node.pk) : undefined;
 			if (videoLookup.hasId(id) || videoLookup.has(node.code ?? undefined))
@@ -40,17 +48,18 @@ export class VideoSniffer {
 				// story items don't carry their own user - it's on the story ("reel") above them
 				const withUser = node.user?.username ? node : { ...node, user: { ...node.user, username: owner } as MediaNode["user"] };
 				const group = PicGroup.fromMediaWithUser(withUser); // registers videos by post code
-				group.pics.forEach(pic => pic.listen("downloadProgress", recordDownloadWhenComplete));
 				if (id && group.pics.length === 1)
 					videoLookup.registerById(id, group.pics[0]);
-				added++;
+				batch.push(group);
 			}
 			catch (err) {
 				con.print(`videos: could not read ${node.code ?? id} from ${source}`, err);
 			}
 		}
-		if (added)
-			con.print(`videos: registered ${added} new of ${found.length} from ${source}`);
+		if (batch.length) {
+			con.print(`videos: registered ${batch.length} new of ${found.length} from ${source}`);
+			this.trigger("batchReceived", batch);
+		}
 	}
 }
 

@@ -6,6 +6,7 @@ import { DetailsPopup } from "./misc/details-popup";
 import { Profile_Posts, Profile_Tagged } from "./user/profile-extractors";
 import { SavedPosts } from "./user/saved-posts";
 import { UserPosts } from "./user/user-posts";
+import { VideoSniffer } from "../services/video-sniffer";
 
 // Generates batches of PicGroups from multiple sources, and marks them as new or not based on the last visit timestamp. 
 export class BatchProducerGroup 
@@ -38,6 +39,7 @@ export function buildBatchProducerGroup_ForUser(snooper:RequestSnooper, lastVisi
 		new SavedPosts(snooper),
 		new UserPosts(snooper),
 		new DetailsPopup(snooper),
+		new VideoSniffer(snooper), // last: only adds videos/story items the extractors above missed (e.g. Reels, Stories)
 	]);
 
 }

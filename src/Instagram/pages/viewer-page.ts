@@ -1,7 +1,6 @@
 import type { SnlWindow } from "../../snl/window";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
 import { buildRequestSnooper } from "../services/snoopBuilder";
-import { VideoSniffer } from "../services/video-sniffer";
 import { UserUpdateService } from "../trackers/user-update-service";
 
 type ViewerPageConstructorArgs = {
@@ -14,8 +13,7 @@ type ViewerPageConstructorArgs = {
 export class ViewerPage {
 	public constructor({ win }: ViewerPageConstructorArgs) {
 		const snooper = buildRequestSnooper(win);
-		const batchProducer = buildBatchProducerGroup_ForUser(snooper, undefined); // registers videos found by the extractors
+		const batchProducer = buildBatchProducerGroup_ForUser(snooper, undefined); // extractors + video sniffer register what's found
 		new UserUpdateService({ batchProducer });
-		new VideoSniffer(snooper);
 	}
 }

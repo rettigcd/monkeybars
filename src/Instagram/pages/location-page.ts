@@ -65,10 +65,10 @@ export class LocationPage {
 			new InitialLocationPageParser(),
 			new LocationContent(snooper),
 			new DetailsPopup(snooper),
+			new VideoSniffer(snooper, { scanPageScripts: false }), // last; InitialLocationPageParser already reads the page scripts
 		]);
 
 		new UserUpdateService({ batchProducer });
-		new VideoSniffer(snooper); // after the extractors: picks up videos they don't handle
 
 		// Age relative to lastVisit rather than "now" - both the bucket (day/week/
 		// month/year) and the number scale off the same offset, signed +/- for

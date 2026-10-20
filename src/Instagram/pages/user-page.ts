@@ -20,7 +20,6 @@ import { SidePanel } from "../ui/side-panel";
 import { makeStatusGroupTable } from "../ui/status-group-table";
 import { addCopyButton } from "../ui/ui";
 import { UserCtx } from "../user-ctx";
-import { VideoSniffer } from "../services/video-sniffer";
 
 // TODO: add proper types if you have them
 type ConstructorArgs = {
@@ -87,7 +86,6 @@ export class UserPage {
 		const batchProducer = buildBatchProducerGroup_ForUser(snooper,this.startingState.lastVisit);
 
 		new UserUpdateService({batchProducer});
-		new VideoSniffer(snooper); // after the extractors: picks up videos (e.g. Reels) they don't handle
 
 		const iiLookup = new ImageLookupByUrl(batchProducer);
 		iiLookup.on("missingImage", snooper.checkLogForMissingImage);
