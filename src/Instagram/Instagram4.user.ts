@@ -60,7 +60,7 @@ export function initInstagram4(): void {
 	const hotkeys = new HotkeyManager();
 	const screenImageActions = new ScreenImageActions(win);
 	hotkeys.register(" ", () => screenImageActions.downloadImageInCenter());
-	hotkeys.register("d", () => screenImageActions.downloadImageUnderMouse());
+	hotkeys.register("d", () => screenImageActions.downloadImageInCenter());
 	hotkeys.register("t", () => screenImageActions.showTaggedUsersUnderMouse());
 	hotkeys.register("p", openFocusUserProfilePage);
 	hotkeys.register("Ctrl+Shift+U", saveUsersToFile);

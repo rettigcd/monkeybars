@@ -314,6 +314,13 @@ export class SidePanel {
 				})
 				.appendTo(div);
 
+		if (singleImage.isVideo)
+			$('span')
+				.txt("▶ video")
+				.attr("title", "click to download the video")
+				.css({ ...this.taggedUsersBadgeCss, top: "auto", bottom: "0", cursor: "inherit", pointerEvents: "none" })
+				.appendTo(div);
+
 		let overlay: ElementBuilder<HTMLElement> | null = null;
 		singleImage.listen('downloadProgress',({newValue:progress}:{newValue:TaskStatus})=>{
 			switch(progress.status){

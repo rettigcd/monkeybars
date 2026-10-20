@@ -2,6 +2,7 @@ import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observ
 import { toMs } from "~/lib/time";
 import type { MediaNode } from "../extractors/ig-types";
 import { sanitizeImgUrl } from "../services/image-lookup-by-url";
+import { videoLookup } from "../services/video-lookup";
 import { SingleImage } from "./single-image";
 
 type PicGroupArgs = {
@@ -50,10 +51,12 @@ export class PicGroup implements ObservableHost<PicGroup> {
 	static fromMediaWithUser(dto: MediaNode): PicGroup {
 		const {
 			pk,
+			code,
 			user,
 			taken_at,
 			carousel_media,
 			image_versions2,
+			video_versions,
 			caption,
 			usertags,
 			has_liked,
@@ -67,9 +70,14 @@ export class PicGroup implements ObservableHost<PicGroup> {
 
 		const coauthors = (coauthor_producers ?? []).map(({ username }) => username);
 
-		const pics = Array.isArray(carousel_media) && 0 < carousel_media.length
-				? carousel_media.map( ({ usertags, image_versions2 }) => SingleImage.fromMedia({ usertags, image_versions2, owner, date, coauthors }) )
-				: [SingleImage.fromMedia({ usertags, image_versions2, owner, date, coauthors })];
+		const isCarousel = Array.isArray(carousel_media) && 0 < carousel_media.length;
+		const pics = isCarousel
+				? carousel_media.map( ({ usertags, image_versions2, video_versions }) => SingleImage.fromMedia({ usertags, image_versions2, video_versions, owner, date, coauthors }) )
+				: [SingleImage.fromMedia({ usertags, image_versions2, video_versions, owner, date, coauthors })];
+
+		// Carousel videos can't be identified by post code alone (the code covers every slide).
+		if (!isCarousel)
+			videoLookup.register(code, pics[0]);
 
 		const following = user?.friendship_status?.following || false;
 

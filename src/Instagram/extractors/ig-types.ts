@@ -38,6 +38,15 @@ export interface Edge {
 export interface TaggedImageMedia {
 	usertags: UserTags | null;
 	image_versions2: ImageVersions2;
+	video_versions?: VideoVersion[] | null; // progressive (single-file, with audio) MP4s - usually capped at 720p
+}
+
+// For the full-resolution stream, see video_dash_manifest (separate audio/video tracks).
+export interface VideoVersion {
+	url: string;
+	width: number;
+	height: number;
+	type?: number;
 }
 
 export interface CarouselMedia extends TaggedImageMedia {
@@ -45,6 +54,7 @@ export interface CarouselMedia extends TaggedImageMedia {
 
 export interface MediaNode extends TaggedImageMedia {
 	pk: string;
+	code?: string; // shortcode used in /p/CODE/ and /reel/CODE/ urls
 	caption: Caption | null;
 	taken_at?: number;
 	user: User;

@@ -5,7 +5,7 @@ import type { TaskStatus } from "~/lib/progress-types";
 import { by } from "~/lib/sorting";
 import { throwExp } from "~/lib/throw";
 import { formatDateForFilename } from "../date-formats";
-import type { ImageCandidate, TaggedImageMedia, UserTags } from "../extractors/ig-types";
+import type { ImageCandidate, TaggedImageMedia, UserTags, VideoVersion } from "../extractors/ig-types";
 
 
 type SingleImageMediaArgs = TaggedImageMedia & {
@@ -28,12 +28,15 @@ export class SingleImage implements ObservableHost<SingleImage> {
 
 	public downloadProgress: TaskStatus = { status:'notStarted' }; // observable
 
+	// Set when this media is a video: the largest progressive MP4 (has audio, usually <= 720p).
+	public readonly videoUrl?: string;
+
 	private readonly filename: string;
 	private readonly largestUrl: string;
 
 	public listen!: ListenFn<SingleImage>;
 
-	constructor(taggedUsers: string[], taggedUserIds: string[], images: ImageCandidate[], owner: string, date: Date, coauthors: string[] = []) {
+	constructor(taggedUsers: string[], taggedUserIds: string[], images: ImageCandidate[], owner: string, date: Date, coauthors: string[] = [], videoVersions: VideoVersion[] = []) {
 		this.taggedUsers = taggedUsers;
 		this.taggedUserIds = taggedUserIds;
 		this.coauthors = coauthors;
@@ -50,7 +53,11 @@ export class SingleImage implements ObservableHost<SingleImage> {
 		this.owner = owner;
 		this.date = date;
 
-		const ext = this.smallestUrl.includes(".webp") ? ".webp" : ".jpg";
+		this.videoUrl = [...videoVersions].sort(by(({ height }) => height)).pop()?.url;
+
+		const ext = this.videoUrl ? ".mp4"
+			: this.smallestUrl.includes(".webp") ? ".webp"
+			: ".jpg";
 		const uniqueUsernames = [...new Set([owner, ...coauthors, ...taggedUsers])];
 		this.filename = uniqueUsernames.slice(0, 10).join(" ")
 			+ " " + formatDateForFilename(date) + ext;
@@ -58,10 +65,10 @@ export class SingleImage implements ObservableHost<SingleImage> {
 		makeObservable(this);
 	}
 
-	static fromMedia({ usertags, image_versions2, owner, date = throwExp("date"), coauthors = [] }: SingleImageMediaArgs): SingleImage {
+	static fromMedia({ usertags, image_versions2, video_versions, owner, date = throwExp("date"), coauthors = [] }: SingleImageMediaArgs): SingleImage {
 		const taggedUsers:string[] = SingleImage.parseUserTags(usertags);
 		const taggedUserIds:string[] = SingleImage.parseUserTagIds(usertags);
-		return new SingleImage(taggedUsers, taggedUserIds, image_versions2.candidates, owner, date, coauthors);
+		return new SingleImage(taggedUsers, taggedUserIds, image_versions2.candidates, owner, date, coauthors, video_versions ?? []);
 	}
 
 	static fromUrlAndOwner(url: string, imageWidth: number, imageHeight: number, owner: string): SingleImage {
@@ -109,9 +116,14 @@ export class SingleImage implements ObservableHost<SingleImage> {
 	// 	con.print(`downloaded: ${this.filename}`);
 	// }
 
+	get isVideo(): boolean { return this.videoUrl !== undefined; }
+
+	// Downloads the video if this is one, otherwise the largest image.
 	public async downloadLargestAsync(){
 		this.downloadProgress = {status:'inProgress', loaded:0, total:1};
-		await downloadAsync({url:this.largestUrl, name:this.filename, 
+		const url = this.videoUrl ?? this.largestUrl;
+		const timeout = this.isVideo ? 5 * 60_000 : undefined; // default 5s is far too short for video
+		await downloadAsync({url, name:this.filename, timeout,
 			onprogress: ({loaded,total}) => this.downloadProgress = {status:'inProgress', loaded, total} }
 		);
 		this.downloadProgress = {status:'complete'};

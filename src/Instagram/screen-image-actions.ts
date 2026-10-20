@@ -3,6 +3,7 @@ import { download, downloadAsync } from "~/lib/gm";
 import { formatDateForFilename } from "./date-formats";
 import { SingleImage } from "./models/single-image";
 import { instaDom, pageOwnerName } from "./services/instaDom";
+import { codeFromPath, videoLookup } from "./services/video-lookup";
 import { showToast } from "./ui/toast";
 
 export type MousePoint = { clientX: number; clientY: number };
@@ -39,15 +40,11 @@ export class ScreenImageActions {
 		this.pointerTracker = new PointerTracker(win);
 	}
 
-	// Used by key press tracker (' ')
+	// Used by key press tracker (' ' and 'd')
+	// Targets the popup's center when one is open, otherwise the mouse.
 	public async downloadImageInCenter(): Promise<void> {
 		const point = this.getCenterOfPresentation() ?? this.pointerTracker.getCurrentPosition();
 		await this.downloadImageUnderPoint(point);
-	}
-
-	// Used by key press tracker ('d')
-	public async downloadImageUnderMouse(): Promise<void> {
-		await this.downloadImagesUnderPoint(this.pointerTracker.getCurrentPosition());
 	}
 
 	// Used by key press tracker
@@ -144,6 +141,9 @@ export class ScreenImageActions {
 			return;
 		}
 
+		if (await this.tryDownloadVideo(sources))
+			return;
+
 		// A paused video shows a static overlay image (e.g. play button) stacked
 		// on top of the blob video source. Prefer the video in that case.
 		const index = this.isStaticOverlayOnBlobVideo(sources) ? 1 : 0;
@@ -156,15 +156,25 @@ export class ScreenImageActions {
 			&& sources[1].src.startsWith("blob:");
 	}
 
-	private async downloadImagesUnderPoint(point: MousePoint): Promise<void> {
-		const sources = this.getSourcesUnder(point);
-		if (sources.length === 0) {
-			console.log("no img");
-			return;
-		}
+	// A playing <video> has an undownloadable blob: src, and a grid thumb only shows the cover image.
+	// Identify the post by its code (from the page url for a popup, or the thumb's link)
+	// and download its MP4 instead. Returns false when no known video is under the point.
+	private async tryDownloadVideo(sources: SourceUnderPoint[]): Promise<boolean> {
+		const linkCode = codeFromPath(sources[0].el.closest("a[href]")?.getAttribute("href"));
+		const hasVideoEl = sources.some(({ el }) => el instanceof HTMLVideoElement);
+		const video = (hasVideoEl ? videoLookup.get(codeFromPath(location.pathname)) : undefined)
+			?? videoLookup.get(linkCode);
+		if (video == null)
+			return false;
 
-		for(let src of sources)
-			await this.downloadSource(src);
+		void showToast(`downloading video (${video.owner})`, 3000);
+		try {
+			await video.downloadLargestAsync();
+		} catch (ex) {
+			console.error(ex);
+			void showToast(`video download failed (${video.owner})`, 5000);
+		}
+		return true;
 	}
 
 	private async downloadSource(source: SourceUnderPoint): Promise<void> {
