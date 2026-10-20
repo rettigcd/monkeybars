@@ -7,6 +7,7 @@ import { throwExp } from "~/lib/throw";
 import { formatDateForFilename } from "../date-formats";
 import type { ImageCandidate, TaggedImageMedia, UserTags, VideoVersion } from "../extractors/ig-types";
 import { bestDashVideo, downloadDashVideo } from "../services/best-video-download";
+import { parseDashDuration } from "../services/dash-manifest";
 
 type VideoSources = {
 	versions?: VideoVersion[] | null;
@@ -37,6 +38,7 @@ export class SingleImage implements ObservableHost<SingleImage> {
 	public readonly videoUrl?: string;
 	private readonly videoSize: number = 0; // larger dimension of videoUrl
 	private readonly dashManifest?: string; // separate higher-quality video + audio tracks
+	public readonly videoDuration?: number; // seconds - identifies which carousel slide is playing
 
 	private readonly filename: string;
 	private readonly largestUrl: string;
@@ -65,6 +67,7 @@ export class SingleImage implements ObservableHost<SingleImage> {
 			this.videoUrl = progressive.url;
 			this.videoSize = Math.max(progressive.width, progressive.height);
 			this.dashManifest = video.dashManifest ?? undefined;
+			this.videoDuration = this.dashManifest ? parseDashDuration(this.dashManifest) : undefined;
 		}
 
 		const ext = this.videoUrl ? ".mp4"

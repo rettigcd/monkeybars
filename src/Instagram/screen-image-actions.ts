@@ -1,9 +1,10 @@
+import { con } from "~/lib/console";
 import { $ } from "~/lib/dom3";
 import { download, downloadAsync } from "~/lib/gm";
 import { formatDateForFilename } from "./date-formats";
 import { SingleImage } from "./models/single-image";
 import { instaDom, pageOwnerName } from "./services/instaDom";
-import { codeFromPath, videoLookup } from "./services/video-lookup";
+import { codeFromPath, type PlayingVideo, videoLookup } from "./services/video-lookup";
 import { showToast } from "./ui/toast";
 
 export type MousePoint = { clientX: number; clientY: number };
@@ -161,11 +162,23 @@ export class ScreenImageActions {
 	// and download its MP4 instead. Returns false when no known video is under the point.
 	private async tryDownloadVideo(sources: SourceUnderPoint[]): Promise<boolean> {
 		const linkCode = codeFromPath(sources[0].el.closest("a[href]")?.getAttribute("href"));
-		const hasVideoEl = sources.some(({ el }) => el instanceof HTMLVideoElement);
-		const video = (hasVideoEl ? videoLookup.get(codeFromPath(location.pathname)) : undefined)
-			?? videoLookup.get(linkCode);
-		if (video == null)
+		const videoEl = sources.map(({ el }) => el).find((el): el is HTMLVideoElement => el instanceof HTMLVideoElement);
+
+		// For carousels: which slide is playing (matched by duration, else the url's 1-based ?img_index=)
+		const imgIndex = Number(new URLSearchParams(location.search).get("img_index"));
+		const playing: PlayingVideo | undefined = videoEl && {
+			duration: videoEl.duration,
+			slideIndex: imgIndex > 0 ? imgIndex - 1 : undefined,
+		};
+
+		const pageCode = codeFromPath(location.pathname);
+		const video = (videoEl ? videoLookup.get(pageCode, playing) : undefined)
+			?? videoLookup.get(linkCode, playing);
+		if (video == null) {
+			if (videoEl && videoLookup.has(pageCode))
+				con.print(`video: could not tell which carousel slide is playing (duration ${videoEl.duration?.toFixed(2)}s, img_index ${imgIndex || "none"})`);
 			return false;
+		}
 
 		void showToast(`downloading video (${video.owner})`, 3000);
 		try {

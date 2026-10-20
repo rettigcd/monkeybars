@@ -5,24 +5,56 @@ export function codeFromPath(path: string | null | undefined): string | undefine
 	return path?.match(/\/(?:p|reels?)\/([A-Za-z0-9_-]+)/)?.[1];
 }
 
-// Maps post shortcodes to their (single, non-carousel) video, so a video playing
-// on screen - whose <video> src is an undownloadable blob: url - can be traced back
-// to the progressive MP4 url from the API response.
-class VideoLookup {
-	private readonly byCode = new Map<string, SingleImage>();
+// What we know about the <video> playing on screen, to pick the right carousel slide.
+export type PlayingVideo = {
+	duration?: number; // seconds, from the <video> element
+	slideIndex?: number; // 0-based, from the page url's ?img_index= (when present)
+};
 
-	register(code: string | undefined, video: SingleImage): void {
-		if (code && video.isVideo)
-			this.byCode.set(code, video);
+type Entry = {
+	slides: SingleImage[]; // every slide (images too), so slideIndex lines up
+	isCarousel: boolean;
+};
+
+const DURATION_TOLERANCE_S = 0.5;
+
+// Maps post shortcodes to their videos, so a video playing on screen - whose <video> src
+// is an undownloadable blob: url - can be traced back to the MP4 urls from the API response.
+class VideoLookup {
+	private readonly byCode = new Map<string, Entry>();
+
+	register(code: string | undefined, slides: SingleImage[], isCarousel: boolean): void {
+		if (code && slides.some(s => s.isVideo))
+			this.byCode.set(code, { slides, isCarousel });
 	}
 
 	has(code: string | undefined): boolean {
 		return code !== undefined && this.byCode.has(code);
 	}
 
-	get(code: string | undefined): SingleImage | undefined {
-		return code ? this.byCode.get(code) : undefined;
+	// For a carousel, only answers when told about the playing video (so a grid thumb,
+	// which shows the cover, isn't silently swapped for one of the carousel's videos).
+	get(code: string | undefined, playing?: PlayingVideo): SingleImage | undefined {
+		const entry = code ? this.byCode.get(code) : undefined;
+		if (entry == null) return undefined;
+		if (!entry.isCarousel) return entry.slides[0];
+		return playing ? pickSlide(entry.slides, playing) : undefined;
 	}
+}
+
+function pickSlide(slides: SingleImage[], { duration, slideIndex }: PlayingVideo): SingleImage | undefined {
+	const videos = slides.filter(s => s.isVideo);
+	if (videos.length === 1)
+		return videos[0];
+
+	if (duration !== undefined && Number.isFinite(duration)) {
+		const matches = videos.filter(v => v.videoDuration !== undefined && Math.abs(v.videoDuration - duration) <= DURATION_TOLERANCE_S);
+		if (matches.length === 1)
+			return matches[0];
+	}
+
+	const byIndex = slideIndex !== undefined ? slides[slideIndex] : undefined;
+	return byIndex?.isVideo ? byIndex : undefined;
 }
 
 export const videoLookup = new VideoLookup();

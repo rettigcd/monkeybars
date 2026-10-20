@@ -76,9 +76,7 @@ export class PicGroup implements ObservableHost<PicGroup> {
 				? carousel_media.map( ({ usertags, image_versions2, video_versions, video_dash_manifest }) => SingleImage.fromMedia({ usertags, image_versions2, video_versions, video_dash_manifest, owner, date, coauthors }) )
 				: [SingleImage.fromMedia({ usertags, image_versions2, video_versions, video_dash_manifest, owner, date, coauthors })];
 
-		// Carousel videos can't be identified by post code alone (the code covers every slide).
-		if (!isCarousel)
-			videoLookup.register(code, pics[0]);
+		videoLookup.register(code, pics, isCarousel);
 
 		const following = user?.friendship_status?.following || false;
 

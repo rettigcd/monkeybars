@@ -36,6 +36,14 @@ export function parseDashManifest(xml: string): DashRepresentation[] {
 	});
 }
 
+// Seconds from the MPD's mediaPresentationDuration, e.g. "PT1M2.5S" -> 62.5
+export function parseDashDuration(xml: string): number | undefined {
+	const match = xml.match(/mediaPresentationDuration="PT(?:([\d.]+)H)?(?:([\d.]+)M)?(?:([\d.]+)S)?"/);
+	if (!match) return undefined;
+	const [, h = "0", m = "0", s = "0"] = match;
+	return Number(h) * 3600 + Number(m) * 60 + Number(s);
+}
+
 // Tallest video (then highest bitrate) and highest-bitrate audio.
 export function pickBestRepresentations(reps: DashRepresentation[]): { video?: DashRepresentation; audio?: DashRepresentation } {
 	const best = (kind: DashRepresentation["kind"], score: (r: DashRepresentation) => number[]) =>
