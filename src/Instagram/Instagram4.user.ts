@@ -26,8 +26,9 @@ import { HotkeyManager } from "~/lib/hotkey-manager";
 import { formatDateForFilename } from "./date-formats";
 import { LocationPage } from "./pages/location-page";
 import { UserPage } from "./pages/user-page";
+import { ViewerPage } from "./pages/viewer-page";
 import { ScreenImageActions } from "./screen-image-actions";
-import { instaDom } from "./services/instaDom";
+import { instaDom, pageOwnerName, pageSection } from "./services/instaDom";
 import { win } from "./types/window";
 
 silenceConsole(win);
@@ -70,7 +71,9 @@ export function initInstagram4(): void {
 
 	if (window.location.pathname.startsWith("/explore/locations"))
 		new LocationPage({win,hotkeys});
-	else if (window.location.pathname != "/")
+	else if (["reels", "reel", "stories"].includes(pageSection))
+		new ViewerPage({ win });
+	else if (pageOwnerName) // a profile (not home, nor another Instagram section)
 		new UserPage({ win, hotkeys });
 
 	con.print("%cInstagram4.js loaded", "background-color:#DFD");

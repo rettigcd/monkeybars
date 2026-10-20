@@ -73,6 +73,15 @@ export const instaDom = {
 
 };
 
-// For USERS, the page owner
-// when visiting locations, 'explore'
-export const pageOwnerName: string = location.pathname.split("/")[1];
+// First segment of the url path: a username on profile pages, otherwise an Instagram section.
+export const pageSection: string = location.pathname.split("/")[1];
+
+// First path segments that are Instagram's own sections, not usernames.
+const instagramSections = new Set([
+	"reels", "reel", "stories", "explore", "direct", "accounts", "p", "tv",
+	"about", "legal", "developer", "web", "challenge", "emails", "session", "oauth",
+]);
+
+// The profile's username on USER pages. Empty on the home page and on Instagram's own
+// sections (reels, stories, explore/locations, direct, ...).
+export const pageOwnerName: string = instagramSections.has(pageSection) ? "" : pageSection;
