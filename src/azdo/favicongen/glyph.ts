@@ -1,4 +1,4 @@
-export async function setRuneFavicon(input) {
+export async function setRuneFavicon(input: string) {
 	const data = new TextEncoder().encode(input);
 	const digest = await crypto.subtle.digest("SHA-256", data);
 	const b = Array.from(new Uint8Array(digest));
@@ -33,7 +33,7 @@ export async function setRuneFavicon(input) {
 		[5, 27], [16, 27], [27, 27]
 	];
 
-	const point = (byte) => grid[byte % grid.length];
+	const point = (byte: number) => grid[byte % grid.length];
 
 	// Choose a series of anchor points.
 	const p1 = point(b[2]);
