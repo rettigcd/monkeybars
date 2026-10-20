@@ -1,7 +1,7 @@
 import { $ } from "~/lib/dom3";
 
 import { HotkeyManager } from "../../lib/hotkey-manager";
-import type { SnlWindow } from "../../snl/window";
+import type { InstagramWindow } from "../window";
 import { reportLast } from "../age";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
 import { userRepo, type LocalStorageUserEntity } from "../local-storage";
@@ -23,7 +23,7 @@ import { UserCtx } from "../user-ctx";
 
 // TODO: add proper types if you have them
 type ConstructorArgs = {
-	win: SnlWindow;
+	win: InstagramWindow;
 	hotkeys: HotkeyManager
 };
 

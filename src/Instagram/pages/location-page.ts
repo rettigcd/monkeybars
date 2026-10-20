@@ -2,7 +2,7 @@ import { $ } from "~/lib/dom3";
 import { SyncedPersistentDict } from "~/lib/storage";
 
 import { HotkeyManager } from "../../lib/hotkey-manager";
-import { type SnlWindow } from "../../snl/window";
+import { type InstagramWindow } from "../window";
 import { formatAgeMs, getAgeTypeFromMs, loadTimeMs, reportLast, type AgeInfo } from "../age";
 import { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { InitialLocationPageParser } from "../extractors/location/initial-location-page-parser";
@@ -28,7 +28,7 @@ const locationTableHostCss = {
 };
 
 type LocationPageConstructor = {
-	win: SnlWindow;
+	win: InstagramWindow;
 	hotkeys: HotkeyManager;
 };
 

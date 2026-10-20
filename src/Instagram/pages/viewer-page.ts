@@ -1,10 +1,10 @@
-import type { SnlWindow } from "../../snl/window";
+import type { InstagramWindow } from "../window";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
 import { buildRequestSnooper } from "../services/snoopBuilder";
 import { UserUpdateService } from "../trackers/user-update-service";
 
 type ViewerPageConstructorArgs = {
-	win: SnlWindow;
+	win: InstagramWindow;
 };
 
 // Reels feed, single reels, Stories and Highlights: not a profile, so no tracking UI
