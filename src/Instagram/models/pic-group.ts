@@ -57,6 +57,7 @@ export class PicGroup implements ObservableHost<PicGroup> {
 			carousel_media,
 			image_versions2,
 			video_versions,
+			video_dash_manifest,
 			caption,
 			usertags,
 			has_liked,
@@ -72,8 +73,8 @@ export class PicGroup implements ObservableHost<PicGroup> {
 
 		const isCarousel = Array.isArray(carousel_media) && 0 < carousel_media.length;
 		const pics = isCarousel
-				? carousel_media.map( ({ usertags, image_versions2, video_versions }) => SingleImage.fromMedia({ usertags, image_versions2, video_versions, owner, date, coauthors }) )
-				: [SingleImage.fromMedia({ usertags, image_versions2, video_versions, owner, date, coauthors })];
+				? carousel_media.map( ({ usertags, image_versions2, video_versions, video_dash_manifest }) => SingleImage.fromMedia({ usertags, image_versions2, video_versions, video_dash_manifest, owner, date, coauthors }) )
+				: [SingleImage.fromMedia({ usertags, image_versions2, video_versions, video_dash_manifest, owner, date, coauthors })];
 
 		// Carousel videos can't be identified by post code alone (the code covers every slide).
 		if (!isCarousel)

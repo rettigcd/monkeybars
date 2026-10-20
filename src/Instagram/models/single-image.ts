@@ -1,12 +1,17 @@
 import { con } from "~/lib/console";
 import { downloadAsync } from "~/lib/gm";
 import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observable";
-import type { TaskStatus } from "~/lib/progress-types";
+import type { LTProgressHandler, TaskStatus } from "~/lib/progress-types";
 import { by } from "~/lib/sorting";
 import { throwExp } from "~/lib/throw";
 import { formatDateForFilename } from "../date-formats";
 import type { ImageCandidate, TaggedImageMedia, UserTags, VideoVersion } from "../extractors/ig-types";
+import { bestDashVideo, downloadDashVideo } from "../services/best-video-download";
 
+type VideoSources = {
+	versions?: VideoVersion[] | null;
+	dashManifest?: string | null;
+};
 
 type SingleImageMediaArgs = TaggedImageMedia & {
 	owner: string;
@@ -30,13 +35,15 @@ export class SingleImage implements ObservableHost<SingleImage> {
 
 	// Set when this media is a video: the largest progressive MP4 (has audio, usually <= 720p).
 	public readonly videoUrl?: string;
+	private readonly videoSize: number = 0; // larger dimension of videoUrl
+	private readonly dashManifest?: string; // separate higher-quality video + audio tracks
 
 	private readonly filename: string;
 	private readonly largestUrl: string;
 
 	public listen!: ListenFn<SingleImage>;
 
-	constructor(taggedUsers: string[], taggedUserIds: string[], images: ImageCandidate[], owner: string, date: Date, coauthors: string[] = [], videoVersions: VideoVersion[] = []) {
+	constructor(taggedUsers: string[], taggedUserIds: string[], images: ImageCandidate[], owner: string, date: Date, coauthors: string[] = [], video: VideoSources = {}) {
 		this.taggedUsers = taggedUsers;
 		this.taggedUserIds = taggedUserIds;
 		this.coauthors = coauthors;
@@ -53,7 +60,12 @@ export class SingleImage implements ObservableHost<SingleImage> {
 		this.owner = owner;
 		this.date = date;
 
-		this.videoUrl = [...videoVersions].sort(by(({ height }) => height)).pop()?.url;
+		const progressive = [...video.versions ?? []].sort(by(({ height }) => height)).pop();
+		if (progressive) {
+			this.videoUrl = progressive.url;
+			this.videoSize = Math.max(progressive.width, progressive.height);
+			this.dashManifest = video.dashManifest ?? undefined;
+		}
 
 		const ext = this.videoUrl ? ".mp4"
 			: this.smallestUrl.includes(".webp") ? ".webp"
@@ -65,10 +77,11 @@ export class SingleImage implements ObservableHost<SingleImage> {
 		makeObservable(this);
 	}
 
-	static fromMedia({ usertags, image_versions2, video_versions, owner, date = throwExp("date"), coauthors = [] }: SingleImageMediaArgs): SingleImage {
+	static fromMedia({ usertags, image_versions2, video_versions, video_dash_manifest, owner, date = throwExp("date"), coauthors = [] }: SingleImageMediaArgs): SingleImage {
 		const taggedUsers:string[] = SingleImage.parseUserTags(usertags);
 		const taggedUserIds:string[] = SingleImage.parseUserTagIds(usertags);
-		return new SingleImage(taggedUsers, taggedUserIds, image_versions2.candidates, owner, date, coauthors, video_versions ?? []);
+		return new SingleImage(taggedUsers, taggedUserIds, image_versions2.candidates, owner, date, coauthors,
+			{ versions: video_versions, dashManifest: video_dash_manifest });
 	}
 
 	static fromUrlAndOwner(url: string, imageWidth: number, imageHeight: number, owner: string): SingleImage {
@@ -118,16 +131,42 @@ export class SingleImage implements ObservableHost<SingleImage> {
 
 	get isVideo(): boolean { return this.videoUrl !== undefined; }
 
-	// Downloads the video if this is one, otherwise the largest image.
+	// Downloads the video if this is one (best quality, falling back to the progressive MP4),
+	// otherwise the largest image.
 	public async downloadLargestAsync(){
 		this.downloadProgress = {status:'inProgress', loaded:0, total:1};
-		const url = this.videoUrl ?? this.largestUrl;
-		const timeout = this.isVideo ? 5 * 60_000 : undefined; // default 5s is far too short for video
-		await downloadAsync({url, name:this.filename, timeout,
-			onprogress: ({loaded,total}) => this.downloadProgress = {status:'inProgress', loaded, total} }
-		);
+		const onprogress: LTProgressHandler = ({loaded,total}) => this.downloadProgress = {status:'inProgress', loaded, total};
+
+		if (!await this.tryDownloadBestVideoAsync(onprogress)) {
+			const url = this.videoUrl ?? this.largestUrl;
+			const timeout = this.isVideo ? 5 * 60_000 : undefined; // default 5s is far too short for video
+			await downloadAsync({url, name:this.filename, timeout, onprogress});
+		}
 		this.downloadProgress = {status:'complete'};
 		con.print(`downloaded: ${this.filename}`);
+	}
+
+	// Downloads the DASH video + audio tracks and muxes them into one MP4.
+	// Returns false when there is nothing better than the progressive MP4, or anything fails.
+	private async tryDownloadBestVideoAsync(onprogress: LTProgressHandler): Promise<boolean> {
+		if (!this.dashManifest)
+			return false;
+		try {
+			const best = bestDashVideo(this.dashManifest, this.videoSize);
+			if (best == null) {
+				con.print(`video: progressive ${this.videoSize}p is already the best quality`);
+				return false;
+			}
+			const { video, audio } = best;
+			con.print(`video: downloading best quality ${video.width}x${video.height} (${video.label} ${video.codecs})`
+				+ (audio ? ` + audio (${audio.codecs})` : " without audio"));
+			await downloadDashVideo(best, this.filename, onprogress);
+			return true;
+		}
+		catch (err) {
+			con.print(`video: best-quality download failed, falling back to progressive ${this.videoSize}p MP4`, err);
+			return false;
+		}
 	}
 
 }

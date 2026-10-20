@@ -39,6 +39,7 @@ export interface TaggedImageMedia {
 	usertags: UserTags | null;
 	image_versions2: ImageVersions2;
 	video_versions?: VideoVersion[] | null; // progressive (single-file, with audio) MP4s - usually capped at 720p
+	video_dash_manifest?: string | null; // DASH XML with separate video (up to 1440p+) and audio tracks
 }
 
 // For the full-resolution stream, see video_dash_manifest (separate audio/video tracks).
