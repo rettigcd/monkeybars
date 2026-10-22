@@ -2,7 +2,7 @@ import { $ } from "~/lib/dom3";
 import { getAgeColor, getAgeInfo as StdGetAgeInfo, type AgeType, type GetAgeInfoFn } from "../age";
 import { BatchProducerGroup } from "../extractors/batch-producer-group";
 import { PicGroup } from "../models/pic-group";
-import { sanitizeImgUrl } from "../services/image-lookup-by-url";
+import { sanitizeImgUrl } from "../services/img-url";
 import { instaDom } from "../services/instaDom";
 
 type GalleryConstructorArgs = {

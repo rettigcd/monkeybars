@@ -1,7 +1,7 @@
 import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observable";
 import { toMs } from "~/lib/time";
 import type { MediaNode } from "../extractors/ig-types";
-import { sanitizeImgUrl } from "../services/image-lookup-by-url";
+import { sanitizeImgUrl } from "../services/img-url";
 import { videoLookup } from "../services/video-lookup";
 import { SingleImage } from "./single-image";
 

@@ -100,12 +100,6 @@ export class ScreenImageActions {
 		const source = sources[0];
 		const imgUrl = source.src;
 
-		// !!! Add this back in when you restore URL lookup.
-		// const singleImage = iiLookup.getImageFor(imgUrl);
-		// if (singleImage != null) {
-		// 	return { singleImage, imgUrl };
-		// }
-
 		const newMissingStandIn = prompt("Please enter username", this.missingStandIn);
 		if (newMissingStandIn === null) return null;
 
@@ -164,6 +158,9 @@ export class ScreenImageActions {
 		if (await this.tryDownloadVideo(sources))
 			return;
 
+		if (await this.tryDownloadKnownImage(sources))
+			return;
+
 		// A paused video shows a static overlay image (e.g. play button) stacked
 		// on top of the blob video source. Prefer the video in that case.
 		const index = this.isStaticOverlayOnBlobVideo(sources) ? 1 : 0;
@@ -206,6 +203,22 @@ export class ScreenImageActions {
 			return false;
 		}
 		return this.downloadKnownMedia(video);
+	}
+
+	// Image posts we have API data for: the popup's url names the post (and ?img_index= the slide),
+	// otherwise the link around a grid thumb does (its cover is the first slide).
+	// Returns false when the post (or the slide) isn't known.
+	private async tryDownloadKnownImage(sources: SourceUnderPoint[]): Promise<boolean> {
+		if (sources[0].src.startsWith("blob:"))
+			return false;
+
+		const pageCode = codeFromPath(location.pathname);
+		const code = pageCode ?? codeFromPath(sources[0].el.closest("a[href]")?.getAttribute("href"));
+		const imgIndex = pageCode ? Number(new URLSearchParams(location.search).get("img_index")) : 0;
+		const image = videoLookup.getSlide(code, imgIndex > 0 ? imgIndex - 1 : 0);
+		if (image == null || image.isVideo)
+			return false;
+		return this.downloadKnownMedia(image);
 	}
 
 	// Downloads media we have API data for (correct owner, date and best quality). Always returns true.

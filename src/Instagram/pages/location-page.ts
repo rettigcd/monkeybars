@@ -9,7 +9,6 @@ import { InitialLocationPageParser } from "../extractors/location/initial-locati
 import { LocationContent } from "../extractors/location/location-content";
 import { DetailsPopup } from "../extractors/misc/details-popup";
 import type { LocalStorageLocationEntity } from "../local-storage";
-import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { instaDom } from "../services/instaDom";
 import { buildRequestSnooper } from "../services/snoopBuilder";
 import { VideoSniffer } from "../services/video-sniffer";
@@ -34,7 +33,6 @@ type LocationPageConstructor = {
 
 type LocationPageContext = {
 	snoopLog: unknown;
-	iiLookup: ImageLookupByUrl;
 	location: string;
 	locRepo: SyncedPersistentDict<LocalStorageLocationEntity>;
 	gallery: Gallery;
@@ -83,12 +81,8 @@ export class LocationPage {
 		const sidePanel = new SidePanel({ batchProducer });
 		sidePanel.register(hotkeys);
 
-		const iiLookup = new ImageLookupByUrl(batchProducer);
-		iiLookup.on("missingImage", snooper.checkLogForMissingImage);
-
 		const cmd: LocationPageContext = {
 			snoopLog: snooper._loadLog,
-			iiLookup,
 			location: locationKey,
 			locRepo,
 			gallery,

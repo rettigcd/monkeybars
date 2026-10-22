@@ -5,7 +5,6 @@ import type { InstagramWindow } from "../window";
 import { reportLast } from "../age";
 import { buildBatchProducerGroup_ForUser } from "../extractors/batch-producer-group";
 import { userRepo, type LocalStorageUserEntity } from "../local-storage";
-import { ImageLookupByUrl } from "../services/image-lookup-by-url";
 import { instaDom, pageOwnerName } from "../services/instaDom";
 import { buildRequestSnooper } from "../services/snoopBuilder";
 import { makeStatusGroupTree } from "../status-group-tree";
@@ -87,9 +86,6 @@ export class UserPage {
 
 		new UserUpdateService({batchProducer});
 
-		const iiLookup = new ImageLookupByUrl(batchProducer);
-		iiLookup.on("missingImage", snooper.checkLogForMissingImage);
-
 		// === UI stuff ===
 		const gallery = new Gallery({batchProducer, getId: () => instaDom.pageOwnerId});
 
@@ -101,7 +97,6 @@ export class UserPage {
 		this.cmd = win.cmd = {
 			snoopLog: snooper._loadLog,
 			userRepo,
-			iiLookup,
 			page: this,
 			pageOwnerName,
 			pageOwnerCtx,

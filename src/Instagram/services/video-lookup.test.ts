@@ -33,9 +33,14 @@ describe("videoLookup", () => {
 		expect(videoLookup.get("single", { duration: 99 })).toBe(v);
 	});
 
-	it("ignores posts without video", () => {
-		videoLookup.register("photo", [image(1)], false);
+	it("does not treat posts without video as videos, but getSlide finds them", () => {
+		const photo = image(1);
+		videoLookup.register("photo", [photo], false);
 		expect(videoLookup.has("photo")).toBe(false);
+		expect(videoLookup.get("photo")).toBeUndefined();
+		expect(videoLookup.getSlide("photo")).toBe(photo);
+		expect(videoLookup.getSlide("photo", 1)).toBeUndefined();
+		expect(videoLookup.getSlide("unknown")).toBeUndefined();
 	});
 
 	describe("carousel", () => {

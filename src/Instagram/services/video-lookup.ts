@@ -47,19 +47,27 @@ class VideoLookup {
 		return matches.length === 1 ? matches[0] : undefined;
 	}
 
+	// Registers every post, image-only ones too, so getSlide can find them.
 	register(code: string | undefined, slides: SingleImage[], isCarousel: boolean): void {
-		if (code && slides.some(s => s.isVideo))
+		if (code)
 			this.byCode.set(code, { slides, isCarousel });
 	}
 
+	// True when the post is known and contains a video.
 	has(code: string | undefined): boolean {
-		return code !== undefined && this.byCode.has(code);
+		return code !== undefined && (this.byCode.get(code)?.slides.some(s => s.isVideo) ?? false);
+	}
+
+	// Any slide (image or video) of a known post, by 0-based index.
+	getSlide(code: string | undefined, slideIndex = 0): SingleImage | undefined {
+		return code ? this.byCode.get(code)?.slides[slideIndex] : undefined;
 	}
 
 	// For a carousel, only answers when told about the playing video (so a grid thumb,
 	// which shows the cover, isn't silently swapped for one of the carousel's videos).
+	// Posts without a video are not answered here - use getSlide.
 	get(code: string | undefined, playing?: PlayingVideo): SingleImage | undefined {
-		const entry = code ? this.byCode.get(code) : undefined;
+		const entry = code && this.has(code) ? this.byCode.get(code) : undefined;
 		if (entry == null) return undefined;
 		if (!entry.isCarousel) return entry.slides[0];
 		return playing ? pickSlide(entry.slides, playing) : undefined;

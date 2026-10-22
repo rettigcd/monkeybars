@@ -1,6 +1,5 @@
 import { con } from "~/lib/console";
 import { RequestSnooper, type RequestSnooperConfig, type SnoopedWindow } from "~/lib/snoop";
-import { detectPath } from "../prune-hay";
 
 type SnooperLogEntry = {
 	responseText: string;
@@ -8,11 +7,10 @@ type SnooperLogEntry = {
 
 type InstagramSnooper = RequestSnooper & {
 	_loadLog: SnooperLogEntry[];
-	checkLogForMissingImage: (imgUrl: string) => void;
 };
 
 // Creates and configures a RequestSnooper that intercepts network requests.
-// Used to monitor Instagram traffic and help debug or locate missing image data.
+// Used to monitor Instagram traffic.
 export function buildRequestSnooper(win: SnoopedWindow): InstagramSnooper {
 	let showLogMessage = true;
 
@@ -43,44 +41,6 @@ export function buildRequestSnooper(win: SnoopedWindow): InstagramSnooper {
 				"https://graph.instagram.com/logging_client_events",
 			].includes(url.toString()) === false,
 		) as InstagramSnooper;
-
-	snooper.checkLogForMissingImage = (imgUrl: string): void => {
-		const matches = imgUrl.match(/.*?jpg/);
-		if (!matches) {
-			console.debug("missing image:", imgUrl);
-			return;
-		}
-
-		const noQueryUrl = matches[0];
-		const candidateResponses = snooper._loadLog.filter((x) =>
-			x.responseText.includes(noQueryUrl),
-		);
-
-		const details: {
-			imgUrl: string;
-			simpleUrl: string;
-			logMatches: SnooperLogEntry[];
-			cssPath?: string[];
-		} = {
-			imgUrl,
-			simpleUrl: noQueryUrl,
-			logMatches: candidateResponses,
-		};
-
-		if (candidateResponses.length !== 0) {
-			details.cssPath = detectPath(
-				candidateResponses[0].responseText,
-				noQueryUrl,
-			);
-		}
-
-		const css = candidateResponses.length !== 0 ? "color:purple" : "";
-		console.debug(
-			`Missing info - found %c${details.logMatches.length} matches`,
-			css,
-			details,
-		);
-	};
 
 	return snooper;
 }
