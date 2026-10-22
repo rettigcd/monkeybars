@@ -1,11 +1,13 @@
 import { con } from "~/lib/console";
+import { saveBytesToFile } from "~/lib/download";
 import { downloadAsync } from "~/lib/gm";
+import { formatPhotoDate, isJpeg, jpegSize, type KeiblerMetadata, type KeiblerTagValue, rectString, writeJpegMetadata } from "~/lib/keibler-metadata";
 import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observable";
 import type { LTProgressHandler, TaskStatus } from "~/lib/progress-types";
 import { by } from "~/lib/sorting";
 import { throwExp } from "~/lib/throw";
 import { formatDateForFilename } from "../date-formats";
-import type { ImageCandidate, TaggedImageMedia, UserTags, VideoVersion } from "../extractors/ig-types";
+import type { ImageCandidate, TaggedImageMedia, UserTagPosition, UserTags, VideoVersion } from "../extractors/ig-types";
 import { bestDashVideo, downloadDashVideo } from "../services/best-video-download";
 import { parseDashDuration } from "../services/dash-manifest";
 
@@ -27,10 +29,11 @@ export class SingleImage implements ObservableHost<SingleImage> {
 	public readonly taggedUsers: string[]; // public so we can display tagged users in the UI
 	public readonly taggedUserIds: string[]; // pk/id of tagged users - usertags don't always carry a username
 	public readonly coauthors: string[]; // usernames from Instagram's "collab post" coauthor_producers
+	private readonly tagPositions: (UserTagPosition | undefined)[]; // parallel to taggedUsers; [x,y] as 0..1 fractions of the image
 
 	// Questionable public props
 	public readonly smallestUrl: string; // used by PicGroup as sanitizedImgUrl
-	public readonly images: ImageCandidate[]; // used by iiLookup for unknown reason
+	public readonly images: ImageCandidate[];
 
 	public downloadProgress: TaskStatus = { status:'notStarted' }; // observable
 
@@ -45,8 +48,9 @@ export class SingleImage implements ObservableHost<SingleImage> {
 
 	public listen!: ListenFn<SingleImage>;
 
-	constructor(taggedUsers: string[], taggedUserIds: string[], images: ImageCandidate[], owner: string, date: Date, coauthors: string[] = [], video: VideoSources = {}) {
+	constructor(taggedUsers: string[], taggedUserIds: string[], images: ImageCandidate[], owner: string, date: Date, coauthors: string[] = [], video: VideoSources = {}, tagPositions: (UserTagPosition | undefined)[] = []) {
 		this.taggedUsers = taggedUsers;
+		this.tagPositions = tagPositions;
 		this.taggedUserIds = taggedUserIds;
 		this.coauthors = coauthors;
 
@@ -84,7 +88,17 @@ export class SingleImage implements ObservableHost<SingleImage> {
 		const taggedUsers:string[] = SingleImage.parseUserTags(usertags);
 		const taggedUserIds:string[] = SingleImage.parseUserTagIds(usertags);
 		return new SingleImage(taggedUsers, taggedUserIds, image_versions2.candidates, owner, date, coauthors,
-			{ versions: video_versions, dashManifest: video_dash_manifest });
+			{ versions: video_versions, dashManifest: video_dash_manifest }, SingleImage.parseUserTagPositions(usertags));
+	}
+
+	// Same order as parseUserTags (which sorts usertags.in in place).
+	static parseUserTagPositions(usertags: UserTags | undefined | null): (UserTagPosition | undefined)[] {
+		try {
+			return usertags ? usertags.in.map(x => x.position) : [];
+		}
+		catch {
+			return [];
+		}
 	}
 
 	static fromUrlAndOwner(url: string, imageWidth: number, imageHeight: number, owner: string): SingleImage {
@@ -140,13 +154,56 @@ export class SingleImage implements ObservableHost<SingleImage> {
 		this.downloadProgress = {status:'inProgress', loaded:0, total:1};
 		const onprogress: LTProgressHandler = ({loaded,total}) => this.downloadProgress = {status:'inProgress', loaded, total};
 
-		if (!await this.tryDownloadBestVideoAsync(onprogress)) {
+		if (!await this.tryDownloadBestVideoAsync(onprogress) && !await this.tryDownloadJpegWithMetadataAsync()) {
 			const url = this.videoUrl ?? this.largestUrl;
 			const timeout = this.isVideo ? 5 * 60_000 : undefined; // default 5s is far too short for video
 			await downloadAsync({url, name:this.filename, timeout, onprogress});
 		}
 		this.downloadProgress = {status:'complete'};
 		con.print(`downloaded: ${this.filename}`);
+	}
+
+	// Fetches the image, embeds Keibler metadata (owner, tagged users + positions, date) and saves it.
+	// Returns false for non-JPEGs, or if anything fails, so the caller can fall back to a plain download.
+	private async tryDownloadJpegWithMetadataAsync(): Promise<boolean> {
+		if (this.isVideo || !this.filename.endsWith(".jpg"))
+			return false;
+		try {
+			const response = await fetch(this.largestUrl);
+			if (!response.ok)
+				throw new Error(`fetch ${response.status} ${response.statusText}`);
+			const jpeg = new Uint8Array(await response.arrayBuffer());
+			if (!isJpeg(jpeg))
+				return false;
+			saveBytesToFile(writeJpegMetadata(jpeg, this.buildMetadata(jpegSize(jpeg))), this.filename, "image/jpeg");
+			return true;
+		}
+		catch (err) {
+			con.print("image: embedding metadata failed, falling back to plain download", err);
+			return false;
+		}
+	}
+
+	// instagram tag group: owner first (bare string), then each tagged user (10x10 rect around the tag position when known).
+	private buildMetadata(size: { w: number; h: number } | undefined): KeiblerMetadata {
+		const R = 10;
+		const instagram: KeiblerTagValue[] = [this.owner];
+		this.taggedUsers.forEach((user, i) => {
+			const pos = this.tagPositions[i];
+			if (!pos || !size)
+				instagram.push(user);
+			else {
+				const x = Math.max(0, Math.min(size.w - R, Math.round(pos[0] * size.w - R / 2)));
+				const y = Math.max(0, Math.min(size.h - R, Math.round(pos[1] * size.h - R / 2)));
+				instagram.push({ v: user, rect: rectString(x, y, R, R) });
+			}
+		});
+		return {
+			up: 0,
+			tags: { instagram },
+			...size && { imageSize: size },
+			photoDate: formatPhotoDate(this.date),
+		};
 	}
 
 	// Downloads the DASH video + audio tracks and muxes them into one MP4.

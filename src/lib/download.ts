@@ -4,6 +4,15 @@ export type SaveTextParams = {
 	type?: "text/plain" | "application/json";
 }
 
+export function saveBytesToFile(bytes: Uint8Array, filename: string, type: string): void {
+	const url = URL.createObjectURL(new Blob([bytes as BlobPart], {type}));
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = filename;
+	a.click();
+	setTimeout(()=>URL.revokeObjectURL(url), 60_000);
+}
+
 // a.href = "data:text"+text // does not handle '#' so this is safer
 export function saveTextToFile({text,filename,type="text/plain"} : SaveTextParams): void{
 	const url = URL.createObjectURL(new Blob([text], {type})); 
