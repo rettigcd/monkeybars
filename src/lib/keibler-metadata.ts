@@ -55,7 +55,30 @@ export function jpegSize(bytes: Uint8Array): { w: number; h: number } | undefine
 	return undefined;
 }
 
+// Spec §5: tag keys and values must be non-empty and trimmed. Trims them and drops
+// empty (or non-string) values, and drops groups left with no values.
+export function cleanTags(tags: Record<string, KeiblerTagValue[]>): Record<string, KeiblerTagValue[]> {
+	const clean: Record<string, KeiblerTagValue[]> = {};
+	for (const [rawKey, values] of Object.entries(tags)) {
+		const key = rawKey.trim();
+		if (!key)
+			continue;
+		const kept: KeiblerTagValue[] = [];
+		for (const value of values ?? []) {
+			const v = typeof value === "string" ? value : value?.v;
+			if (typeof v !== "string" || !v.trim())
+				continue;
+			kept.push(typeof value === "string" ? v.trim() : { ...value, v: v.trim() });
+		}
+		if (kept.length)
+			(clean[key] ??= []).push(...kept);
+	}
+	return clean;
+}
+
 function buildApp0(meta: KeiblerMetadata): Uint8Array {
+	if (meta.tags)
+		meta = { ...meta, tags: cleanTags(meta.tags) };
 	const json = new TextEncoder().encode(JSON.stringify(meta));
 	const paddedJson = Math.ceil(json.length / PAD_BLOCK) * PAD_BLOCK;
 	const payloadLength = ID.length + paddedJson;

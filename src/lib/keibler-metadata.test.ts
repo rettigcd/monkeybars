@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPhotoDate, jpegSize, type KeiblerMetadata, writeJpegMetadata } from "./keibler-metadata";
+import { formatPhotoDate, jpegSize, type KeiblerMetadata, type KeiblerTagValue, writeJpegMetadata } from "./keibler-metadata";
 
 // SOI, JFIF APP0, SOF0 (h=20,w=30), SOS, data, EOI
 const jfif = [0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 1, 1, 0, 0, 1, 0, 1, 0, 0];
@@ -37,6 +37,13 @@ describe("keibler-metadata", () => {
 		const twice = writeJpegMetadata(once, { up: 0, photoDate: "2020-01-01T00:00:00" });
 		expect(twice.length).toBe(once.length);
 		expect(JSON.parse(keiblerJson(twice))).toEqual({ up: 0, photoDate: "2020-01-01T00:00:00" });
+	});
+
+	it("trims tag keys/values and drops empty or missing ones", () => {
+		const dirty = { " instagram ": [" bob ", "", "   ", undefined, null, { v: " al ", rect: "1,2,10,10" }, { v: "", rect: "0,0,1,1" }, { rect: "0,0,1,1" }],
+			"": ["x"], empty: [""] } as unknown as Record<string, KeiblerTagValue[]>;
+		const out = writeJpegMetadata(jpeg, { up: 0, tags: dirty });
+		expect(JSON.parse(keiblerJson(out))).toEqual({ up: 0, tags: { instagram: ["bob", { v: "al", rect: "1,2,10,10" }] } });
 	});
 
 	it("formats photoDate", () => {
