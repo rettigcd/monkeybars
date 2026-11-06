@@ -24,6 +24,7 @@ import { appendEmployeeAsync, clearEmployees, renderEmployeeTable, renderTermina
 
 declare global {
 	var employeeData: EmployeeDirectory | undefined;
+	var scanNewAsync: () => Promise<void>;
 	var scanEmployeesAsync: (start: number, count?: number) => Promise<void>;
 	var showEmployeesByIdAsync: (ids?: number[] | null) => Promise<void>;
 	var saveEmployees: (ids:number[]) => void;
@@ -69,6 +70,21 @@ async function scanEmployeesAsync(start: number, count = 100): Promise<void> {
 	console.log(`${start} .. ${start + count - 1} complete`);
 }
 
+// Scans employees added since the last scan: from store.maxEmployeeId+1 through the
+// last employee in the directory, then records that last id as the new maxEmployeeId.
+async function scanNewAsync(): Promise<void> {
+	const ids = Object.keys(employeeDirectory()).map(Number).filter(n => !Number.isNaN(n));
+	const last = Math.max(...ids);
+	const start = store.maxEmployeeId + 1;
+	if (last < start) {
+		console.log(`scanNewAsync: no new employees (last scanned ${store.maxEmployeeId}, last in list ${last}).`);
+		return;
+	}
+	await scanEmployeesAsync(start, last - start + 1);
+	store.maxEmployeeId = last;
+	console.log(`scanNewAsync: scanned ${start} .. ${last}; last scanned is now ${last}.`);
+}
+
 function employeeDirectory() : EmployeeDirectory {
 	return globalThis.employeeData || throwExp("No employee data available.");
 }
@@ -112,6 +128,7 @@ function updateTerms(): void {
 
 void (async function (): Promise<void> {
 	globalThis.employeeData = await getEmployeeDictAsync();
+	globalThis.scanNewAsync = scanNewAsync;
 	globalThis.scanEmployeesAsync = scanEmployeesAsync;
 	globalThis.showEmployeesByIdAsync = showEmployeesByIdAsync;
 	globalThis.saveEmployees = saveEmployees;
@@ -120,6 +137,7 @@ void (async function (): Promise<void> {
 	globalThis.groups = groupBy<Employee,string>(Object.values(globalThis.employeeData),x=>x.dept);
 
 	(unsafeWindow as any).cmd = {
+		scanNewAsync,
 		scanEmployeesAsync,
 		showEmployeesByIdAsync,
 		saveEmployees,
@@ -133,6 +151,7 @@ void (async function (): Promise<void> {
 
 	foo("activeIds = [...]");
 	foo("terminatedIds = [...]");
+	foo("cmd.scanNewAsync()");
 	foo("scanEmployeesAsync(start,count=100);");
 	foo("showEmployeesByIdAsync(ids=null);");
 	foo("saveEmployees([...])");
