@@ -1,4 +1,5 @@
 import { $, $q, $qAll, ElementBuilder, loadImgSrcAsync } from "~/lib/dom3";
+import { type KeiblerMetadata, saveImageWithMetadataAsync } from "~/lib/image-metadata";
 import { type Employee } from "./data-source";
 import { downloadImageAsync } from "./download";
 import { savedEmployeeFields, store } from "./store";
@@ -18,6 +19,30 @@ export async function appendEmployeeAsync(employeeId:number, employee?: Employee
 	} catch {
 		// Missing employee photos are expected while scanning IDs.
 	}
+}
+
+// Saves "<First Last>.jpg" with the employee's info embedded as Keibler metadata.
+// Falls back to a plain download (no embedding) if the photo isn't a JPEG or embedding fails.
+async function downloadEmployeeImageAsync(img: HTMLImageElement, emp: Employee): Promise<void> {
+	const name = `${emp.firstName} ${emp.lastName}`.trim();
+	const filename = name.replace(/[\\/:*?"<>|]/g, "_");
+	const url = img.currentSrc || img.src;
+	const meta: KeiblerMetadata = {
+		up: 0,
+		tags: {
+			realname: [name],
+			phone: [emp.mobilePhone ?? ""],
+			location: [emp.location],
+			employeeId: [emp.employeeId],
+		},
+	};
+	try {
+		if (await saveImageWithMetadataAsync(url, `${filename}.jpg`, meta))
+			return;
+	} catch (err) {
+		console.warn("employee image: embedding metadata failed, falling back to plain download", err);
+	}
+	await downloadImageAsync(url, filename);
 }
 
 // Sync part of appendEmployee
@@ -52,7 +77,7 @@ function buildEmployeeCard(employeeId:number, emp?: Employee): {
 	if (emp) {
 		img.on("click", async () => {
 			store.saveEmployee(emp);
-			await downloadImageAsync(img.el);
+			await downloadEmployeeImageAsync(img.el, emp);
 			img.css({opacity:"0.4"});
 		});
 
