@@ -1,7 +1,6 @@
 import { con } from "~/lib/console";
-import { saveBytesToFile } from "~/lib/download";
 import { downloadAsync } from "~/lib/gm";
-import { formatPhotoDate, isJpeg, jpegSize, type KeiblerMetadata, type KeiblerTagValue, rectString, writeJpegMetadata } from "~/lib/keibler-metadata";
+import { formatPhotoDate, type KeiblerMetadata, type KeiblerTagValue, rectString, saveImageWithMetadataAsync } from "~/lib/image-metadata";
 import { type ListenFn, makeObservable, type ObservableHost } from "~/lib/observable";
 import type { LTProgressHandler, TaskStatus } from "~/lib/progress-types";
 import { by } from "~/lib/sorting";
@@ -169,14 +168,7 @@ export class SingleImage implements ObservableHost<SingleImage> {
 		if (this.isVideo || !this.filename.endsWith(".jpg"))
 			return false;
 		try {
-			const response = await fetch(this.largestUrl);
-			if (!response.ok)
-				throw new Error(`fetch ${response.status} ${response.statusText}`);
-			const jpeg = new Uint8Array(await response.arrayBuffer());
-			if (!isJpeg(jpeg))
-				return false;
-			saveBytesToFile(writeJpegMetadata(jpeg, this.buildMetadata(jpegSize(jpeg))), this.filename, "image/jpeg");
-			return true;
+			return await saveImageWithMetadataAsync(this.largestUrl, this.filename, size => this.buildMetadata(size));
 		}
 		catch (err) {
 			con.print("image: embedding metadata failed, falling back to plain download", err);
