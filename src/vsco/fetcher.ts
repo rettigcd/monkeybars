@@ -44,6 +44,7 @@ export class Fetcher {
 	async * fetchGalleryImagesAsync(): AsyncGenerator<ImageModel,void,unknown> {
 		const startingHtml = await this._fetchGalleryPageHtml();
 		const preloadedState = extractPreloadedStateFromHtml(startingHtml);
+		throwIfSiteNotFound(preloadedState);
 
 		const { users:{currentUser:{tkn:token}}, medias:{bySiteId} } = preloadedState;
 		const siteStates = Object.entries(bySiteId);
@@ -92,10 +93,15 @@ export class Fetcher {
 
 	}
 
+	// Throws on 404 (deleted/renamed account) so the caller records a failure
+	// instead of treating it as a user with no new images.
 	private async _fetchGalleryPageHtml(): Promise<string>{
-		return this._useDocumentBody
-			? $q<HTMLBodyElement>('body')!.outerHTML
-			: await (await fetch( this.galleryUrl )).text();
+		if(this._useDocumentBody)
+			return $q<HTMLBodyElement>('body')!.outerHTML;
+		const resp = await fetch( this.galleryUrl );
+		if(resp.status === 404)
+			throw new Error(`${this.username}: gallery page returned 404`);
+		return await resp.text();
 	}
 
 	private async _fetchCollectionPageHtml(pageNum: number): Promise<string>{
@@ -113,9 +119,13 @@ export class Fetcher {
 // called from 2 places
 function getPageImages(html:string): ImageModel[] {
 	let preloadedState = extractPreloadedStateFromHtml(html);
-	if(preloadedState.errorMessage =="site_not_found") { throw new Error("site_not_found"); }
+	throwIfSiteNotFound(preloadedState);
 	let result = extractImagesFromPreloadedState(preloadedState);
 	return result;
+}
+
+function throwIfSiteNotFound(preloadedState: PreloadedState): void {
+	if(preloadedState.errorMessage == "site_not_found") { throw new Error("site_not_found"); }
 }
 
 // returns array of ImageModel objects.
