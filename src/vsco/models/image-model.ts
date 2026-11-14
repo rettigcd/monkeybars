@@ -75,7 +75,6 @@ export class ImageModel extends ObservableBase<ImageModel>{
 	}
 
 	private _onProgress = ({loaded,total}:{loaded:number,total:number}): void => {
-		console.debug( `%cdownloading... ${Math.floor(loaded / total * 100)}%`, 'color:blue;font-size:14px;');
 		this.downloadProgress = { status: 'inProgress', loaded, total};
 	}		
 
