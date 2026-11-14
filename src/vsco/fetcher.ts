@@ -1,7 +1,12 @@
+import { delayAsync } from "~/lib/async";
 import { $q } from "~/lib/dom3";
+import { throwIfBlocked } from "./blocked-error";
 import { byDesc } from "~/lib/sorting";
 import { ImageModel } from "./models/image-model";
 import type { FetchProfileResponse, PreloadedState, PreloadImageEntity } from "./types/vsco-json";
+
+// ms to wait between requests to vsco.co (keeps us under Cloudflare's rate limit)
+export const requestDelay = 300;
 
 export class Fetcher {
 
@@ -62,13 +67,14 @@ export class Fetcher {
 		let nextCursor = siteMedia.nextCursor;
 		while(nextCursor){
 
-			await new Promise(resolve => setTimeout(resolve, 60*1000/150)); // rate-limit - do 200/minute
+			await delayAsync(requestDelay);
 
 			let params = {site_id:siteId,limit:"14",show_only:"0",cursor:nextCursor} as Record<string,string>;
 			let response = await fetch(
 				'https://vsco.co/api/3.0/medias/profile?'+new URLSearchParams(params).toString(),
 				{headers:{"Authorization":"Bearer "+token}}
 			);
+			throwIfBlocked(response);
 
 			let json: FetchProfileResponse = await response.json();
 			let newImgs = json.media
@@ -99,6 +105,7 @@ export class Fetcher {
 		if(this._useDocumentBody)
 			return $q<HTMLBodyElement>('body')!.outerHTML;
 		const resp = await fetch( this.galleryUrl );
+		throwIfBlocked(resp);
 		if(resp.status === 404)
 			throw new Error(`${this.username}: gallery page returned 404`);
 		return await resp.text();
@@ -106,6 +113,7 @@ export class Fetcher {
 
 	private async _fetchCollectionPageHtml(pageNum: number): Promise<string>{
 		const resp = await fetch( this.collectionUrl(pageNum) );
+		throwIfBlocked(resp);
 		return await resp.text();
 	}
 

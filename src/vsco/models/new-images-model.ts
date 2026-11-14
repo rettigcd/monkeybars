@@ -3,6 +3,8 @@ import { con } from "~/lib/console";
 import { type LTProgress, openInTab } from "~/lib/gm";
 import { ObservableBase } from "~/lib/observable";
 import { by, byDesc } from "~/lib/sorting";
+import { BlockedError, reportBlocked } from "../blocked-error";
+import { requestDelay } from "../fetcher";
 import { executePromisesInParallelAsync } from "../parallel";
 import { UserStore } from "../user-store";
 import { UserCtx } from "../user/user-ctx";
@@ -42,15 +44,26 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
 		const toScan:UserCtx[] = this._staleUsers
 			.sort(by(user=>user.viewDateMs))
 			.slice(0,numToScan); // only scan 200 oldest
+		let blocked: BlockedError | undefined; // once set, remaining users are skipped
 		const unexecutedPromiseGenerators = toScan
 			.map(user => async () => {
-				await delayAsync(300);
-				return user.scanForNewImagesAsync();
+				if(blocked) return;
+				await delayAsync(requestDelay);
+				try{
+					await user.scanForNewImagesAsync();
+				} catch(err){
+					if(!(err instanceof BlockedError)) throw err;
+					blocked = err;
+				}
 			});
 
 		try{
 			await executePromisesInParallelAsync( unexecutedPromiseGenerators, 1, this.trackStaleUserProgress );
-			this.scanStaleUsersStatus = {status:"complete"};
+			if(blocked){
+				this.scanStaleUsersStatus = {status:"error", error:blocked.message};
+				reportBlocked(blocked);
+			} else
+				this.scanStaleUsersStatus = {status:"complete"};
 		} catch(err){
 			this.scanStaleUsersStatus = {status:"error", error:String(err) };
 			console.log(err);

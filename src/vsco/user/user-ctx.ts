@@ -4,6 +4,7 @@ import { EventHostBase } from "~/lib/observable";
 import { CachedPersistentArray } from "~/lib/storage";
 import { throwNever } from "~/lib/throw";
 import { DAYS, SECONDS, toMs, YEARS } from "~/lib/time";
+import { BlockedError } from "../blocked-error";
 import { Fetcher } from "../fetcher";
 import { formatDate } from "../format-date";
 import { commonRepo, newImageRepo, userRepo, type LocalStorageUserEntity, type StarType } from "../local-storage";
@@ -255,6 +256,7 @@ export class UserCtx extends EventHostBase<UserCtxEvents> implements ILinkedUser
 
 			new NewImageStore().addNewImagesToUser(this.username,newImages);
 		} catch( error ){
+			if(error instanceof BlockedError) throw error; // Cloudflare blocked us - not this user's fault
 			console.log('Failed to load new images for '+this.username);
 			console.error(error);
 			this._update( info => {

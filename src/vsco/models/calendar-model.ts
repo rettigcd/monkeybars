@@ -1,6 +1,7 @@
 import { HotkeyManager } from "~/lib/hotkey-manager";
 import { type EventHost, makeEventHost, type MyEventSource, ObservableBase } from "~/lib/observable";
 import { groupBy } from "~/lib/sorting";
+import { BlockedError, reportBlocked } from "../blocked-error";
 import { formatDate, type YearStr, type YYYYMM } from "../format-date";
 import { UserCtx } from "../user/user-ctx";
 import { Gallery } from "./gallery-model";
@@ -142,7 +143,10 @@ export class CalendarModel
 
 			this._monthCount = this._sortedMonthKeys.length;
 		} catch( error ){
-			console.log(error);
+			if(error instanceof BlockedError)
+				reportBlocked(error);
+			else
+				console.log(error);
 		} finally {
 			this._sortedMonthKeys.sort();
 			this.isLoading = false;

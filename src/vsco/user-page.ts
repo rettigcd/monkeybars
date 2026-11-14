@@ -1,6 +1,7 @@
 import { con } from "~/lib/console";
 import { $, $qAll, $qAsync2 } from "~/lib/dom3";
 import { HotkeyManager } from "~/lib/hotkey-manager";
+import { BlockedError, reportBlocked } from "./blocked-error";
 import type { LocalStorageUserEntity } from "./local-storage";
 import { CalendarModel } from "./models/calendar-model";
 import { Gallery } from "./models/gallery-model";
@@ -113,7 +114,12 @@ export async function initUserPageAsync(
 			}
 
 			// Scan and show new Images
-			await pageOwnerCtx.scanForNewImagesAsync(); // Sets .viewDate which we NEED
+			try{
+				await pageOwnerCtx.scanForNewImagesAsync(); // Sets .viewDate which we NEED
+			} catch(err){
+				if(!(err instanceof BlockedError)) throw err;
+				reportBlocked(err);
+			}
 			if(0<pageOwnerCtx.newImages.length){
 				const newImagesRow = new GalleryRowModel({ labelText : 'new images', images:pageOwnerCtx.newImages })
 				gallery.rows = [newImagesRow];

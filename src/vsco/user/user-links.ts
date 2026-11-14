@@ -2,6 +2,7 @@ import { by, byDesc, onlyUnique } from "~/lib/sorting";
 import { linkRepo } from "~/vsco/local-storage";
 import { UserCtx } from "~/vsco/user/user-ctx";
 import { pageOwnerName } from "~/vsco/vscoDom";
+import { BlockedError, reportBlocked } from "../blocked-error";
 import { Fetcher } from "../fetcher";
 import { GalleryRowModel } from "../models/gallery-row-model";
 import { ImageModel } from "../models/image-model";
@@ -95,13 +96,22 @@ async function fetchFirstPageOfEachUserAsync(
 	track: (model:ImageModel) => void
 ): Promise<LinkedUserPage[]> {
 	const linkedUserPages: LinkedUserPage[] = [];
+	let blocked: BlockedError | undefined; // once set, remaining users are skipped
 	const threads = users.map( function(user:ILinkedUser){
 		return async () => {
-			const images: ImageModel[] = await new Fetcher(user.username, user.username === pageOwner, track )
-				.fetchFirstPageImages();
-			linkedUserPages.push({ user, images});
+			if(blocked) return;
+			try{
+				const images: ImageModel[] = await new Fetcher(user.username, user.username === pageOwner, track )
+					.fetchFirstPageImages();
+				linkedUserPages.push({ user, images});
+			} catch(err){
+				if(!(err instanceof BlockedError)) throw err;
+				blocked ??= err; // several requests are in flight, keep the first
+			}
 		}
 	});
 	await executePromisesInParallelAsync(threads)
+	if(blocked)
+		reportBlocked(blocked);
 	return linkedUserPages;
 }
