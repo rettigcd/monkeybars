@@ -30,8 +30,10 @@ export class UserStore {
 			.map(username => this.get(username));
 	}
 
-	// Users with FOUND new Images
+	// Users with FOUND new Images.
+	// Re-reads storage first: another tab may have cleared some (visiting a user's page clears theirs).
 	get newImageUsers(): UserCtx[] {
+		newImageRepo.sync();
 		return newImageRepo.keys()
 			.map(username => this.get(username));
 	}

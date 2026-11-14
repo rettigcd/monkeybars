@@ -62,6 +62,12 @@ export class NewImagesModel extends ObservableBase<NewImagesModel> {
 	// takes a batch of new-image users and generates GalleryRows[]
 	// when user hides GalleryRow, they are removed from the cache and globaly
 	public buildImageBatch(): void {
+		// Drop users whose new images were cleared since we cached them (e.g. in another tab).
+		const stillNew = new Set(this._userStore.newImageUsers.map(user => user.username));
+		this._cachedNewImageUsers = this._cachedNewImageUsers
+			.filter(user => stillNew.has(user.username) && user.newImages.length > 0);
+		this.newImageUserCount = this._cachedNewImageUsers.length;
+
 		const pageSize=25,allowOverflow=5;
 		const countOnPage = this._cachedNewImageUsers.length % pageSize; 
 		const take = countOnPage < allowOverflow ? countOnPage + pageSize : countOnPage;
