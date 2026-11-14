@@ -8,6 +8,14 @@ import type { FetchProfileResponse, PreloadedState, PreloadImageEntity } from ".
 // ms to wait between requests to vsco.co (keeps us under Cloudflare's rate limit)
 export const requestDelay = 300;
 
+// User's page doesn't exist (404 or VSCO's site_not_found) - deleted or renamed account.
+export class UserNotFoundError extends Error {
+	constructor(public readonly username: string){
+		super(`404 user ${username} not found`);
+		this.name = "UserNotFoundError";
+	}
+}
+
 export class Fetcher {
 
 	private username: string;
@@ -40,7 +48,7 @@ export class Fetcher {
 	// Gets the 1st page of a user for displaying their images in the linked-user friend list.
 	async fetchFirstPageImages(): Promise<ImageModel[]>{
 		const html = await this._fetchGalleryPageHtml();
-		return getPageImages( html );
+		return getPageImages( html, this.username );
 	}
 
 	// Used by:
@@ -49,7 +57,7 @@ export class Fetcher {
 	async * fetchGalleryImagesAsync(): AsyncGenerator<ImageModel,void,unknown> {
 		const startingHtml = await this._fetchGalleryPageHtml();
 		const preloadedState = extractPreloadedStateFromHtml(startingHtml);
-		throwIfSiteNotFound(preloadedState);
+		throwIfSiteNotFound(preloadedState, this.username);
 
 		const { users:{currentUser:{tkn:token}}, medias:{bySiteId} } = preloadedState;
 		const siteStates = Object.entries(bySiteId);
@@ -107,7 +115,7 @@ export class Fetcher {
 		const resp = await fetch( this.galleryUrl );
 		throwIfBlocked(resp);
 		if(resp.status === 404)
-			throw new Error(`${this.username}: gallery page returned 404`);
+			throw new UserNotFoundError(this.username);
 		return await resp.text();
 	}
 
@@ -119,21 +127,21 @@ export class Fetcher {
 
 	private async _fetchCollectionImagesOnPage(pageNum: number): Promise<ImageModel[]>{
 		const collectionHtml = await this._fetchCollectionPageHtml(pageNum);
-		return getPageImages( collectionHtml );
+		return getPageImages( collectionHtml, this.username );
 	}
 
 }
 
 // called from 2 places
-function getPageImages(html:string): ImageModel[] {
+function getPageImages(html:string, username:string): ImageModel[] {
 	let preloadedState = extractPreloadedStateFromHtml(html);
-	throwIfSiteNotFound(preloadedState);
+	throwIfSiteNotFound(preloadedState, username);
 	let result = extractImagesFromPreloadedState(preloadedState);
 	return result;
 }
 
-function throwIfSiteNotFound(preloadedState: PreloadedState): void {
-	if(preloadedState.errorMessage == "site_not_found") { throw new Error("site_not_found"); }
+function throwIfSiteNotFound(preloadedState: PreloadedState, username: string): void {
+	if(preloadedState.errorMessage == "site_not_found") { throw new UserNotFoundError(username); }
 }
 
 // returns array of ImageModel objects.
