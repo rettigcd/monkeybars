@@ -6,10 +6,6 @@
 // @author       Dean Rettig
 // @match        http*://vsco.co/*
 // @match        http*://vsco.com/*
-// @require      file://C:/[monkeyBarsFolder]/dom.js
-// @require      file://C:/[monkeyBarsFolder]/epoch_time.js
-// @require      file://C:/[monkeyBarsFolder]/observable.js
-// @require      file://C:/[monkeyBarsFolder]/storage.js
 // @require      file://C:/[monkeyBarsFolder]/vsco.user.js
 // @icon64       https://www.google.com/s2/favicons?sz=64&domain=vsco.co
 // @grant        GM_download
