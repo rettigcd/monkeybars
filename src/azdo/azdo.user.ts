@@ -18,6 +18,7 @@ import { setUserStoryFavicon } from "./favicongen/user-story";
 import { watchLocationChange } from "./location-watcher";
 import { cacheRepositoryName, getCachedRepositoryName } from "./repository-cache";
 import { createRepositoryResolver } from "./repository-resolver";
+import { watchTitle } from "./title";
 import { isWorkItemUrl, parseAzureDevOpsUrl } from "./url";
 
 async function getLocationString(){
@@ -59,6 +60,7 @@ async function applyForCurrentLocation(){
 }
 
 (async function(){
+	watchTitle();
 	await applyForCurrentLocation();
 	watchLocationChange(() => void applyForCurrentLocation());
 	con.print("%cAzDo loaded", "background-color:#DFD");
