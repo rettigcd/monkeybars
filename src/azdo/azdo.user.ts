@@ -18,7 +18,8 @@ import { setUserStoryFavicon } from "./favicongen/user-story";
 import { watchLocationChange } from "./location-watcher";
 import { cacheRepositoryName, getCachedRepositoryName } from "./repository-cache";
 import { createRepositoryResolver } from "./repository-resolver";
-import { watchTitle } from "./title";
+import { setFeatureFavicon } from "./favicongen/feature";
+import { isFeatureTitle, watchTitle } from "./title";
 import { isWorkItemUrl, parseAzureDevOpsUrl } from "./url";
 
 async function getLocationString(){
@@ -49,10 +50,20 @@ async function getLocationString(){
 	}
 }
 
+let workItemIcon: "feature" | "story" | null = null;
+
+function setWorkItemFavicon(){
+	const kind = isFeatureTitle(document.title) ? "feature" : "story";
+	if (kind === workItemIcon) return;
+	workItemIcon = kind;
+	if (kind === "feature") setFeatureFavicon(); else setUserStoryFavicon();
+}
+
 async function applyForCurrentLocation(){
 	if (isWorkItemUrl(window.location.href)) {
-		setUserStoryFavicon();
+		setWorkItemFavicon();
 	} else {
+		workItemIcon = null;
 		const locationStr = await getLocationString();
 		if(locationStr != null)
 			setFavicon(locationStr);
@@ -60,7 +71,9 @@ async function applyForCurrentLocation(){
 }
 
 (async function(){
-	watchTitle();
+	watchTitle(() => {
+		if (isWorkItemUrl(window.location.href)) setWorkItemFavicon();
+	});
 	await applyForCurrentLocation();
 	watchLocationChange(() => void applyForCurrentLocation());
 	con.print("%cAzDo loaded", "background-color:#DFD");
