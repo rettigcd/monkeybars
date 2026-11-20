@@ -19,7 +19,7 @@ import { watchLocationChange } from "./location-watcher";
 import { cacheRepositoryName, getCachedRepositoryName } from "./repository-cache";
 import { createRepositoryResolver } from "./repository-resolver";
 import { setFeatureFavicon } from "./favicongen/feature";
-import { isFeatureTitle, watchTitle } from "./title";
+import { isFeatureWorkItem, watchTitle } from "./title";
 import { isWorkItemUrl, parseAzureDevOpsUrl } from "./url";
 
 async function getLocationString(){
@@ -53,7 +53,7 @@ async function getLocationString(){
 let workItemIcon: "feature" | "story" | null = null;
 
 function setWorkItemFavicon(){
-	const kind = isFeatureTitle(document.title) ? "feature" : "story";
+	const kind = isFeatureWorkItem() ? "feature" : "story";
 	if (kind === workItemIcon) return;
 	workItemIcon = kind;
 	if (kind === "feature") setFeatureFavicon(); else setUserStoryFavicon();

@@ -1,21 +1,29 @@
 // Azure DevOps titles work item pages "User Story 12345: Story title - Boards".
-// Drop the "User Story " prefix so the tab starts with the number.
-const userStoryPrefix = /^User Story (?=\d)/;
+// Drop the "User Story " / "Feature " prefix so the tab starts with the number.
+const typePrefix = /^(User Story|Feature) (?=\d)/;
 
-export function stripUserStoryPrefix(title: string): string {
-	return title.replace(userStoryPrefix, "");
+export function stripTypePrefix(title: string): string {
+	return title.replace(typePrefix, "");
 }
 
-export function isFeatureTitle(title: string): boolean {
-	return /^Feature \d/.test(title);
+// Stripping removes the type from the title, so remember it for the favicon.
+let currentIsFeature = false;
+
+export function isFeatureWorkItem(): boolean {
+	return currentIsFeature;
 }
 
 let onTitleChange: (() => void) | undefined;
 
 function fixTitle() {
-	const fixed = stripUserStoryPrefix(document.title);
-	if (fixed !== document.title)
-		document.title = fixed;
+	const title = document.title;
+	const match = typePrefix.exec(title);
+	if (match) {
+		currentIsFeature = match[1] === "Feature";
+		document.title = stripTypePrefix(title);
+	} else if (!/^\d+:/.test(title)) {
+		currentIsFeature = false; // not a (stripped) work item title
+	}
 	onTitleChange?.();
 }
 
